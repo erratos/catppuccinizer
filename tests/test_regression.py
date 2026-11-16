@@ -99,10 +99,10 @@ term_palette: 000000;aa0000;00aa00;aa5500;0000aa;aa00aa;00aaaa;aaaaaa
 # ------------------------------------------------------------------- hashing
 def digest(path, tmp):
     if path.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
-        im = Image.open(path)
-        h = hashlib.sha256(f"{im.size}".encode())
-        for fr in ImageSequence.Iterator(im):
-            h.update(fr.convert("RGBA").tobytes())
+        with Image.open(path) as im:
+            h = hashlib.sha256(f"{im.size}".encode())
+            for fr in ImageSequence.Iterator(im):
+                h.update(fr.convert("RGBA").tobytes())
         return h.hexdigest()[:16]
     data = path.read_bytes()
     if path.suffix.lower() == ".svgz":

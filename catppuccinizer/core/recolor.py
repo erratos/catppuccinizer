@@ -1,38 +1,26 @@
-"""Image target: recolour wallpapers and other pictures.
+"""Recolouring.
 
-Two methods:
-- keys: the Plymouth method (source colours + intensity over a background);
-  best for flat art (line art, logos, neon on a plain background). Supports
-  --map and "accent".
-- lut:  a colour look-up table that pulls every colour towards the Catppuccin
-  palette in Oklab, keeping part of the original lightness; for photos,
-  paintings and gradients.
-"auto" picks keys when the source colours explain the image well.
+- keys: each pixel ~ background + t * (source colour - background); rebuilt as
+  base + t * (target - base). Exact for flat art, keeps anti-aliasing and alpha.
+- lut:  a 33^3 colour look-up table in Oklab (neutral ramp for lightness,
+  nearest accents for hue), for photos and soft gradients.
+- plan(): picks the method for an image ("auto"), applies --map, prints it.
 """
 from functools import lru_cache
-from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-from . import ROOT
-from .colours import apply_maps, detect_group, load_rgba, recolor_image
-from .palette import ACCENTS, FLAVOR_TITLES, PALETTES, hex2rgb, oklab_to_srgb, rgb, srgb_to_oklab
+from .detect import detect_group, load_rgba
+from .mapping import apply_maps, print_colours, uses_accent
+from .palette import ACCENTS, PALETTES, hex2rgb, oklab_to_srgb, rgb, srgb_to_oklab
 
-EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".qoi"}
 FIT_THRESHOLD = 6.0          # mean error (0..255) on content pixels under which "keys" is chosen
 CHROMA_REF = 0.10           # lut: Oklab chroma at which a colour fully takes its accent
 NEUTRALS = ["crust", "mantle", "base", "surface0", "surface1", "surface2", "overlay0",
             "overlay1", "overlay2", "subtext0", "subtext1", "text"]
 MIN_BG_SHARE = 0.35          # ... and the plain background must cover at least this share
 MIN_SHARPNESS = 0.08         # ... and edges must be crisp (blurred blobs/gradients -> lut)
-
-
-def add_arguments(p):
-    p.add_argument("images", nargs="+", metavar="IMAGE", help="image file(s) or folder(s)")
-    add_method_arguments(p)
-    p.add_argument("-s", "--suffix", default="", help="extra suffix for the file names")
-    p.set_defaults(out_default=ROOT / "wallpapers", default_accent=["mauve"])
 
 
 def add_method_arguments(p):
@@ -44,16 +32,39 @@ def add_method_arguments(p):
                    help="lut: blend radius in Oklab; smaller = purer palette colours (default: 0.08)")
 
 
-def collect(paths):
-    files = []
-    for p in map(Path, paths):
-        if p.is_dir():
-            files += sorted(f for f in p.rglob("*") if f.suffix.lower() in EXTS)
-        elif p.is_file():
-            files.append(p)
-        else:
-            raise SystemExit(f"Not found: {p}")
-    return files
+# ---------------------------------------------------------------------- keys
+def recolor_image(path, src_bg, keys, targets, base):
+    """Each pixel ~ bg + t * (key - bg): find the key and intensity t that explain
+    it best, then rebuild it as base + t * (target - base). Alpha is kept."""
+    px, alpha = load_rgba(path)
+    flat = px.reshape(-1, 3) - src_bg
+    k = keys - src_bg
+    t = np.clip((flat @ k.T) / np.maximum((k ** 2).sum(1), 1e-6), 0, 1)       # (N, K)
+    if len(keys) == 1 and alpha is None:
+        # single colour: indexed PNG whose palette is the exact base -> target ramp
+        idx = np.round(t[:, 0] * 255).astype(np.uint8).reshape(px.shape[:2])
+        ramp = np.arange(256, dtype=np.float32)[:, None] / 255
+        pal = np.clip(base + ramp * (targets[0] - base) + 0.5, 0, 255).astype(np.uint8)
+        im = Image.fromarray(idx, "P")
+        im.putpalette(pal.flatten().tolist())
+        return im
+    if len(keys) == 1:
+        best = np.zeros(len(flat), int)
+    else:
+        best = (((flat[:, None, :] - t[..., None] * k[None]) ** 2).sum(-1)).argmin(1)
+    tb = t[np.arange(len(flat)), best][:, None]
+    out = np.clip((base + tb * (targets[best] - base)).reshape(px.shape) + 0.5, 0, 255)
+    if alpha is not None:
+        rgba = np.dstack([out, alpha]).astype(np.uint8)
+        return Image.fromarray(rgba, "RGBA")
+    im = Image.fromarray(out.astype(np.uint8), "RGB")
+    return im.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+
+
+def recolor_job(args):
+    """Pool-friendly: (path, dst, src_bg, keys, targets, base) -> saved image."""
+    path, dst, src_bg, keys, targets, base = args
+    recolor_image(path, src_bg, keys, targets, base).save(dst, optimize=True)
 
 
 # ---------------------------------------------------------------- analysis
@@ -155,7 +166,7 @@ def recolor_lut(path, flavor, smooth, keep_lum):
 
 
 # --------------------------------------------------------------------- API
-def plan_image(path, a, verbose=True):
+def plan(path, a, verbose=True):
     """Return (method, group config or None) for one image."""
     grp, err, bg_share, sharp = None, None, None, None
     if a.method in ("auto", "keys"):
@@ -175,8 +186,7 @@ def plan_image(path, a, verbose=True):
         if method == "keys":
             bg = "transparent" if grp["transparent"] else f"background {grp['background']}"
             print(f"  {bg}")
-            for n, c in grp["colors"].items():
-                print(f"    {n:10s} {c['source']} -> {c['target']}  ({c['share'] * 100:.0f}%)")
+            print_colours(grp["colors"])
     return method, grp
 
 
@@ -189,11 +199,11 @@ def render(path, method, grp, flavor, accent, a):
     return recolor_image(path, hex2rgb(grp["background"]), keys, targets, rgb(flavor, "base"))
 
 
-def uses_accent(method, grp):
-    return method == "keys" and any(c["target"] == "accent" for c in grp["colors"].values())
+def method_uses_accent(method, grp):
+    return method == "keys" and uses_accent(grp["colors"])
 
 
-def save(im, dst, method, src):
+def save_image(im, dst, method, src):
     ext = src.suffix.lower()
     if method == "lut" and ext in (".jpg", ".jpeg", ".webp") and im.mode == "RGB":
         dst = dst.with_suffix(ext)
@@ -216,25 +226,3 @@ def side_by_side(src, im, out):
     sheet.paste(before, (0, 0))
     sheet.paste(after.resize(before.size), (before.width + 8, 0))
     sheet.save(out)
-
-
-def run(a):
-    files = collect(a.images)
-    if not files:
-        raise SystemExit("No images found")
-    a.out.mkdir(parents=True, exist_ok=True)
-    a.strict_map = len(files) == 1      # with several images, a name may exist in only some
-    for path in files:
-        method, grp = plan_image(path, a)
-        accents = a.accent if uses_accent(method, grp) else [None]
-        for flv in a.flavor:
-            for acc in accents:
-                name = "-".join(x for x in (path.stem, "catppuccin", flv, acc, a.suffix) if x)
-                im = render(path, method, grp, flv, acc, a)
-                if a.preview:
-                    (a.out / "previews").mkdir(exist_ok=True)
-                    dst = a.out / "previews" / f"{name}.png"
-                    side_by_side(path, im, dst)
-                else:
-                    dst = save(im, a.out / name, method, path)
-                print(f"  -> {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + acc if acc else ''})")

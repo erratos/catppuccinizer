@@ -15,9 +15,10 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from . import ROOT
-from . import image as img
-from .palette import FLAVOR_TITLES, PALETTES
+from ..core import recolor
+from ..core.palette import FLAVOR_TITLES, PALETTES
+from ..core.paths import give_back
+from ..core.target import Target
 
 BEGIN = "# >>> catppuccinizer"
 END = "# <<< catppuccinizer"
@@ -30,12 +31,27 @@ KEYS = ["backdrop", "term_palette", "term_palette_bright",
         "interface_help_color", "interface_help_colour_bright", "interface_help_color_bright"]
 
 
+class LimineTarget(Target):
+    name = "limine"
+    help = "Catppuccin colours + wallpaper for the Limine boot menu"
+    default_accent = ("mauve",)
+
+    def add_arguments(self, p):
+        add_arguments(p)
+
+    def check(self, a):
+        check_args(a)
+
+    def run(self, a):
+        run(a)
+
+
 def add_arguments(p):
     p.add_argument("--wallpaper", type=Path, metavar="IMAGE",
                    help="image to recolour and use as the Limine wallpaper")
     p.add_argument("--recolor-wallpaper", action="store_true",
                    help="recolour the wallpaper(s) already set in limine.conf")
-    img.add_method_arguments(p)
+    recolor.add_method_arguments(p)
     p.add_argument("--style", choices=["stretched", "centered", "tiled"],
                    help="wallpaper_style (default: the current one, or stretched)")
     p.add_argument("--apply", action="store_true",
@@ -44,7 +60,6 @@ def add_arguments(p):
     p.add_argument("--conf", type=Path, help="limine.conf to edit (default: searched on the ESP)")
     p.add_argument("--esp", type=Path,
                    help="ESP mount point (default: ESP_PATH of /etc/default/limine, or /boot)")
-    p.set_defaults(out_default=ROOT / "themes", default_accent=["mauve"])
 
 
 def check_args(a):
@@ -203,12 +218,12 @@ def run(a):
             dst.mkdir(parents=True, exist_ok=True)
             wall_files = []
             for k, src in enumerate(sources):
-                method, grp = img.plan_image(src, a)
-                im = img.render(src, method, grp, flv, acc, a)
+                method, grp = recolor.plan(src, a)
+                im = recolor.render(src, method, grp, flv, acc, a)
                 stem = f"wallpaper-{flv}-{acc}" + (f"-{k + 1}" if len(sources) > 1 else "")
                 if a.preview:
-                    img.side_by_side(src, im, dst / f"preview-{stem}.png")
-                wall_files.append(img.save(im.convert("RGB"), dst / stem, method, src))
+                    recolor.side_by_side(src, im, dst / f"preview-{stem}.png")
+                wall_files.append(recolor.save_image(im.convert("RGB"), dst / stem, method, src))
             wall_refs = [f"boot():/{WALL_DIR}/{f.name}" for f in wall_files]
             lines = theme_lines(flv, acc, wall_refs, style,
                                 over_wallpaper=bool(current) and not wall_files)
@@ -221,8 +236,7 @@ def run(a):
                       + (f", copy {', '.join(f.name for f in wall_files)} to <ESP>/{WALL_DIR}/"
                          if wall_files else "")
                       + ", or rerun with --apply (sudo)")
-    if os.geteuid() == 0 and a.out.is_relative_to(ROOT) and a.out.exists():
-        # files written as root in the user's checkout: give them back
-        uid, gid = ROOT.stat().st_uid, ROOT.stat().st_gid
-        for p in [a.out, *a.out.rglob("*")]:
-            os.chown(p, uid, gid)
+    give_back(a.out)      # files written under sudo belong to the invoking user
+
+
+TARGET = LimineTarget()

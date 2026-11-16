@@ -18,23 +18,27 @@ shading and transparency are preserved.
 
 ## Quick start
 
-Requires Python 3.11+ with `numpy` and `Pillow`, and `git`.
+Requires Python 3.11+ with `numpy` and `Pillow`, and `git` (for adi1090x themes).
 
 ```bash
-git clone https://github.com/erratos/catppuccinizer.git
-cd catppuccinizer
-./catppuccinize plymouth /usr/share/plymouth/themes/spinner -a mauve   # a theme you have
-./catppuccinize plymouth rings_2           # an adi1090x theme (fetched on demand)
-./install.sh catppuccin-mocha-rings-2      # install + rebuild the initramfs
+pipx install git+https://github.com/erratos/catppuccinizer.git   # or: pip install --user …
+```
 
-./catppuccinize image ~/Pictures/wall.jpg -f macchiato          # -> wallpapers/
-./catppuccinize limine -a mauve --wallpaper ~/Pictures/wall.jpg # -> themes/limine-…
-./catppuccinize ksplash org.kde.breeze.desktop -a mauve --test  # KDE splash screen
+or run it from a clone, without installing: `./catppuccinize …` in the repository.
+
+```bash
+catppuccinize plymouth rings_2 -a mauve --test      # an adi1090x theme, shown without rebooting
+catppuccinize plymouth rings_2 -a mauve --install   # install + rebuild the initramfs
+catppuccinize plymouth /usr/share/plymouth/themes/spinner -a mauve   # a theme you have
+
+catppuccinize image ~/Pictures/wall.jpg -f macchiato          # -> ./wallpapers/
+catppuccinize limine -a mauve --recolor-wallpaper             # -> ./themes/limine-…
+catppuccinize ksplash org.kde.breeze.desktop -a mauve --test  # KDE splash screen
 ```
 
 Every target shares `-f/--flavor`, `-a/--accent`, `-m/--map`, `--preview` and
-`-o/--out`; see `./catppuccinize <target> --help`. (`generate.py` is kept as an
-alias of `catppuccinize plymouth`.)
+`-o/--out` (outputs go to `./themes/` or `./wallpapers/` by default); see
+`catppuccinize <target> --help`.
 
 Prebuilt **hexa_retro** and **infinite_seal** (Mocha) themes are also available
 from the [Releases](../../releases), see [Example themes](#example-themes).
@@ -112,7 +116,7 @@ rewritten too.
 
 ### Example themes
 
-These two are hand-tuned (see `configs/`) and published prebuilt in the
+These two are hand-tuned (their configs ship with the tool) and published prebuilt in the
 [Releases](../../releases), in Mocha.
 
 | hexa_retro | infinite_seal (mauve) |
@@ -151,7 +155,7 @@ rewritten for the new theme name. Themes using `UseFirmwareBackground=true`
 ### Colour detection
 
 The first time a theme is used, its colours are detected and saved to
-`configs/<theme>.toml`, **per group of images**: each numbered sequence
+`~/.config/catppuccinizer/plymouth/<theme>.toml`, **per group of images**: each numbered sequence
 (`animation-*`, `throbber-*`, `progress-*`…) and `ui` for the single images.
 
 - a sequence with **a single colour** (white, cyan, orange…) is mapped to
@@ -172,7 +176,8 @@ group (`ui.white`), or a `#rrggbb` source colour:
 ./catppuccinize plymouth rings_2 -m '#32bcff=sky' --preview               # quick before/after image
 ```
 
-`-m` applies to one run; edit `configs/<theme>.toml` for a permanent change.
+`-m` applies to one run; edit `~/.config/catppuccinizer/plymouth/<theme>.toml`
+for a permanent change (it overrides the defaults shipped with the tool).
 Targets can be any Catppuccin colour (the 14 accents, `text`, `subtext1/0`,
 `overlay2/1/0`, `surface2/1/0`, `base`, `mantle`, `crust`) or `accent`.
 
@@ -192,6 +197,9 @@ Targets can be any Catppuccin colour (the 14 accents, `text`, `subtext1/0`,
 | `--list` | | list upstream themes (`[config]` = has a config) |
 | `-o, --out` | `themes/` | output folder |
 | `--src` | | local `adi1090x/plymouth-themes` checkout instead of fetching |
+| `--test [S]` | `10` | show the result for S seconds without rebooting (always quits Plymouth, restores your default theme) |
+| `--install` | | install the result (its `-status` variant if any) and rebuild the initramfs |
+| `--boot-delay S\|off` | | keep the splash up to 15 s longer at boot, to actually see it on fast machines |
 
 Output names: `catppuccin-<flavor>-<theme>[-<accent>][-<suffix>]`.
 
@@ -210,13 +218,8 @@ password prompts and messages.
 
 ### Installation
 
-From the repository:
-
-```bash
-./install.sh catppuccin-mocha-hexa-retro-status
-```
-
-From a release archive:
+`--install` copies the theme to `/usr/share/plymouth/themes/`, sets it as default
+and rebuilds the initramfs (it asks for sudo). From a release archive:
 
 ```bash
 tar xf catppuccin-mocha-infinite-seal-mauve.tar.gz
@@ -353,17 +356,25 @@ containing only the splash screen. `--test` shows it in a window with
 `~/.local/share/plasma/look-and-feel/` and selects it (or pick it in *System
 Settings → Colours & Themes → Splash Screen*).
 
-## Tools
+## Architecture
 
-| Script | What it does |
-|---|---|
-| `catppuccinize` | The tool: `plymouth`, `image`, `limine` and `ksplash` targets (code in `catppuccinizer/`). |
-| `generate.py` | Alias of `catppuccinize plymouth`. |
-| `configs/*.toml` | Colour mappings per theme and image group (hand-tuned for the example themes, auto-created for others). |
-| `extras.script` | Plymouth script code appended to the `-status` variants. |
-| `install.sh <name\|folder>` | Installs a theme, sets it as default and rebuilds the initramfs. |
-| `preview.sh [theme] [seconds]` | Shows a theme without rebooting, with simulated service messages. Always quits Plymouth at the end, even after Ctrl+C, and restores your previous default theme. Run it from a text console (Ctrl+Alt+F3) if nothing appears. |
-| `boot-delay.sh <seconds\|off>` | Keeps the splash up to 15 s longer at boot, handy on fast machines to actually see the theme. Remember to turn it `off`. |
+```
+catppuccinizer/
+  core/        palette (+ Oklab), detect, recolor (keys / LUT / auto), mapping (--map,
+               colour lists), formats (QML/SVG colours, GIF), paths, target (interface)
+  targets/     plymouth/  image.py  limine.py  ksplash.py
+tests/         regression (golden outputs) + architecture rules
+```
+
+- a **target** is a subcommand; it uses only `catppuccinizer.core`, never another
+  target (checked by `tests/test_architecture.py`);
+- built-in targets are found automatically; other packages can add targets
+  through the `catppuccinizer.targets` entry point, without touching this repo;
+- `python3 -m unittest discover -s tests` checks that every target still
+  produces exactly the same files.
+
+See [docs/architecture.md](docs/architecture.md) for the core API and how to
+write a new target.
 
 ## How it works
 

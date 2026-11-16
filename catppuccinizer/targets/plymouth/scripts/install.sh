@@ -7,11 +7,10 @@ set -euo pipefail
 [[ $EUID -eq 0 ]] || exec sudo "$0" "$@"
 
 arg="${1:?Usage: $0 <theme-name | path/to/theme-folder>}"
-here="$(dirname "$(readlink -f "$0")")"
 if [[ -d "$arg" ]]; then
     src="$(readlink -f "$arg")"
 else
-    src="$here/themes/$arg"
+    src="$PWD/themes/$arg"
 fi
 name="$(basename "$src")"
 [[ -f "$src/$name.plymouth" ]] || { echo "Theme not found: $src" >&2; exit 1; }

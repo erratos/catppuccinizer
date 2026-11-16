@@ -14,7 +14,6 @@
 set -u
 [[ $EUID -eq 0 ]] || exec sudo "$0" "$@"
 
-here="$(dirname "$(readlink -f "$0")")"
 prev="$(plymouth-set-default-theme)"
 arg="${1:-$prev}"
 dur="${2:-10}"
@@ -22,7 +21,7 @@ dur="${2:-10}"
 if [[ -d "$arg" ]]; then
     src="$(readlink -f "$arg")"
 else
-    src="$here/themes/$arg"
+    src="$PWD/themes/$arg"
 fi
 theme="$(basename "$src")"
 dest="/usr/share/plymouth/themes/$theme"

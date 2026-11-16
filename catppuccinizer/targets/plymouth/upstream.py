@@ -2,9 +2,9 @@
 import subprocess
 from pathlib import Path
 
-from . import ROOT
+from ...core.paths import cache_dir
 
-UPSTREAM = ROOT / "upstream/plymouth-themes"
+UPSTREAM = cache_dir() / "plymouth-themes"
 UPSTREAM_REPO = "https://github.com/adi1090x/plymouth-themes.git"
 
 
@@ -17,7 +17,7 @@ def ensure_clone():
     if (UPSTREAM / ".git").exists():
         return
     print(f"Fetching {UPSTREAM_REPO} ...", flush=True)
-    UPSTREAM.parent.mkdir(exist_ok=True)
+    UPSTREAM.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse",
                     UPSTREAM_REPO, str(UPSTREAM)], check=True)
 

@@ -1,12 +1,11 @@
-"""Colour detection and recolouring, shared by every target."""
+"""Colour detection: background, source colours (clustered by hue) and their
+automatic Catppuccin targets."""
 import colorsys
-import re
 
 import numpy as np
 from PIL import Image
 
-from .palette import (ACCENTS, AUTO_HUE_TARGETS, TARGETS, colour_name, hex2rgb, hue_dist,
-                      hue_of, rgb, rgb2hex)
+from .palette import AUTO_HUE_TARGETS, colour_name, hex2rgb, hue_dist, hue_of, rgb, rgb2hex
 
 UI_GROUP = "ui"
 
@@ -146,69 +145,3 @@ def auto_targets(colors, single_to_accent=True):
             used.add(t)
     for _, name, t in sorted(pairs):            # more colours than targets: reuse
         colors[name].setdefault("target", t)
-
-
-def apply_maps(cfg, maps, strict=True):
-    """Apply NAME=TARGET overrides; unknown names fail when strict, else are skipped."""
-    groups = cfg["groups"]
-    for m in maps:
-        if "=" not in m:
-            raise SystemExit(f"--map expects NAME=TARGET, got '{m}'")
-        k, t = (s.strip() for s in m.split("=", 1))
-        if t not in TARGETS:
-            raise SystemExit(f"--map {m}: unknown target '{t}' (choose from: {', '.join(TARGETS)})")
-        gname, _, k2 = k.rpartition(".") if "." in k and k.split(".")[0] in groups else ("", "", k)
-        scope = {gname: groups[gname]} if gname else groups
-        hit = False
-        for grp in scope.values():
-            if k2 in grp["colors"]:
-                grp["colors"][k2]["target"], hit = t, True
-            elif re.fullmatch(r"#?[0-9a-fA-F]{6}", k2):
-                hx = "#" + k2.lstrip("#").lower()
-                for c in grp["colors"].values():
-                    if c["source"] == hx:
-                        c["target"], hit = t, True
-        if not hit and re.fullmatch(r"#?[0-9a-fA-F]{6}", k2):
-            hx = "#" + k2.lstrip("#").lower()      # new source colour in the first group
-            next(iter(scope.values()))["colors"][hx] = {"source": hx, "target": t}
-            hit = True
-        if not hit and not strict:
-            continue
-        if not hit:
-            have = sorted({f"{g}.{n}" for g, grp in groups.items() for n in grp["colors"]})
-            raise SystemExit(f"--map {m}: no colour named '{k}' "
-                             f"(have: {', '.join(have)}; or use a #rrggbb source)")
-
-
-# --------------------------------------------------------------- recolouring
-def recolor_image(path, src_bg, keys, targets, base):
-    """Each pixel ~ bg + t * (key - bg): find the key and intensity t that explain
-    it best, then rebuild it as base + t * (target - base). Alpha is kept."""
-    px, alpha = load_rgba(path)
-    flat = px.reshape(-1, 3) - src_bg
-    k = keys - src_bg
-    t = np.clip((flat @ k.T) / np.maximum((k ** 2).sum(1), 1e-6), 0, 1)       # (N, K)
-    if len(keys) == 1 and alpha is None:
-        # single colour: indexed PNG whose palette is the exact base -> target ramp
-        idx = np.round(t[:, 0] * 255).astype(np.uint8).reshape(px.shape[:2])
-        ramp = np.arange(256, dtype=np.float32)[:, None] / 255
-        pal = np.clip(base + ramp * (targets[0] - base) + 0.5, 0, 255).astype(np.uint8)
-        im = Image.fromarray(idx, "P")
-        im.putpalette(pal.flatten().tolist())
-        return im
-    if len(keys) == 1:
-        best = np.zeros(len(flat), int)
-    else:
-        best = (((flat[:, None, :] - t[..., None] * k[None]) ** 2).sum(-1)).argmin(1)
-    tb = t[np.arange(len(flat)), best][:, None]
-    out = np.clip((base + tb * (targets[best] - base)).reshape(px.shape) + 0.5, 0, 255)
-    if alpha is not None:
-        rgba = np.dstack([out, alpha]).astype(np.uint8)
-        return Image.fromarray(rgba, "RGBA")
-    im = Image.fromarray(out.astype(np.uint8), "RGB")
-    return im.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-
-
-def _job(args):
-    path, dst, src_bg, keys, targets, base = args
-    recolor_image(path, src_bg, keys, targets, base).save(dst, optimize=True)

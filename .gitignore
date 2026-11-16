@@ -3,3 +3,5 @@ upstream/
 dist/
 __pycache__/
 wallpapers/
+build/
+*.egg-info/

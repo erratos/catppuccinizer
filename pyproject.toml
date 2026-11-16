@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "catppuccinizer"
+dynamic = ["version"]
+description = "Recolour boot themes, wallpapers and more with Catppuccin"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.11"
+dependencies = ["numpy", "Pillow"]
+
+[project.urls]
+Homepage = "https://github.com/erratos/catppuccinizer"
+
+[project.scripts]
+catppuccinize = "catppuccinizer.cli:main"
+
+# Built-in targets are found without entry points; other packages can add
+# their own targets here, e.g.:
+# [project.entry-points."catppuccinizer.targets"]
+# grub = "my_package.grub:TARGET"
+
+[tool.setuptools.dynamic]
+version = { attr = "catppuccinizer.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["catppuccinizer*"]
+
+[tool.setuptools.package-data]
+"catppuccinizer.targets.plymouth" = ["configs/*.toml", "extras.script", "scripts/*.sh"]

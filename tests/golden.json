@@ -1,7 +1,7 @@
 {
  "configs": {
-  "glow_mini.toml": "87f082138dfdbc29",
-  "hexa_mini.toml": "6f102e0e53d4157b"
+  "plymouth/glow_mini.toml": "87f082138dfdbc29",
+  "plymouth/hexa_mini.toml": "6f102e0e53d4157b"
  },
  "image": {
   "blobs-catppuccin-frappe.png": "243ea686e79fdac4",

@@ -1,7 +1,15 @@
-"""Plymouth target: recolour any Plymouth theme folder or adi1090x theme."""
+"""Plymouth target: recolour any Plymouth theme folder (script, two-step,
+fade-throbber, ...) or any of the 80 adi1090x themes, fetched by name.
+
+Colours are detected per group of images (each numbered sequence, plus "ui"
+for single images) and saved in ~/.config/catppuccinizer/plymouth/<theme>.toml
+(hand-tuned defaults ship with the package). Themes built on adi1090x's script
+template also get a "-status" variant (progress bar + latest systemd services).
+"""
 import configparser
 import re
 import shutil
+import subprocess
 import tomllib
 from collections import defaultdict
 from multiprocessing import Pool
@@ -10,14 +18,34 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from . import CONFIGS, ROOT
-from .colours import (UI_GROUP, _job, apply_maps, auto_targets, detect_group, load_rgba,
-                      recolor_image)
-from .palette import (ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb)
+from ...core.detect import UI_GROUP, detect_group
+from ...core.mapping import apply_maps, print_colours
+from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
+from ...core.paths import config_dir
+from ...core.recolor import recolor_image, recolor_job
+from ...core.target import Target
 from .upstream import resolve_theme, upstream_themes
+
+HERE = Path(__file__).resolve().parent
+DEFAULT_CONFIGS = HERE / "configs"
+SCRIPTS = HERE / "scripts"
 
 INSTALL_DIR = "/usr/share/plymouth/themes"
 DEFAULT_THEMES = ["hexa_retro", "infinite_seal"]
+
+
+class PlymouthTarget(Target):
+    name = "plymouth"
+    help = "recolour Plymouth themes (folders or adi1090x names)"
+
+    def add_arguments(self, p):
+        add_arguments(p)
+
+    def check(self, a):
+        check_args(a)
+
+    def run(self, a):
+        run(a)
 
 
 def add_arguments(p):
@@ -27,14 +55,21 @@ def add_arguments(p):
     p.add_argument("--bar", metavar="COLOUR", help="progress bar colour")
     p.add_argument("--no-status", action="store_true", help="skip the -status variants")
     p.add_argument("--detect", action="store_true",
-                   help="(re)detect colours, overwrite configs/<theme>.toml, then stop")
+                   help="(re)detect colours, overwrite the theme's config, then stop")
     p.add_argument("--list", action="store_true", help="list adi1090x themes and exit")
     p.add_argument("--src", type=Path,
-                   help="local adi1090x/plymouth-themes checkout (default: fetched into upstream/)")
-    p.set_defaults(out_default=ROOT / "themes")
+                   help="local adi1090x/plymouth-themes checkout (default: fetched into the cache)")
+    p.add_argument("--install", action="store_true",
+                   help="install the result (its -status variant if any) and rebuild the initramfs")
+    p.add_argument("--test", nargs="?", const=10, type=int, metavar="SECONDS",
+                   help="show the result without rebooting (default: 10 s)")
+    p.add_argument("--boot-delay", metavar="SECONDS|off",
+                   help="keep the splash N more seconds at boot (max 15), or 'off', then exit")
 
 
 def check_args(a):
+    if (a.install or a.test) and (len(a.themes) > 1 or len(a.flavor) > 1 or len(a.accent) > 1):
+        raise SystemExit("--install / --test need a single theme, flavour and accent")
     if a.bar and a.bar not in PALETTES["mocha"]:
         raise SystemExit(f"--bar: unknown colour '{a.bar}'")
     if a.suffix and not re.fullmatch(r"[a-z0-9-]+", a.suffix):
@@ -123,14 +158,18 @@ def detect(theme):
 
 # -------------------------------------------------------------------- config
 def config_path(name):
-    return CONFIGS / f"{name}.toml"
+    """User config if any, else the default shipped with the package."""
+    user = config_dir("plymouth") / f"{name}.toml"
+    default = DEFAULT_CONFIGS / f"{name}.toml"
+    return user if user.exists() or not default.exists() else default
 
 
 def save_config(theme, cfg):
-    CONFIGS.mkdir(exist_ok=True)
+    path = config_dir("plymouth") / f"{theme.name}.toml"
+    path.parent.mkdir(parents=True, exist_ok=True)
     src = theme.dir
     try:
-        src = src.relative_to(ROOT)
+        src = src.relative_to(Path.cwd())
     except ValueError:
         pass
     lines = [
@@ -156,7 +195,7 @@ def save_config(theme, cfg):
                       f'target = "{c["target"]}"']
             if "share" in c:
                 lines.append(f'share = {c["share"]}   # informative')
-    config_path(theme.name).write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n")
 
 
 def load_config(theme):
@@ -188,9 +227,7 @@ def print_mapping(theme, cfg):
         n = len(theme.groups.get(g, []))
         bg = "transparent" if grp["transparent"] else f"background {grp['background']}"
         print(f"  {g} ({n} image{'s' if n > 1 else ''}, {bg})")
-        for name, c in grp["colors"].items():
-            share = f"  ({c['share'] * 100:.0f}%)" if "share" in c else ""
-            print(f"    {name:10s} {c['source']} -> {c['target']}{share}")
+        print_colours(grp["colors"])
 
 
 # --------------------------------------------------------------- theme files
@@ -286,7 +323,7 @@ def write_status_variant(base_dir, flavor, bar, bar_width, bar_gap):
     (dst / f"{name}.plymouth").write_text(conf)
     (dst / f"{base}.plymouth").unlink()
 
-    extras = ((ROOT / "extras.script").read_text()
+    extras = ((HERE / "extras.script").read_text()
               .replace("@SUBTEXT@", color_args(flavor, "subtext0"))
               .replace("@OVERLAY@", color_args(flavor, "overlay1"))
               .replace("@BARFRAC@", str(bar_width))
@@ -334,9 +371,16 @@ def list_themes():
         print(f"{path}{mark}")
 
 
+def script(name, *args):
+    """Run one of the helper shell scripts (they call sudo themselves)."""
+    return subprocess.run(["bash", str(SCRIPTS / name), *map(str, args)], check=False).returncode
+
+
 def run(a):
     if a.list:
         return list_themes()
+    if a.boot_delay:
+        raise SystemExit(script("boot-delay.sh", a.boot_delay))
 
     jobs, status = [], []
     for arg in a.themes:
@@ -394,10 +438,21 @@ def run(a):
         return
     print(f"{len(status)} theme(s), {len(jobs)} images", flush=True)
     with Pool() as pool:
-        for i, _ in enumerate(pool.imap_unordered(_job, jobs, chunksize=8), 1):
+        for i, _ in enumerate(pool.imap_unordered(recolor_job, jobs, chunksize=8), 1):
             if i % 500 == 0 or i == len(jobs):
                 print(f"{i}/{len(jobs)} images", flush=True)
     for args, with_st in status:
         if with_st:
             write_status_variant(*args)
         print(f"  {args[0].name}" + (f"  (+ {args[0].name}-status)" if with_st else ""))
+
+    if (a.install or a.test) and status:
+        folder, with_st = status[0][0][0], status[0][1]
+        folder = folder.parent / f"{folder.name}-status" if with_st else folder
+        if a.test:
+            script("preview.sh", folder, a.test)
+        if a.install:
+            script("install.sh", folder)
+
+
+TARGET = PlymouthTarget()
