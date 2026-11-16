@@ -1,14 +1,18 @@
 # catppuccin-adi1090x-plymouth
 
-[Catppuccin Mocha](https://catppuccin.com) adaptations of two Plymouth boot
-animations from [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes):
+[Catppuccin](https://catppuccin.com) adaptations (Latte, Frappé, Macchiato,
+Mocha) of two Plymouth boot animations from [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes):
 **hexa_retro** and **infinite_seal**.
 
 | hexa_retro | infinite_seal (mauve) |
 |:---:|:---:|
 | ![hexa_retro](assets/hexa-retro.gif) | ![infinite_seal](assets/infinite-seal-mauve.gif) |
 
-### infinite_seal: one theme per Mocha accent
+### Four flavours
+
+![flavours](assets/hexa-flavors.png)
+
+### infinite_seal: one theme per accent (Mocha shown)
 
 ![accents](assets/infinite-seal-accents.png)
 
@@ -16,17 +20,19 @@ animations from [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-
 
 | Theme | Colours |
 |---|---|
-| `catppuccin-mocha-hexa-retro` | white → `text`, red → `red`, yellow → `yellow`, blue → `blue`, cyan → `teal` |
-| `catppuccin-mocha-infinite-seal-<accent>` | white → accent (rosewater, flamingo, pink, mauve, red, maroon, peach, yellow, green, teal, sky, sapphire, blue, lavender) |
+| `catppuccin-<flavor>-hexa-retro` | white → `text`, red → `red`, yellow → `yellow`, blue → `blue`, cyan → `teal` |
+| `catppuccin-<flavor>-infinite-seal-<accent>` | white → accent (rosewater, flamingo, pink, mauve, red, maroon, peach, yellow, green, teal, sky, sapphire, blue, lavender) |
 
-All themes use the Mocha `base` (`#1e1e2e`) for the whole screen and `text`
-for password prompts and messages.
+`<flavor>` is `latte`, `frappe`, `macchiato` or `mocha`. All themes use the
+flavour's `base` for the whole screen and `text` for password prompts and messages.
+Prebuilt [releases](../../releases) contain the Mocha themes; build any other
+flavour/accent combination from source (see below).
 
 ### `-status` variants
 
 Every theme also comes as a `…-status` variant that adds, under the animation:
 
-- a thin **progress bar** (Mocha `surface0` track, accent fill) driven by the
+- a thin **progress bar** (`surface0` track, accent fill) driven by the
   real boot progress reported by Plymouth (boot only, hidden on shutdown);
 - the **last 4 services** started by systemd, newest in `subtext0`, older ones
   fading in `overlay1`, disappearing after 3 s of inactivity.
@@ -67,11 +73,30 @@ python3 generate.py          # fetches the upstream themes, writes themes/
 ./install.sh catppuccin-mocha-hexa-retro-status
 ```
 
+Pick the flavour(s) and accent(s) you want:
+
+```bash
+python3 generate.py -f macchiato -a mauve            # macchiato hexa_retro + mauve seal
+python3 generate.py -f latte frappe -a pink blue     # several at once
+python3 generate.py -f all -a all                    # everything: 120 themes, ~2.3 GB
+python3 generate.py -f mocha -a teal -t seal --no-status
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` (several allowed) |
+| `-a, --accent` | `all` | infinite_seal accent(s) or `all` |
+| `-t, --theme` | `hexa seal` | which animations to build |
+| `--hexa-bar` | `blue` | progress bar accent of `hexa-retro-status` |
+| `--no-status` | | skip the `-status` variants |
+| `-o, --out` | `themes/` | output folder |
+| `--src` | fetched into `upstream/` | local copy of `adi1090x/plymouth-themes/pack_3` |
+
 ## Tools
 
 | Script | What it does |
 |---|---|
-| `generate.py` | Fetches the two upstream themes and generates all 30 themes in `themes/`. Colour mapping lives at the top of the file. |
+| `generate.py` | Fetches the two upstream themes and generates the chosen flavours/accents in `themes/`. Palettes and colour mapping live at the top of the file. |
 | `extras.script` | Plymouth script code appended to the `-status` variants (progress bar + service list). |
 | `install.sh <name\|folder>` | Installs a theme, sets it as default and rebuilds the initramfs. |
 | `preview.sh [theme] [seconds]` | Shows the theme without rebooting, with simulated service messages. Always quits Plymouth at the end, even after Ctrl+C, and restores your previous default theme. Run it from a text console (Ctrl+Alt+F3) if nothing appears. |
@@ -80,10 +105,10 @@ python3 generate.py          # fetches the upstream themes, writes themes/
 ## How the recolouring works
 
 - **infinite_seal** is white on black: each pixel's intensity becomes a blend
-  between Mocha `base` and the accent, stored as an indexed PNG whose palette
+  between the flavour's `base` and the accent, stored as an indexed PNG whose palette
   is that exact gradient (lossless, same size as the original).
 - **hexa_retro** has five neon colours over black: each pixel is matched to the
-  nearest original colour and its intensity, then rebuilt with the Mocha colour
+  nearest original colour and its intensity, then rebuilt with the flavour's colour
   over `base`, so anti-aliasing and glow are preserved.
 
 ## Credits & licence
