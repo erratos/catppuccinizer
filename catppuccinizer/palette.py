@@ -61,8 +61,8 @@ HUE_NAMES = [(15, "red"), (35, "orange"), (70, "yellow"), (160, "green"), (190, 
 
 
 def colour_name(hue, sat, val):
-    if sat < 0.25:
-        return "white" if val > 0.7 else "gray"
+    if sat < 0.25 or val < 0.15:
+        return "white" if val > 0.7 else "black" if val < 0.15 else "gray"
     return next(n for limit, n in HUE_NAMES if hue < limit)
 
 

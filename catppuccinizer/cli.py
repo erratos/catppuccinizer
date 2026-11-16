@@ -2,13 +2,14 @@
 import argparse
 from pathlib import Path
 
-from . import image, limine, plymouth
+from . import image, ksplash, limine, plymouth
 from .palette import ACCENTS, FLAVORS, TARGETS, expand
 
 TARGETS_HELP = {
     "plymouth": (plymouth, "recolour Plymouth themes (folders or adi1090x names)"),
     "image": (image, "recolour wallpapers and other images"),
     "limine": (limine, "Catppuccin colours + wallpaper for the Limine boot menu"),
+    "ksplash": (ksplash, "recolour a KDE Plasma splash screen"),
 }
 
 

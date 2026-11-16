@@ -7,7 +7,8 @@ Recolour your boot chain and desktop with [Catppuccin](https://catppuccin.com)
   `fade-throbber`…), or any of the 80 animations of
   [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes), fetched by name;
 - **[Wallpapers](#wallpapers)**: flat art and photos;
-- **[Limine](#limine)**: boot menu colours and a recoloured wallpaper.
+- **[Limine](#limine)**: boot menu colours and a recoloured wallpaper;
+- **[KDE splash screen](#kde-splash-screen)**: the Plasma splash shown after login.
 
 The original colours are **detected automatically**, mapped to the Catppuccin
 palette, and **any colour can be remapped by hand**. Anti-aliasing, glow,
@@ -28,6 +29,7 @@ cd catppuccinizer
 
 ./catppuccinize image ~/Pictures/wall.jpg -f macchiato          # -> wallpapers/
 ./catppuccinize limine -a mauve --wallpaper ~/Pictures/wall.jpg # -> themes/limine-…
+./catppuccinize ksplash org.kde.breeze.desktop -a mauve --test  # KDE splash screen
 ```
 
 Every target shares `-f/--flavor`, `-a/--accent`, `-m/--map`, `--preview` and
@@ -306,11 +308,51 @@ and deletes the copied wallpapers. Menu entries are not touched, so tools that
 regenerate them (e.g. CachyOS's `limine-entry-tool`) keep the theme. If config
 enrollment is enabled, run `sudo limine-enroll-config` afterwards.
 
+## KDE splash screen
+
+The Plasma splash screen (KSplash, shown after login) is the `contents/splash/`
+folder of a look-and-feel package. Any of them can be recoloured:
+
+```bash
+./catppuccinize ksplash --list                           # installed splash screens
+./catppuccinize ksplash org.kde.breeze.desktop -a mauve --test
+./catppuccinize ksplash CachyOS-Nord -f macchiato -a teal --install
+./catppuccinize ksplash ~/Downloads/some-splash -m '#3daee9=peach'
+```
+
+![KDE splash](assets/demo-ksplash.png)
+
+```
+Breeze (/usr/share/plasma/look-and-feel/org.kde.breeze.desktop)
+  QML / SVG colours
+    gray       #31363b -> surface1  (x6)
+    blue       #3daee9 -> accent  (x6)
+    white      #eff0f1 -> text  (x5)
+    ...
+```
+
+| Part | How it is recoloured |
+|---|---|
+| `Splash.qml` | `"#rrggbb"` / `"#aarrggbb"` strings, `"black"`/`"white"`, `Qt.rgba()` |
+| SVG / SVGZ | `fill`, `stroke`, `stop-color`, `color` (incl. Plasma colour-scheme stylesheets) |
+| PNG / JPEG | like the [image](#wallpapers) target (keys for flat art, LUT for photos) |
+| animated GIF | every frame, with one mapping detected over the animation |
+
+QML/SVG colours: grays go to the neutral ramp (`base` … `text`, by lightness),
+the most used saturated colour becomes the **accent**, the others the closest
+Catppuccin hue; `-m` remaps any of them by name or `#rrggbb`.
+
+The result is a new look-and-feel package (`themes/catppuccin-<flavor>-<name>-<accent>/`)
+containing only the splash screen. `--test` shows it in a window with
+`ksplashqml --test --window`; `--install` copies it to
+`~/.local/share/plasma/look-and-feel/` and selects it (or pick it in *System
+Settings → Colours & Themes → Splash Screen*).
+
 ## Tools
 
 | Script | What it does |
 |---|---|
-| `catppuccinize` | The tool: `plymouth`, `image` and `limine` targets (code in `catppuccinizer/`). |
+| `catppuccinize` | The tool: `plymouth`, `image`, `limine` and `ksplash` targets (code in `catppuccinizer/`). |
 | `generate.py` | Alias of `catppuccinize plymouth`. |
 | `configs/*.toml` | Colour mappings per theme and image group (hand-tuned for the example themes, auto-created for others). |
 | `extras.script` | Plymouth script code appended to the `-status` variants. |
