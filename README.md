@@ -275,7 +275,9 @@ boot menu, optionally with a recoloured wallpaper:
 ```bash
 ./catppuccinize limine -f mocha -a mauve                        # snippet only
 ./catppuccinize limine -a mauve --wallpaper wall.jpg --preview  # + recoloured wallpaper
-sudo ./catppuccinize limine -a mauve --wallpaper wall.jpg --apply
+sudo ./catppuccinize limine -a mauve --apply                    # keeps your current wallpaper
+sudo ./catppuccinize limine -a mauve --recolor-wallpaper --apply  # recolours it
+sudo ./catppuccinize limine -a mauve --wallpaper wall.jpg --apply # replaces it
 sudo ./catppuccinize limine --remove
 ```
 
@@ -303,6 +305,9 @@ With `--apply` (as root), the tool finds `limine.conf` on the ESP (`ESP_PATH`
 from `/etc/default/limine`, or `/boot`; override with `--esp` / `--conf`),
 **backs it up**, inserts the block before the first menu entry, comments out the
 global options it replaces, and copies the wallpaper to `<ESP>/catppuccin/`.
+A wallpaper already set in `limine.conf` is kept (the menu background becomes
+slightly see-through over it) unless `--wallpaper` replaces it or
+`--recolor-wallpaper` recolours it (its `wallpaper_style` is kept).
 Running it again replaces the block; `--remove` restores the original options
 and deletes the copied wallpapers. Menu entries are not touched, so tools that
 regenerate them (e.g. CachyOS's `limine-entry-tool`) keep the theme. If config

@@ -5,6 +5,9 @@ Without --apply, writes a snippet (limine-theme.conf) and the wallpaper into the
 output folder. With --apply, inserts the snippet into limine.conf between marker
 comments (a backup is made, conflicting global options are commented out) and
 copies the wallpaper to the ESP. --remove undoes it.
+
+An existing wallpaper is kept (the menu background becomes see-through over
+it), unless --wallpaper replaces it or --recolor-wallpaper recolours it.
 """
 import os
 import re
@@ -20,7 +23,8 @@ BEGIN = "# >>> catppuccinizer"
 END = "# <<< catppuccinizer"
 DISABLED = "# (catppuccinizer) "
 WALL_DIR = "catppuccin"
-KEYS = ["wallpaper", "wallpaper_style", "backdrop", "term_palette", "term_palette_bright",
+WALL_KEYS = ["wallpaper", "wallpaper_style"]
+KEYS = ["backdrop", "term_palette", "term_palette_bright",
         "term_background", "term_foreground", "term_background_bright", "term_foreground_bright",
         "interface_branding_colour", "interface_branding_color", "interface_help_colour",
         "interface_help_color", "interface_help_colour_bright", "interface_help_color_bright"]
@@ -29,9 +33,11 @@ KEYS = ["wallpaper", "wallpaper_style", "backdrop", "term_palette", "term_palett
 def add_arguments(p):
     p.add_argument("--wallpaper", type=Path, metavar="IMAGE",
                    help="image to recolour and use as the Limine wallpaper")
+    p.add_argument("--recolor-wallpaper", action="store_true",
+                   help="recolour the wallpaper(s) already set in limine.conf")
     img.add_method_arguments(p)
-    p.add_argument("--style", choices=["stretched", "centered", "tiled"], default="stretched",
-                   help="wallpaper_style (default: stretched)")
+    p.add_argument("--style", choices=["stretched", "centered", "tiled"],
+                   help="wallpaper_style (default: the current one, or stretched)")
     p.add_argument("--apply", action="store_true",
                    help="write the theme into limine.conf (run with sudo; a backup is made)")
     p.add_argument("--remove", action="store_true", help="remove the theme from limine.conf")
@@ -44,23 +50,27 @@ def add_arguments(p):
 def check_args(a):
     if a.apply and (len(a.flavor) > 1 or len(a.accent) > 1):
         raise SystemExit("--apply needs a single flavour and a single accent")
+    if a.wallpaper and a.recolor_wallpaper:
+        raise SystemExit("use either --wallpaper or --recolor-wallpaper")
 
 
-def theme_lines(flavor, accent, wallpaper_path=None, style="stretched"):
+def theme_lines(flavor, accent, wallpapers=(), style=None, over_wallpaper=False):
     p = PALETTES[flavor]
     normal = ";".join(p[c] for c in ("surface1", "red", "green", "yellow", "blue", "pink",
                                      "teal", "subtext1"))
     bright = ";".join(p[c] for c in ("surface2", "red", "green", "yellow", "blue", "pink",
                                      "teal", "subtext0"))
     lines = [f"{BEGIN}: Catppuccin {FLAVOR_TITLES[flavor]} ({accent})"]
-    if wallpaper_path:
-        lines += [f"wallpaper: {wallpaper_path}", f"wallpaper_style: {style}"]
+    lines += [f"wallpaper: {w}" for w in wallpapers]
+    if wallpapers:
+        lines.append(f"wallpaper_style: {style or 'stretched'}")
+    see_through = bool(wallpapers) or over_wallpaper
     lines += [
         f"backdrop: {p['base']}",
         f"term_palette: {normal}",
         f"term_palette_bright: {bright}",
         # TTRRGGBB, TT = transparency: slightly see-through over a wallpaper
-        f"term_background: {'33' if wallpaper_path else '00'}{p['base']}",
+        f"term_background: {'33' if see_through else '00'}{p['base']}",
         f"term_foreground: {p['text']}",
         f"term_background_bright: {p['surface0']}",
         f"term_foreground_bright: {p['text']}",
@@ -98,15 +108,34 @@ def strip_theme(text):
     return re.sub(rf"^{re.escape(DISABLED)}", "", text, flags=re.M)
 
 
-def insert_theme(text, lines):
+def global_values(text, key):
+    """Active values of a global option (before the first menu entry)."""
+    vals = []
+    for line in text.splitlines():
+        if line.lstrip().startswith("/"):
+            break
+        k, _, v = line.partition(":")
+        if k.strip().lower() == key and not line.lstrip().startswith("#"):
+            vals.append(v.strip())
+    return vals
+
+
+def resolve_on_esp(ref, esp):
+    """'boot():/path#hash' (or any 'xxx():/path') -> file on the mounted ESP."""
+    path = re.sub(r"^[a-z_]+\([^)]*\):", "", ref).split("#", 1)[0]
+    return esp / path.lstrip("/")
+
+
+def insert_theme(text, lines, replace_wallpaper=False):
     text = strip_theme(text)
+    disable = KEYS + (WALL_KEYS if replace_wallpaper else [])
     out, in_globals, inserted = [], True, False
     for line in text.splitlines():
         if in_globals and line.lstrip().startswith("/"):        # first menu entry
             out += lines + [""]
             in_globals, inserted = False, True
         key = line.split(":", 1)[0].strip().lower()
-        if in_globals and key in KEYS and not line.lstrip().startswith("#"):
+        if in_globals and key in disable and not line.lstrip().startswith("#"):
             line = DISABLED + line
         out.append(line)
     if not inserted:
@@ -114,15 +143,16 @@ def insert_theme(text, lines):
     return "\n".join(out) + "\n"
 
 
-def apply(conf, esp, lines, wallpaper_file):
+def apply(conf, esp, lines, wallpaper_files=()):
     try:
         text = conf.read_text()
         backup = conf.with_name(conf.name + datetime.now().strftime(".%Y%m%d-%H%M%S-%f.bak"))
         shutil.copy2(conf, backup)
-        if wallpaper_file:
+        for wf in wallpaper_files:
             (esp / WALL_DIR).mkdir(exist_ok=True)
-            shutil.copy(wallpaper_file, esp / WALL_DIR / wallpaper_file.name)
-        conf.write_text(insert_theme(text, lines) if lines else strip_theme(text))
+            shutil.copy(wf, esp / WALL_DIR / wf.name)
+        conf.write_text(insert_theme(text, lines, bool(wallpaper_files)) if lines
+                        else strip_theme(text))
         if not lines:                            # --remove: drop our wallpapers too
             for f in (esp / WALL_DIR).glob("wallpaper-*"):
                 f.unlink()
@@ -142,31 +172,52 @@ def run(a):
     if a.remove:
         conf = a.conf or find_conf(esp)
         print(f"Removing the Catppuccin theme from {conf}")
-        return apply(conf, esp, None, None)
+        return apply(conf, esp, None)
+
+    current, style = [], a.style
+    if a.apply or a.recolor_wallpaper:
+        conf = a.conf or find_conf(esp)
+        try:
+            text = strip_theme(conf.read_text())
+        except PermissionError:
+            raise SystemExit(f"Cannot read {conf}: run with sudo.")
+        current = global_values(text, "wallpaper")
+        style = style or next(iter(global_values(text, "wallpaper_style")), None)
+        if current:
+            print(f"Current Limine wallpaper: {', '.join(current)}")
+    sources = [a.wallpaper] if a.wallpaper else []
+    if a.recolor_wallpaper:
+        if not current:
+            raise SystemExit("limine.conf has no wallpaper to recolour (use --wallpaper IMAGE)")
+        sources = [resolve_on_esp(w, esp) for w in current]
+        for s in sources:
+            if not s.is_file():
+                raise SystemExit(f"Wallpaper not found on the ESP: {s} (use --esp or --wallpaper)")
 
     for flv in a.flavor:
         for acc in a.accent:
             name = f"limine-catppuccin-{flv}-{acc}"
             dst = a.out / name
             dst.mkdir(parents=True, exist_ok=True)
-            wall_file = wall_ref = None
-            if a.wallpaper:
-                method, grp = img.plan_image(a.wallpaper, a)
-                im = img.render(a.wallpaper, method, grp, flv, acc, a)
+            wall_files = []
+            for k, src in enumerate(sources):
+                method, grp = img.plan_image(src, a)
+                im = img.render(src, method, grp, flv, acc, a)
+                stem = f"wallpaper-{flv}-{acc}" + (f"-{k + 1}" if len(sources) > 1 else "")
                 if a.preview:
-                    img.side_by_side(a.wallpaper, im, dst / "preview.png")
-                wall_file = img.save(im.convert("RGB"), dst / f"wallpaper-{flv}-{acc}", method,
-                                     a.wallpaper)
-                wall_ref = f"boot():/{WALL_DIR}/{wall_file.name}"
-            lines = theme_lines(flv, acc, wall_ref, a.style)
+                    img.side_by_side(src, im, dst / f"preview-{stem}.png")
+                wall_files.append(img.save(im.convert("RGB"), dst / stem, method, src))
+            wall_refs = [f"boot():/{WALL_DIR}/{f.name}" for f in wall_files]
+            lines = theme_lines(flv, acc, wall_refs, style,
+                                over_wallpaper=bool(current) and not wall_files)
             (dst / "limine-theme.conf").write_text("\n".join(lines) + "\n")
             print(f"Catppuccin {FLAVOR_TITLES[flv]} ({acc}) -> {dst}")
             if a.apply:
-                conf = a.conf or find_conf(esp)
-                apply(conf, esp, lines, wall_file)
+                apply(conf, esp, lines, wall_files)
             else:
                 print(f"  paste {dst / 'limine-theme.conf'} at the top of limine.conf"
-                      + (f", copy {wall_file.name} to <ESP>/{WALL_DIR}/" if wall_file else "")
+                      + (f", copy {', '.join(f.name for f in wall_files)} to <ESP>/{WALL_DIR}/"
+                         if wall_files else "")
                       + ", or rerun with --apply (sudo)")
     if a.apply and os.geteuid() == 0 and a.out.is_relative_to(ROOT):
         # files written as root in the user's checkout: give them back
