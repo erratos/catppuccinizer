@@ -1,0 +1,79 @@
+{
+ "configs": {
+  "glow_mini.toml": "87f082138dfdbc29",
+  "hexa_mini.toml": "6f102e0e53d4157b"
+ },
+ "image": {
+  "blobs-catppuccin-frappe.png": "243ea686e79fdac4",
+  "blobs-catppuccin-mocha.png": "bd66ee1b1040e291",
+  "flat-catppuccin-frappe.png": "94267ff813df9d67",
+  "flat-catppuccin-mocha-mapped.png": "481737bc6c0433e7",
+  "flat-catppuccin-mocha.png": "cfb5866886e64131",
+  "logo-catppuccin-frappe.png": "2ad51cf01bf428ca",
+  "logo-catppuccin-mocha.png": "7dbf692015582d19",
+  "photo-catppuccin-frappe.jpg": "2fc25f7409add48b",
+  "photo-catppuccin-mocha.jpg": "8d7dc4a313006aa8"
+ },
+ "ksplash": {
+  "catppuccin-mocha-test-splash-peach/contents/splash/Splash.qml": "d60cfe6c3d459568",
+  "catppuccin-mocha-test-splash-peach/contents/splash/images/bg.png": "21b6927039a7136d",
+  "catppuccin-mocha-test-splash-peach/contents/splash/images/logo.svg": "c7cc85d2b293d098",
+  "catppuccin-mocha-test-splash-peach/contents/splash/images/spin.gif": "8a137029f3da1274",
+  "catppuccin-mocha-test-splash-peach/metadata.json": "71cad479b75f6e06"
+ },
+ "limine": {
+  "keep": "ab9420334b75a598",
+  "recolor": "cee9f207d827e2cb",
+  "recolor_files": {
+   "catppuccin/wallpaper-mocha-lavender.png": "bd66ee1b1040e291",
+   "limine-splash.png": "44b2c26d9ac77580",
+   "limine.conf": "cee9f207d827e2cb"
+  },
+  "removed_is_original": true
+ },
+ "limine_out": {
+  "limine-catppuccin-mocha-lavender/limine-theme.conf": "30258f8696d46051",
+  "limine-catppuccin-mocha-lavender/wallpaper-mocha-lavender.png": "bd66ee1b1040e291"
+ },
+ "plymouth": {
+  "catppuccin-latte-glow-mini-teal/box.png": "e73b9a65bbe81f8d",
+  "catppuccin-latte-glow-mini-teal/bullet.png": "bdd886421a262178",
+  "catppuccin-latte-glow-mini-teal/catppuccin-latte-glow-mini-teal.plymouth": "8583f7ca4a634d12",
+  "catppuccin-latte-glow-mini-teal/entry.png": "728ba5ede51cf513",
+  "catppuccin-latte-glow-mini-teal/lock.png": "01efa777cf5021e3",
+  "catppuccin-latte-glow-mini-teal/progress-00.png": "5fb7dc002993a06a",
+  "catppuccin-latte-glow-mini-teal/progress-01.png": "62753fcea19cd8fc",
+  "catppuccin-latte-glow-mini-teal/progress-02.png": "bb973edd33dcef18",
+  "catppuccin-latte-glow-mini-teal/throbber-00.png": "2972c81f7db19226",
+  "catppuccin-latte-glow-mini-teal/throbber-01.png": "bacbf794978c59e6",
+  "catppuccin-latte-glow-mini-teal/throbber-02.png": "f1fe20030bac5662",
+  "catppuccin-macchiato-hexa-mini-status/LICENSE": "589ed823e9a84c56",
+  "catppuccin-macchiato-hexa-mini-status/bar-fill.png": "89dc072a9a3c796b",
+  "catppuccin-macchiato-hexa-mini-status/bar-track.png": "8fa90eae594072ac",
+  "catppuccin-macchiato-hexa-mini-status/catppuccin-macchiato-hexa-mini-status.plymouth": "5b5fb7ae5ddd7454",
+  "catppuccin-macchiato-hexa-mini-status/catppuccin-macchiato-hexa-mini-status.script": "d9a74491eee44902",
+  "catppuccin-macchiato-hexa-mini-status/progress-0.png": "7de4d47d492d27d6",
+  "catppuccin-macchiato-hexa-mini-status/progress-1.png": "20e7e04819065a0a",
+  "catppuccin-macchiato-hexa-mini-status/progress-2.png": "1fc681c28cf1cc60",
+  "catppuccin-macchiato-hexa-mini/LICENSE": "589ed823e9a84c56",
+  "catppuccin-macchiato-hexa-mini/catppuccin-macchiato-hexa-mini.plymouth": "79ec5c61185c1a42",
+  "catppuccin-macchiato-hexa-mini/catppuccin-macchiato-hexa-mini.script": "0f1e0739ddf1627f",
+  "catppuccin-macchiato-hexa-mini/progress-0.png": "7de4d47d492d27d6",
+  "catppuccin-macchiato-hexa-mini/progress-1.png": "20e7e04819065a0a",
+  "catppuccin-macchiato-hexa-mini/progress-2.png": "1fc681c28cf1cc60",
+  "catppuccin-mocha-hexa-mini-status/LICENSE": "589ed823e9a84c56",
+  "catppuccin-mocha-hexa-mini-status/bar-fill.png": "3854280d72748570",
+  "catppuccin-mocha-hexa-mini-status/bar-track.png": "a0e3d9b5b514ced6",
+  "catppuccin-mocha-hexa-mini-status/catppuccin-mocha-hexa-mini-status.plymouth": "129fe61b4aa9d02e",
+  "catppuccin-mocha-hexa-mini-status/catppuccin-mocha-hexa-mini-status.script": "9fec331c7423abec",
+  "catppuccin-mocha-hexa-mini-status/progress-0.png": "d9067ca5f5832db0",
+  "catppuccin-mocha-hexa-mini-status/progress-1.png": "8d82538231887835",
+  "catppuccin-mocha-hexa-mini-status/progress-2.png": "60fae8c34ff80e2c",
+  "catppuccin-mocha-hexa-mini/LICENSE": "589ed823e9a84c56",
+  "catppuccin-mocha-hexa-mini/catppuccin-mocha-hexa-mini.plymouth": "44eb3af2ebb03051",
+  "catppuccin-mocha-hexa-mini/catppuccin-mocha-hexa-mini.script": "7b4bdd0436642235",
+  "catppuccin-mocha-hexa-mini/progress-0.png": "d9067ca5f5832db0",
+  "catppuccin-mocha-hexa-mini/progress-1.png": "8d82538231887835",
+  "catppuccin-mocha-hexa-mini/progress-2.png": "60fae8c34ff80e2c"
+ }
+}
