@@ -1,4 +1,4 @@
-# plymouth-catppuccinizer
+# catppuccinizer
 
 Recolour your boot chain and desktop with [Catppuccin](https://catppuccin.com)
 (Latte, Frappé, Macchiato, Mocha):
@@ -20,8 +20,8 @@ shading and transparency are preserved.
 Requires Python 3.11+ with `numpy` and `Pillow`, and `git`.
 
 ```bash
-git clone https://github.com/erratos/plymouth-catppuccinizer.git
-cd plymouth-catppuccinizer
+git clone https://github.com/erratos/catppuccinizer.git
+cd catppuccinizer
 ./catppuccinize plymouth /usr/share/plymouth/themes/spinner -a mauve   # a theme you have
 ./catppuccinize plymouth rings_2           # an adi1090x theme (fetched on demand)
 ./install.sh catppuccin-mocha-rings-2      # install + rebuild the initramfs
