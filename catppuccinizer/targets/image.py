@@ -8,14 +8,25 @@ Two methods (core.recolor):
   paintings and soft gradients.
 "auto" picks keys when the source colours explain the image well, the
 background is plain and the edges are crisp.
+
+SVG / SVGZ files stay vector: the colours written in the file (fill, stroke,
+stop-color…) are mapped to Catppuccin roles and replaced, nothing is rasterised.
 """
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
+from PIL import Image
+
 from ..core import recolor
-from ..core.palette import FLAVOR_TITLES
+from ..core.formats import collect_text_colours, read_text, recolour_text, write_text
+from ..core.mapping import apply_maps, map_colour_counts, print_colours, resolve_target, uses_accent
+from ..core.palette import FLAVOR_TITLES, rgb2hex
 from ..core.target import Target
 
-EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".qoi"}
+VECTOR = {".svg", ".svgz"}
+EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".qoi"} | VECTOR
 
 
 def collect(paths):
@@ -48,6 +59,9 @@ class ImageTarget(Target):
         a.out.mkdir(parents=True, exist_ok=True)
         a.strict_map = len(files) == 1      # with several images, a name may exist in only some
         for path in files:
+            if path.suffix.lower() in VECTOR:
+                self.run_vector(path, a)
+                continue
             method, grp = recolor.plan(path, a)
             accents = a.accent if recolor.method_uses_accent(method, grp) else [None]
             for flv in a.flavor:
@@ -61,6 +75,51 @@ class ImageTarget(Target):
                     else:
                         dst = recolor.save_image(im, a.out / name, method, path)
                     print(f"  -> {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + acc if acc else ''})")
+
+    def run_vector(self, path, a):
+        colors = map_colour_counts(collect_text_colours([path]))
+        cfg = {"groups": {"svg": {"colors": colors}}}
+        apply_maps(cfg, a.map, strict=a.strict_map)
+        colors = cfg["groups"]["svg"]["colors"]
+        print(f"{path}: vector ({len(colors)} colours)")
+        print_colours(colors, show_share=False)
+        text = read_text(path)
+        accents = a.accent if uses_accent(colors) else [None]
+        for flv in a.flavor:
+            for acc in accents:
+                lookup = {c["source"]: rgb2hex(resolve_target(flv, acc, c["target"]))
+                          for c in colors.values()}
+                name = "-".join(x for x in (path.stem, "catppuccin", flv, acc, a.suffix) if x)
+                new = recolour_text(text, False, lookup)
+                if a.preview:
+                    (a.out / "previews").mkdir(exist_ok=True)
+                    dst = a.out / "previews" / f"{name}.png"
+                    if not svg_preview(path, new, dst):
+                        dst = dst.with_suffix(path.suffix)
+                        write_text(dst, new)
+                else:
+                    dst = a.out / f"{name}{path.suffix}"
+                    write_text(dst, new)
+                print(f"  -> {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + acc if acc else ''})")
+
+
+def svg_preview(src, new_text, dst):
+    """Before/after PNG of an SVG with rsvg-convert; False when it is not installed."""
+    tool = shutil.which("rsvg-convert")
+    if not tool:
+        print("  (install rsvg-convert, from librsvg, for a PNG preview; writing the SVG instead)")
+        return False
+    with tempfile.TemporaryDirectory(prefix="catppuccinize-") as tmp:
+        tmp = Path(tmp)
+        after_svg = tmp / "after.svg"
+        after_svg.write_text(new_text)
+        before_svg = tmp / "before.svg"
+        before_svg.write_text(read_text(src))
+        for f in (before_svg, after_svg):
+            subprocess.run([tool, "-w", "512", "-o", str(f.with_suffix(".png")), str(f)], check=True)
+        with Image.open(tmp / "after.png") as im:
+            recolor.side_by_side(tmp / "before.png", im.copy(), dst)
+    return True
 
 
 TARGET = ImageTarget()

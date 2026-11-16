@@ -6,7 +6,7 @@ Recolour your boot chain and desktop with [Catppuccin](https://catppuccin.com)
 - **[Plymouth](#plymouth)**: any boot splash theme folder (`script`, `two-step`,
   `fade-throbber`…), or any of the 80 animations of
   [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes), fetched by name;
-- **[Wallpapers](#wallpapers)**: flat art and photos;
+- **[Wallpapers](#wallpapers)**: flat art, photos and SVG logos;
 - **[Limine](#limine)**: boot menu colours and a recoloured wallpaper;
 - **[KDE splash screen](#kde-splash-screen)**: the Plasma splash shown after login.
 
@@ -224,7 +224,14 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 catppuccinize image wall.png                     # Mocha, method chosen automatically
 catppuccinize image ~/Pictures/walls -f all      # a whole folder, four flavours
 catppuccinize image photo.jpg --method lut --keep-lum 0.7 --preview
+catppuccinize image logo.svg -m blue=lavender    # SVG stays SVG
 ```
+
+**SVG / SVGZ** files stay vector: the colours written in the file (`fill`,
+`stroke`, `stop-color`…) are mapped to Catppuccin roles and replaced, nothing
+is rasterised, so the result scales like the original. `-m` works as for
+images (names or `#rrggbb`); `--preview` renders a before/after PNG with
+`rsvg-convert` when it is installed.
 
 Two methods, picked automatically (`--method auto|keys|lut`):
 

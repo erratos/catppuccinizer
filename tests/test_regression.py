@@ -54,6 +54,14 @@ def make_images(d):
     dr.ellipse([8, 8, 88, 88], fill=(255, 255, 255, 255))
     dr.ellipse([30, 30, 66, 66], fill=(23, 147, 209, 255))
     im.save(d / "logo.png")
+    # vector logo: stays an SVG, only the colours written in it change
+    (d / "mark.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+        '<linearGradient id="g"><stop stop-color="#0cf" offset="0"/>'
+        '<stop stop-color="#00aa88" stop-opacity="0" offset="1"/></linearGradient>'
+        '<rect width="10" height="10" fill="#fff"/>'
+        '<circle cx="5" cy="5" r="4" style="fill:#e0306a;stroke:#0cf"/>'
+        '<circle cx="5" cy="5" r="2" fill="url(#g)"/></svg>\n')
 
 
 def make_splash(d):
@@ -139,6 +147,7 @@ def run_all():
         make_images(tmp / "img")
         cli("image", tmp / "img", "-f", "mocha", "frappe", "-o", tmp / "image")
         cli("image", tmp / "img/flat.png", "-m", "pink=peach", "-s", "mapped", "-o", tmp / "image")
+        cli("image", tmp / "img/mark.svg", "-m", "blue=lavender", "-s", "mapped", "-o", tmp / "image")
         out["image"] = tree(tmp / "image", tmp)
 
         esp = tmp / "esp"
