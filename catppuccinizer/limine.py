@@ -94,6 +94,8 @@ def default_esp():
 
 
 def find_conf(esp):
+    if esp.is_dir() and not os.access(esp, os.R_OK | os.X_OK):
+        raise SystemExit(f"Cannot read {esp}: run with sudo.")
     for rel in ("limine.conf", "EFI/limine/limine.conf", "EFI/BOOT/limine.conf",
                 "boot/limine/limine.conf", "limine/limine.conf"):
         if (esp / rel).is_file():
@@ -219,7 +221,7 @@ def run(a):
                       + (f", copy {', '.join(f.name for f in wall_files)} to <ESP>/{WALL_DIR}/"
                          if wall_files else "")
                       + ", or rerun with --apply (sudo)")
-    if a.apply and os.geteuid() == 0 and a.out.is_relative_to(ROOT):
+    if os.geteuid() == 0 and a.out.is_relative_to(ROOT) and a.out.exists():
         # files written as root in the user's checkout: give them back
         uid, gid = ROOT.stat().st_uid, ROOT.stat().st_gid
         for p in [a.out, *a.out.rglob("*")]:

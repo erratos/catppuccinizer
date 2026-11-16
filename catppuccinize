@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Recolour boot themes and wallpapers with Catppuccin. See --help."""
-from catppuccinizer.cli import main
+import sys
+
+sys.dont_write_bytecode = True      # no root-owned __pycache__ after a sudo run
+
+from catppuccinizer.cli import main  # noqa: E402
 
 if __name__ == "__main__":
     main()

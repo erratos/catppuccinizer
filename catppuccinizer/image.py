@@ -25,6 +25,7 @@ CHROMA_REF = 0.10           # lut: Oklab chroma at which a colour fully takes it
 NEUTRALS = ["crust", "mantle", "base", "surface0", "surface1", "surface2", "overlay0",
             "overlay1", "overlay2", "subtext0", "subtext1", "text"]
 MIN_BG_SHARE = 0.35          # ... and the plain background must cover at least this share
+MIN_SHARPNESS = 0.08         # ... and edges must be crisp (blurred blobs/gradients -> lut)
 
 
 def add_arguments(p):
@@ -70,7 +71,18 @@ def analyse(path):
     recon = t[..., None] * keys[None]
     err = np.abs(d[:, None, :] - recon).mean(-1).min(1)
     content = np.abs(d).max(-1) > 24
-    return grp, float(err[content].mean() if content.any() else 0), float(1 - content.mean())
+    return (grp, float(err[content].mean() if content.any() else 0), float(1 - content.mean()),
+            sharpness(path))
+
+
+def sharpness(path):
+    """99th percentile of the local contrast, relative to the image's range:
+    ~0.01-0.03 for blurred blobs and soft gradients, > 0.2 for line art and photos."""
+    im = Image.open(path).convert("L")
+    im.thumbnail((1024, 1024))
+    a = np.asarray(im, np.float32)
+    g = np.maximum(np.abs(np.diff(a, axis=1))[:-1], np.abs(np.diff(a, axis=0))[:, :-1])
+    return float(np.percentile(g, 99) / (np.percentile(a, 99) - np.percentile(a, 1) + 1))
 
 
 # --------------------------------------------------------------------- LUT
@@ -145,10 +157,11 @@ def recolor_lut(path, flavor, smooth, keep_lum):
 # --------------------------------------------------------------------- API
 def plan_image(path, a, verbose=True):
     """Return (method, group config or None) for one image."""
-    grp, err, bg_share = None, None, None
+    grp, err, bg_share, sharp = None, None, None, None
     if a.method in ("auto", "keys"):
-        grp, err, bg_share = analyse(path)
-    flat = err is not None and err < FIT_THRESHOLD and bg_share >= MIN_BG_SHARE
+        grp, err, bg_share, sharp = analyse(path)
+    flat = (err is not None and err < FIT_THRESHOLD and bg_share >= MIN_BG_SHARE
+            and sharp >= MIN_SHARPNESS)
     method = a.method if a.method != "auto" else ("keys" if flat else "lut")
     if method == "keys":
         cfg = {"groups": {"image": grp}}
@@ -156,7 +169,8 @@ def plan_image(path, a, verbose=True):
     elif a.map:
         print(f"  note: --map is ignored by the lut method ({path.name})")
     if verbose:
-        fit = f" (fit error {err:.1f}, background {bg_share:.0%})" if err is not None else ""
+        fit = (f" (fit error {err:.1f}, background {bg_share:.0%}, sharpness {sharp:.2f})"
+               if err is not None else "")
         print(f"{path.name}: {method}{fit}")
         if method == "keys":
             bg = "transparent" if grp["transparent"] else f"background {grp['background']}"
