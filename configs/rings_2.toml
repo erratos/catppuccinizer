@@ -1,0 +1,24 @@
+# Colour mapping for adi1090x/plymouth-themes pack_4/rings_2
+# Edit the targets: any Catppuccin colour name (rosewater, flamingo, pink, mauve, red, maroon, peach, yellow, green, teal, sky, sapphire, blue, lavender,
+# text, subtext1/0, overlay2/1/0, surface2/1/0, base, mantle, crust) or "accent"
+# ("accent" = one theme per accent chosen with -a). You can also add colours.
+
+background = "#000000"   # detected background of the source frames
+bar_gap = -135              # -status: px between frame bottom and bar
+bar_width = 0.22          # -status: bar width / frame width
+# bar = "blue"          # -status: bar colour (default: accent or main colour)
+
+[colors.blue]
+source = "#32bcff"
+target = "sapphire"
+share = 0.455   # informative: share of coloured pixels
+
+[colors.green]
+source = "#8cff4a"
+target = "green"
+share = 0.322   # informative: share of coloured pixels
+
+[colors.pink]
+source = "#ff42a5"
+target = "pink"
+share = 0.223   # informative: share of coloured pixels

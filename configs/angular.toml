@@ -1,0 +1,44 @@
+# Colour mapping for adi1090x/plymouth-themes pack_1/angular
+# Edit the targets: any Catppuccin colour name (rosewater, flamingo, pink, mauve, red, maroon, peach, yellow, green, teal, sky, sapphire, blue, lavender,
+# text, subtext1/0, overlay2/1/0, surface2/1/0, base, mantle, crust) or "accent"
+# ("accent" = one theme per accent chosen with -a). You can also add colours.
+
+background = "#000000"   # detected background of the source frames
+bar_gap = -2              # -status: px between frame bottom and bar
+bar_width = 0.52          # -status: bar width / frame width
+# bar = "blue"          # -status: bar colour (default: accent or main colour)
+
+[colors.blue]
+source = "#0129aa"
+target = "blue"
+share = 0.237   # informative: share of coloured pixels
+
+[colors.orange]
+source = "#ff8800"
+target = "peach"
+share = 0.186   # informative: share of coloured pixels
+
+[colors.blue-2]
+source = "#0199c5"
+target = "sky"
+share = 0.176   # informative: share of coloured pixels
+
+[colors.yellow]
+source = "#ffec01"
+target = "yellow"
+share = 0.118   # informative: share of coloured pixels
+
+[colors.purple]
+source = "#2b08ac"
+target = "mauve"
+share = 0.11   # informative: share of coloured pixels
+
+[colors.pink]
+source = "#f00048"
+target = "red"
+share = 0.111   # informative: share of coloured pixels
+
+[colors.green]
+source = "#67bb02"
+target = "green"
+share = 0.063   # informative: share of coloured pixels

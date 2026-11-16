@@ -1,0 +1,19 @@
+# Colour mapping for adi1090x/plymouth-themes pack_2/cyanide
+# Edit the targets: any Catppuccin colour name (rosewater, flamingo, pink, mauve, red, maroon, peach, yellow, green, teal, sky, sapphire, blue, lavender,
+# text, subtext1/0, overlay2/1/0, surface2/1/0, base, mantle, crust) or "accent"
+# ("accent" = one theme per accent chosen with -a). You can also add colours.
+
+background = "#000000"   # detected background of the source frames
+bar_gap = -45              # -status: px between frame bottom and bar
+bar_width = 0.43          # -status: bar width / frame width
+# bar = "blue"          # -status: bar colour (default: accent or main colour)
+
+[colors.white]
+source = "#ffffff"
+target = "text"
+share = 0.364   # informative: share of coloured pixels
+
+[colors.cyan]
+source = "#3afeff"
+target = "sky"
+share = 0.636   # informative: share of coloured pixels
