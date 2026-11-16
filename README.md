@@ -40,8 +40,8 @@ Every target shares `-f/--flavor`, `-a/--accent`, `-m/--map`, `--preview` and
 `-o/--out` (outputs go to `./themes/` or `./wallpapers/` by default); see
 `catppuccinize <target> --help`.
 
-Prebuilt **hexa_retro** and **infinite_seal** (Mocha) themes are also available
-from the [Releases](../../releases), see [Example themes](#example-themes).
+Ready-made themes built with the tool (Plymouth hexa_retro and infinite_seal in
+Mocha) are published in [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
 
 ## Plymouth
 
@@ -52,7 +52,7 @@ Left: original. Right: generated theme.
 #### Automatic detection: `angular` in Macchiato
 
 ```bash
-./catppuccinize plymouth angular -f macchiato
+catppuccinize plymouth angular -f macchiato
 ```
 
 ```
@@ -73,7 +73,7 @@ Even a rainbow is split into hue clusters, each mapped to the closest Catppuccin
 #### Manual mapping: `rings_2` with your own colours
 
 ```bash
-./catppuccinize plymouth rings_2 -m pink=mauve green=peach blue=lavender
+catppuccinize plymouth rings_2 -m pink=mauve green=peach blue=lavender
 ```
 
 ![rings_2](assets/demo-rings-2.gif)
@@ -81,7 +81,7 @@ Even a rainbow is split into hue clusters, each mapped to the closest Catppuccin
 #### Accent mode: `cyanide` in Frappé peach
 
 ```bash
-./catppuccinize plymouth cyanide -f frappe -m cyan=accent -a peach
+catppuccinize plymouth cyanide -f frappe -m cyan=accent -a peach
 ```
 
 ![cyanide](assets/demo-cyanide.gif)
@@ -92,7 +92,7 @@ Colours mapped to `accent` produce one theme per accent passed with `-a`
 #### Any theme folder: `glow` (two-step), with per-group mapping
 
 ```bash
-./catppuccinize plymouth /usr/share/plymouth/themes/glow -f macchiato -a mauve \
+catppuccinize plymouth /usr/share/plymouth/themes/glow -f macchiato -a mauve \
     -m throbber.white=accent ui.white=lavender
 ```
 
@@ -114,30 +114,15 @@ detected separately; `group.name=target` remaps a colour in one group only.
 The two-step colours of the `.plymouth` file (background, progress bar) are
 rewritten too.
 
-### Example themes
+### Hand-tuned themes
 
-These two are hand-tuned (their configs ship with the tool) and published prebuilt in the
-[Releases](../../releases), in Mocha.
-
-| hexa_retro | infinite_seal (mauve) |
-|:---:|:---:|
-| ![hexa_retro](assets/hexa-retro.gif) | ![infinite_seal](assets/infinite-seal-mauve.gif) |
-| `catppuccin-<flavor>-hexa-retro` | `catppuccin-<flavor>-infinite-seal-<accent>` |
-| white → `text`, red → `red`, yellow → `yellow`, blue → `blue`, cyan → `teal` | white → accent |
-
-hexa_retro in the four flavours:
-
-![flavours](assets/hexa-flavors.png)
-
-infinite_seal, one theme per accent (Mocha):
-
-![accents](assets/infinite-seal-accents.png)
-
-Build them yourself, in any flavour:
+`hexa_retro` and `infinite_seal` have hand-tuned configs shipped with the tool;
+`catppuccinize plymouth` without a theme builds both (Mocha, all accents). The
+results are published, with previews, in
+[catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
 
 ```bash
-./catppuccinize plymouth                          # both, Mocha, all accents (default)
-./catppuccinize plymouth hexa_retro infinite_seal -f latte -a mauve blue
+catppuccinize plymouth hexa_retro infinite_seal -f latte -a mauve blue
 ```
 
 ### Supported themes
@@ -163,7 +148,7 @@ The first time a theme is used, its colours are detected and saved to
 - otherwise whites/grays go to `text` and each hue to the closest Catppuccin
   colour (red, peach, yellow, green, teal, sky, sapphire, blue, mauve, pink).
 
-`./catppuccinize plymouth <theme> --detect` re-runs the detection and prints the mapping.
+`catppuccinize plymouth <theme> --detect` re-runs the detection and prints the mapping.
 
 ### Manual mapping
 
@@ -171,9 +156,9 @@ Use the colour names printed by the detection, optionally prefixed by the
 group (`ui.white`), or a `#rrggbb` source colour:
 
 ```bash
-./catppuccinize plymouth hexa_retro -m yellow=red white=lavender -s alt   # -s: name suffix
-./catppuccinize plymouth owl -m white=accent -a mauve
-./catppuccinize plymouth rings_2 -m '#32bcff=sky' --preview               # quick before/after image
+catppuccinize plymouth hexa_retro -m yellow=red white=lavender -s alt   # -s: name suffix
+catppuccinize plymouth owl -m white=accent -a mauve
+catppuccinize plymouth rings_2 -m '#32bcff=sky' --preview               # quick before/after image
 ```
 
 `-m` applies to one run; edit `~/.config/catppuccinizer/plymouth/<theme>.toml`
@@ -235,9 +220,9 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 ## Wallpapers
 
 ```bash
-./catppuccinize image wall.png                     # Mocha, method chosen automatically
-./catppuccinize image ~/Pictures/walls -f all      # a whole folder, four flavours
-./catppuccinize image photo.jpg --method lut --keep-lum 0.7 --preview
+catppuccinize image wall.png                     # Mocha, method chosen automatically
+catppuccinize image ~/Pictures/walls -f all      # a whole folder, four flavours
+catppuccinize image photo.jpg --method lut --keep-lum 0.7 --preview
 ```
 
 Two methods, picked automatically (`--method auto|keys|lut`):
@@ -276,12 +261,12 @@ Catppuccin colours for the [Limine](https://github.com/limine-bootloader/limine)
 boot menu, optionally with a recoloured wallpaper:
 
 ```bash
-./catppuccinize limine -f mocha -a mauve                        # snippet only
-./catppuccinize limine -a mauve --wallpaper wall.jpg --preview  # + recoloured wallpaper
-sudo ./catppuccinize limine -a mauve --apply                    # keeps your current wallpaper
-sudo ./catppuccinize limine -a mauve --recolor-wallpaper --apply  # recolours it
-sudo ./catppuccinize limine -a mauve --wallpaper wall.jpg --apply # replaces it
-sudo ./catppuccinize limine --remove
+catppuccinize limine -f mocha -a mauve                        # snippet only
+catppuccinize limine -a mauve --wallpaper wall.jpg --preview  # + recoloured wallpaper
+sudo catppuccinize limine -a mauve --apply                    # keeps your current wallpaper
+sudo catppuccinize limine -a mauve --recolor-wallpaper --apply  # recolours it
+sudo catppuccinize limine -a mauve --wallpaper wall.jpg --apply # replaces it
+sudo catppuccinize limine --remove
 ```
 
 Without `--apply`, a `limine-theme.conf` snippet (and the wallpaper) is written
@@ -322,10 +307,10 @@ The Plasma splash screen (KSplash, shown after login) is the `contents/splash/`
 folder of a look-and-feel package. Any of them can be recoloured:
 
 ```bash
-./catppuccinize ksplash --list                           # installed splash screens
-./catppuccinize ksplash org.kde.breeze.desktop -a mauve --test
-./catppuccinize ksplash CachyOS-Nord -f macchiato -a teal --install
-./catppuccinize ksplash ~/Downloads/some-splash -m '#3daee9=peach'
+catppuccinize ksplash --list                           # installed splash screens
+catppuccinize ksplash org.kde.breeze.desktop -a mauve --test
+catppuccinize ksplash CachyOS-Nord -f macchiato -a teal --install
+catppuccinize ksplash ~/Downloads/some-splash -m '#3daee9=peach'
 ```
 
 ![KDE splash](assets/demo-ksplash.png)
