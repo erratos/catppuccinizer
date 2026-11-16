@@ -1,0 +1,101 @@
+
+//------------------------ Catppuccin extras: progress bar + status ------------------------
+// Appended by generate.py to the "-status" variants.
+// @SUBTEXT@ / @OVERLAY@ / @BARFRAC@ / @BARGAP@ are filled in by generate.py.
+
+anim.h = flyingman_image[0].GetHeight();
+anim.w = flyingman_image[0].GetWidth();
+anim.bottom = Window.GetY() + Window.GetHeight(0) / 2 + anim.h / 2;
+center.x = Window.GetX() + Window.GetWidth(0) / 2;
+ticks = 0;
+
+// --- Progress bar (real boot progress reported by Plymouth) ---
+bar.w = Math.Int(anim.w * @BARFRAC@);
+bar.h = 3;
+bar.x = center.x - bar.w / 2;
+bar.y = anim.bottom + @BARGAP@;
+bar.track = Sprite(Image("bar-track.png").Scale(bar.w, bar.h));
+bar.track.SetPosition(bar.x, bar.y, 10);
+bar.fill_image = Image("bar-fill.png");
+bar.fill = Sprite();
+bar.fill.SetPosition(bar.x, bar.y, 11);
+bar.target = 0;
+bar.shown = 0;
+bar.drawn = 0;
+bar.enabled = 0;
+if (Plymouth.GetMode() == "boot")
+    bar.enabled = 1;
+if (bar.enabled == 0)
+    bar.track.SetOpacity(0);
+
+fun boot_progress_callback(duration, progress) {
+    global.bar.target = progress;
+}
+Plymouth.SetBootProgressFunction(boot_progress_callback);
+
+// --- Latest started services (sent by systemd) ---
+status.count = 4;
+status.alpha[0] = 1;
+status.alpha[1] = 0.6;
+status.alpha[2] = 0.35;
+status.alpha[3] = 0.15;
+status.line_h = Image.Text("Ag", 1, 1, 1).GetHeight() + 4;
+status.y = bar.y + 14;
+status.last = -1000;
+for (i = 0; i < status.count; i++) {
+    status.text[i] = "";
+    status.sprite[i] = Sprite();
+    status.sprite[i].SetOpacity(0);
+}
+
+fun status_callback(text) {
+    for (i = global.status.count - 1; i > 0; i--)
+        global.status.text[i] = global.status.text[i - 1];
+    global.status.text[0] = text;
+
+    for (i = 0; i < global.status.count; i++) {
+        if (global.status.text[i] != "") {
+            if (i == 0)
+                img = Image.Text(global.status.text[i], @SUBTEXT@, 1);
+            else
+                img = Image.Text(global.status.text[i], @OVERLAY@, 1);
+            global.status.sprite[i].SetImage(img);
+            global.status.sprite[i].SetPosition(global.center.x - img.GetWidth() / 2,
+                                                global.status.y + i * global.status.line_h, 10);
+        }
+    }
+    global.status.last = global.ticks;
+}
+Plymouth.SetUpdateStatusFunction(status_callback);
+
+// --- Per-frame update (~50 fps) ---
+fun extras_refresh() {
+    global.ticks = global.ticks + 1;
+
+    if (global.bar.enabled) {
+        global.bar.shown = global.bar.shown + (global.bar.target - global.bar.shown) * 0.08;
+        w = Math.Int(global.bar.shown * global.bar.w);
+        if (w > global.bar.drawn) {
+            global.bar.fill.SetImage(global.bar.fill_image.Scale(w, global.bar.h));
+            global.bar.drawn = w;
+        }
+    }
+
+    // lines fade out after 3 s without a new status
+    age = global.ticks - global.status.last;
+    fade = 1;
+    if (age > 150)
+        fade = 1 - (age - 150) / 50;
+    if (fade < 0)
+        fade = 0;
+    for (i = 0; i < global.status.count; i++) {
+        if (global.status.text[i] != "")
+            global.status.sprite[i].SetOpacity(fade * global.status.alpha[i]);
+    }
+}
+
+fun refresh_with_extras() {
+    refresh_callback();
+    extras_refresh();
+}
+Plymouth.SetRefreshFunction(refresh_with_extras);
