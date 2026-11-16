@@ -1,0 +1,40 @@
+# Colour mapping for the Plymouth theme 'Bizcom Glow' (/usr/share/plymouth/themes/glow)
+# Edit the targets: any Catppuccin colour name (rosewater, flamingo, pink, mauve, red, maroon, peach, yellow, green, teal, sky, sapphire, blue, lavender,
+# text, subtext1/0, overlay2/1/0, surface2/1/0, base, mantle, crust) or "accent"
+# ("accent" = one theme per accent chosen with -a). You can also add colours.
+
+bar_gap = -15              # -status: px between frame bottom and bar
+bar_width = 0.16          # -status: bar width / frame width
+# bar = "blue"          # progress bar colour (default: accent or main colour)
+
+[groups.progress]   # progress-00.png, progress-01.png, progress-02.png, ... (33 files)
+background = "#000000"
+transparent = true
+
+[groups.progress.colors.white]
+source = "#ffffff"
+target = "accent"
+share = 1.0   # informative
+
+[groups.throbber]   # throbber-00.png, throbber-01.png, throbber-02.png, ... (20 files)
+background = "#000000"
+transparent = true
+
+[groups.throbber.colors.white]
+source = "#ffffff"
+target = "text"
+share = 0.872   # informative
+
+[groups.throbber.colors.yellow]
+source = "#f9a905"
+target = "yellow"
+share = 0.128   # informative
+
+[groups.ui]   # box.png, bullet.png, entry.png, ... (4 files)
+background = "#000000"
+transparent = true
+
+[groups.ui.colors.white]
+source = "#ffffff"
+target = "text"
+share = 1.0   # informative

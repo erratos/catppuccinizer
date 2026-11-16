@@ -1,12 +1,14 @@
-# catppuccin-adi1090x-plymouth
+# plymouth-catppuccinizer
 
-Recolour any of the 80 Plymouth boot animations from
-[adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes) with
-[Catppuccin](https://catppuccin.com) (Latte, Frappé, Macchiato, Mocha).
+Recolour **any Plymouth boot theme** with [Catppuccin](https://catppuccin.com)
+(Latte, Frappé, Macchiato, Mocha): a theme folder on your system (`script`,
+`two-step`, `fade-throbber`…), or any of the 80 animations of
+[adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes),
+fetched by name.
 
 The generator **detects the original colours automatically**, maps them to the
 Catppuccin palette, and lets you **remap any colour by hand**. Anti-aliasing,
-glow and shading are preserved over the Catppuccin background.
+glow, shading and transparency are preserved.
 
 ![before / after](assets/other-themes.png)
 
@@ -15,10 +17,11 @@ glow and shading are preserved over the Catppuccin background.
 Requires Python 3.11+ with `numpy` and `Pillow`, and `git`.
 
 ```bash
-git clone https://github.com/erratos/catppuccin-adi1090x-plymouth.git
-cd catppuccin-adi1090x-plymouth
-python3 generate.py --list                 # the 80 upstream themes
-python3 generate.py rings_2 -f mocha       # recolour one (fetched on demand)
+git clone https://github.com/erratos/plymouth-catppuccinizer.git
+cd plymouth-catppuccinizer
+python3 generate.py /usr/share/plymouth/themes/spinner -a mauve   # a theme you have
+python3 generate.py --list                 # the 80 adi1090x themes
+python3 generate.py rings_2 -f mocha       # one of them (fetched on demand)
 ./install.sh catppuccin-mocha-rings-2      # install + rebuild the initramfs
 ```
 
@@ -69,6 +72,31 @@ python3 generate.py cyanide -f frappe -m cyan=accent -a peach
 Colours mapped to `accent` produce one theme per accent passed with `-a`
 (`-a all` gives the 14 of them). The white ring keeps `text`.
 
+### Any theme folder: `glow` (two-step), with per-group mapping
+
+```bash
+python3 generate.py /usr/share/plymouth/themes/glow -f macchiato -a mauve \
+    -m throbber.white=accent ui.white=lavender
+```
+
+```
+Bizcom Glow [two-step]
+  progress (33 images, transparent)
+    white      #ffffff -> accent  (100%)
+  throbber (20 images, transparent)
+    white      #ffffff -> accent  (87%)
+    yellow     #f9a905 -> yellow  (13%)
+  ui (4 images, transparent)
+    white      #ffffff -> lavender  (100%)
+```
+
+![glow](assets/demo-glow.png)
+
+Each animation sequence and the UI pieces (password box, lock, bullets…) are
+detected separately; `group.name=target` remaps a colour in one group only.
+The two-step colours of the `.plymouth` file (background, progress bar) are
+rewritten too.
+
 ## Example themes
 
 These two are hand-tuned (see `configs/`) and published prebuilt in the
@@ -97,12 +125,26 @@ python3 generate.py hexa_retro infinite_seal -f latte -a mauve blue
 
 ## The generator
 
+### Supported themes
+
+| Module | What is recoloured |
+|---|---|
+| `script` | all images, `Window.SetBackground…Color` calls (or added), white `Image.Text` colours |
+| `two-step` | all images, `BackgroundStartColor`/`EndColor`, progress bar colours (alpha kept) |
+| others (`fade-throbber`, `space-flares`…) | all images |
+
+Other files (fonts, licences…) are copied, paths in the `.plymouth` file are
+rewritten for the new theme name. Themes using `UseFirmwareBackground=true`
+(e.g. CachyOS) keep showing the firmware logo screen behind the animation.
+
 ### Colour detection
 
 The first time a theme is used, its colours are detected and saved to
-`configs/<theme>.toml`:
+`configs/<theme>.toml`, **per group of images**: each numbered sequence
+(`animation-*`, `throbber-*`, `progress-*`…) and `ui` for the single images.
 
-- a theme with **a single colour** (white, cyan, orange…) is mapped to `accent`;
+- a sequence with **a single colour** (white, cyan, orange…) is mapped to
+  `accent`; a single-colour `ui` group goes to `text`;
 - otherwise whites/grays go to `text` and each hue to the closest Catppuccin
   colour (red, peach, yellow, green, teal, sky, sapphire, blue, mauve, pink).
 
@@ -110,7 +152,8 @@ The first time a theme is used, its colours are detected and saved to
 
 ### Manual mapping
 
-Use the colour names printed by the detection (or a `#rrggbb` source colour):
+Use the colour names printed by the detection, optionally prefixed by the
+group (`ui.white`), or a `#rrggbb` source colour:
 
 ```bash
 python3 generate.py hexa_retro -m yellow=red white=lavender -s alt   # -s: name suffix
@@ -126,12 +169,12 @@ Targets can be any Catppuccin colour (the 14 accents, `text`, `subtext1/0`,
 
 | Option | Default | Meaning |
 |---|---|---|
-| `THEME …` | `hexa_retro infinite_seal` | adi1090x theme name(s) |
+| `THEME …` | `hexa_retro infinite_seal` | theme folder(s) or adi1090x theme name(s) |
 | `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` |
 | `-a, --accent` | `all` | accent(s) for colours mapped to `accent`, or `all` |
-| `-m, --map` | | `NAME=TARGET …` overrides for this run |
+| `-m, --map` | | `[GROUP.]NAME=TARGET …` overrides for this run |
 | `-s, --suffix` | | extra suffix for the theme names |
-| `--bar` | auto | `-status` progress bar colour |
+| `--bar` | auto | progress bar colour (`-status` variants, two-step bar) |
 | `--no-status` | | skip the `-status` variants |
 | `--detect` | | re-detect colours, overwrite the config, stop |
 | `--preview` | | only render one before/after image per theme in `<out>/previews/` |
@@ -143,7 +186,8 @@ Output names: `catppuccin-<flavor>-<theme>[-<accent>][-<suffix>]`.
 
 ### `-status` variants
 
-Each generated theme also comes as a `…-status` variant that adds, under the animation:
+Themes built on adi1090x's script template also come as a `…-status`
+variant that adds, under the animation:
 
 - a thin **progress bar** (`surface0` track, accent fill) driven by the real
   boot progress reported by Plymouth (boot only, hidden on shutdown);
@@ -179,7 +223,7 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 | Script | What it does |
 |---|---|
 | `generate.py` | The generator. |
-| `configs/*.toml` | Colour mappings (hand-tuned for the example themes, auto-created for others). |
+| `configs/*.toml` | Colour mappings per theme and image group (hand-tuned for the example themes, auto-created for others). |
 | `extras.script` | Plymouth script code appended to the `-status` variants. |
 | `install.sh <name\|folder>` | Installs a theme, sets it as default and rebuilds the initramfs. |
 | `preview.sh [theme] [seconds]` | Shows a theme without rebooting, with simulated service messages. Always quits Plymouth at the end, even after Ctrl+C, and restores your previous default theme. Run it from a text console (Ctrl+Alt+F3) if nothing appears. |
@@ -187,15 +231,15 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 
 ## How it works
 
-- **Detection**: on ~24 frames, the background is the most common border
-  colour; bright content pixels are split into grays and hues, hue clusters are
+- **Detection** (per image group): on ~24 images, the background is the most
+  common border colour (or none for transparent images); bright content pixels are split into grays and hues, hue clusters are
   found from histogram peaks (plus extra centres for spread-out rainbows), and
   each cluster's brightest pixels give its source colour.
 - **Recolouring**: every pixel is modelled as `background + t × (source −
   background)`. For each pixel the source colour and intensity `t` that explain
   it best are found, then it is rebuilt as `base + t × (target − base)`.
   Single-colour themes are stored as indexed PNGs whose palette is the exact
-  `base → target` ramp (lossless).
+  `base → target` ramp (lossless). Transparent images keep their alpha channel.
 - **Limits**: where two colours blend (overlapping lines, gradients between
   hues) a pixel is attached to one of them; very photographic themes keep their
   shapes but lose subtle hue variations.

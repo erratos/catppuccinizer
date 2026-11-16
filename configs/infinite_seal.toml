@@ -1,14 +1,17 @@
-# Colour mapping for adi1090x/plymouth-themes pack_3/infinite_seal
+# Colour mapping for the Plymouth theme 'Infinite Seal' (upstream/plymouth-themes/pack_3/infinite_seal)
 # Edit the targets: any Catppuccin colour name (rosewater, flamingo, pink, mauve, red, maroon, peach, yellow, green, teal, sky, sapphire, blue, lavender,
 # text, subtext1/0, overlay2/1/0, surface2/1/0, base, mantle, crust) or "accent"
 # ("accent" = one theme per accent chosen with -a). You can also add colours.
 
-background = "#000000"   # detected background of the source frames
 bar_gap = -36              # -status: px between frame bottom and bar
 bar_width = 0.39          # -status: bar width / frame width
-# bar = "blue"          # -status: bar colour (default: accent or main colour)
+# bar = "blue"          # progress bar colour (default: accent or main colour)
 
-[colors.white]
+[groups.progress]   # progress-0.png, progress-1.png, progress-2.png, ... (540 files)
+background = "#000000"
+transparent = false
+
+[groups.progress.colors.white]
 source = "#fffeff"
 target = "accent"
-share = 1.0   # informative: share of coloured pixels
+share = 1.0   # informative

@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
-"""Generate Catppuccin adaptations of any adi1090x Plymouth theme.
+"""Recolour Plymouth themes with Catppuccin.
 
-For each theme, the original colours are detected automatically and mapped to
-Catppuccin colours. The mapping is saved in configs/<theme>.toml so it can be
-edited by hand, or overridden on the command line with --map.
+Works with any theme folder (script, two-step, fade-throbber, ...) and can fetch
+any of the 80 themes of adi1090x/plymouth-themes by name. The original colours
+are detected automatically, per group of images (each animation sequence, plus
+the UI pieces), and saved in configs/<theme>.toml so they can be edited, or
+overridden on the command line with --map.
 
 Examples:
   python3 generate.py                                  # hexa_retro + infinite_seal, mocha
-  python3 generate.py --list                           # every upstream theme
-  python3 generate.py rings_2 --detect                 # detect colours, write config, stop
-  python3 generate.py rings_2 --map pink=mauve green=peach --preview
-  python3 generate.py cyanide -f all -a mauve blue     # mono theme: one per accent
-  python3 generate.py colorful --map yellow=red -s red # manual mapping, name suffix
+  python3 generate.py --list                           # adi1090x themes
+  python3 generate.py rings_2 -m pink=mauve green=peach
+  python3 generate.py /usr/share/plymouth/themes/spinner -f frappe -a mauve
+  python3 generate.py ./my-theme --detect              # detect colours, write config, stop
+  python3 generate.py cyanide -m cyan=accent -a peach --preview
 
 A target is any Catppuccin colour name (red, mauve, text, overlay1, ...) or
 "accent": themes using "accent" are generated once per accent chosen with -a.
 """
 import argparse
 import colorsys
+import configparser
 import re
 import shutil
 import subprocess
 import tomllib
+from collections import defaultdict
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -63,6 +67,7 @@ TARGETS = _ORDER + ["accent"]
 # colours used for automatic mapping of saturated source colours
 AUTO_HUE_TARGETS = ["red", "peach", "yellow", "green", "teal", "sky", "sapphire",
                     "blue", "mauve", "pink"]
+UI_GROUP = "ui"
 
 
 def hex2rgb(h):
@@ -99,9 +104,9 @@ def colour_name(hue, sat, val):
 
 
 # ------------------------------------------------------------------ upstream
-def git(*args, **kw):
+def git(*args):
     return subprocess.run(["git", "-C", str(UPSTREAM), *args], check=True,
-                          capture_output=True, text=True, **kw).stdout
+                          capture_output=True, text=True).stdout
 
 
 def ensure_clone():
@@ -114,64 +119,144 @@ def ensure_clone():
 
 
 def upstream_themes():
-    """{theme name: 'pack_N/theme'} for every upstream theme."""
+    """{theme name: 'pack_N/theme'} for every adi1090x theme."""
     ensure_clone()
     dirs = git("ls-tree", "-d", "--name-only", "HEAD", "pack_1/", "pack_2/", "pack_3/", "pack_4/")
     return {Path(d).name: d for d in dirs.split()}
 
 
-def theme_dir(name, src):
-    """Return the folder of a source theme, fetching it if needed."""
-    name = Path(name).name
+def resolve_theme(arg, src):
+    """Folder of a theme given as a path, or as an adi1090x name (fetched on demand)."""
+    p = Path(arg).expanduser()
+    if p.is_dir():
+        return p.resolve()
+    if "/" in arg:
+        raise SystemExit(f"Theme folder not found: {arg}")
     if src:
-        for cand in (src / name, *src.glob(f"pack_*/{name}"), src):
-            if (cand / f"{name}.script").exists():
+        for cand in (src / arg, *src.glob(f"pack_*/{arg}")):
+            if cand.is_dir():
                 return cand
-        raise SystemExit(f"Theme {name} not found in {src}")
+        raise SystemExit(f"Theme {arg} not found in {src}")
     themes = upstream_themes()
-    if name not in themes:
-        raise SystemExit(f"Unknown theme: {name} (see --list)")
-    d = UPSTREAM / themes[name]
-    if not (d / f"{name}.script").exists():
-        print(f"Fetching {themes[name]} ...", flush=True)
+    if arg not in themes:
+        raise SystemExit(f"Unknown theme: {arg} (give a folder path, or see --list)")
+    d = UPSTREAM / themes[arg]
+    if not (d / f"{arg}.plymouth").exists():
+        print(f"Fetching {themes[arg]} ...", flush=True)
         current = git("sparse-checkout", "list").split()
-        git("sparse-checkout", "set", *sorted(set(current) | {themes[name]}))
+        git("sparse-checkout", "set", *sorted(set(current) | {themes[arg]}))
     return d
 
 
-def frames(d):
-    return sorted(d.glob("progress-*.png"), key=lambda p: int(p.stem.split("-")[1]))
+# --------------------------------------------------------------- theme model
+class Theme:
+    """A source theme: its .plymouth, module, script and image groups."""
+
+    def __init__(self, folder):
+        self.dir = folder
+        files = sorted(folder.glob("*.plymouth"))
+        own = folder / f"{folder.name}.plymouth"
+        if own.exists():
+            files = [own]
+        if not files:
+            raise SystemExit(f"No .plymouth file in {folder}")
+        self.conf_file = files[0]
+        self.conf_text = self.conf_file.read_text()
+        cp = configparser.ConfigParser(interpolation=None, strict=False)
+        cp.optionxform = str
+        cp.read_string(self.conf_text)
+        self.cp = cp
+        main = cp["Plymouth Theme"] if cp.has_section("Plymouth Theme") else {}
+        self.module = main.get("ModuleName", "script")
+        self.title = main.get("Name", folder.name)
+        if " " not in self.title and "_" in self.title:      # hexa_retro -> Hexa Retro
+            self.title = self.title.replace("_", " ").title()
+        self.name = folder.name
+        self.slug = re.sub(r"[^a-z0-9]+", "-", folder.name.lower()).strip("-")
+
+        self.script = None
+        if self.module == "script":
+            sf = cp.get("script", "ScriptFile", fallback=f"{folder.name}.script")
+            cand = folder / Path(sf).name
+            self.script = cand if cand.exists() else next(iter(folder.glob("*.script")), None)
+
+        # images: theme folder, or the ImageDir of the module if it lives elsewhere
+        self.image_dir = folder
+        if not list(folder.glob("*.png")):
+            idir = cp.get(self.module, "ImageDir", fallback="")
+            if idir and Path(idir).is_dir():
+                self.image_dir = Path(idir)
+        self.groups = group_images(sorted(self.image_dir.glob("*.png")))
+
+    @property
+    def adi_template(self):
+        """True for scripts built on adi1090x's template (needed for -status)."""
+        if not self.script:
+            return False
+        s = self.script.read_text()
+        return "flyingman_image" in s and "refresh_callback" in s
 
 
-def load_rgb(path):
-    """Frame as float RGB; transparent images are flattened onto black."""
+def group_images(paths):
+    """Numbered sequences (animation-1.png ...) get their own group; single
+    images are gathered into the 'ui' group."""
+    seq = defaultdict(list)
+    for p in paths:
+        m = re.fullmatch(r"(.*?)[-_]?(\d+)", p.stem)
+        seq[m.group(1) if m and m.group(1) else p.stem].append(p)
+    groups, ui = {}, []
+    for prefix, items in seq.items():
+        if len(items) > 1:
+            groups[prefix] = sorted(items, key=lambda p: int(re.search(r"(\d+)$", p.stem).group(1)))
+        else:
+            ui += items
+    if ui:
+        groups[UI_GROUP] = ui
+    # biggest animation first
+    return dict(sorted(groups.items(), key=lambda kv: (kv[0] == UI_GROUP, -len(kv[1]))))
+
+
+def load_rgba(path):
+    """Image as float RGB plus alpha (0..255), or alpha=None when fully opaque."""
     im = Image.open(path)
-    if im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info:
-        im = im.convert("RGBA")
-        flat = Image.new("RGBA", im.size, (0, 0, 0, 255))
-        flat.alpha_composite(im)
-        im = flat
-    return np.asarray(im.convert("RGB"), dtype=np.float32)
+    has_alpha = im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
+    im = im.convert("RGBA")
+    arr = np.asarray(im, dtype=np.float32)
+    alpha = arr[..., 3]
+    if not has_alpha or alpha.min() >= 255:
+        return arr[..., :3], None
+    return arr[..., :3], alpha
 
 
 # ----------------------------------------------------------------- detection
-def detect(src_dir, max_colors=8):
-    files = frames(src_dir)
-    sample = [files[int(i)] for i in np.linspace(0, len(files) - 1, min(24, len(files)))]
-    imgs = [load_rgb(f) for f in sample]
-    h, w = imgs[0].shape[:2]
+def detect_group(paths, is_ui, max_colors=8):
+    sample = [paths[int(i)] for i in np.linspace(0, len(paths) - 1, min(24, len(paths)))]
+    imgs = [load_rgba(f) for f in sample]
+    transparent = any(a is not None for _, a in imgs)
+    h, w = imgs[0][0].shape[:2]
 
-    # background = most common border colour
-    border = np.concatenate([np.concatenate([im[0], im[-1], im[:, 0], im[:, -1]]) for im in imgs])
-    vals, counts = np.unique(border.astype(np.uint8), axis=0, return_counts=True)
-    bg = vals[counts.argmax()].astype(np.float32)
+    if transparent:
+        bg = np.zeros(3, np.float32)
+    else:   # background = most common border colour
+        border = np.concatenate([np.concatenate([im[0], im[-1], im[:, 0], im[:, -1]])
+                                 for im, _ in imgs])
+        vals, counts = np.unique(border.astype(np.uint8), axis=0, return_counts=True)
+        bg = vals[counts.argmax()].astype(np.float32)
 
-    # content pixels, expressed as offset from the background
-    d = np.concatenate([(im - bg).reshape(-1, 3) for im in imgs])
+    ds, content = [], np.zeros((h, w), bool)
+    rng = np.random.default_rng(0)
+    for im, a in imgs:
+        d = im - bg
+        visible = (a >= 128) if a is not None else np.ones(im.shape[:2], bool)
+        dv = d[visible]
+        dv = dv[dv.max(-1) > 16]
+        if is_ui and len(dv) > 20_000:           # every UI image weighs the same
+            dv = dv[rng.choice(len(dv), 20_000, replace=False)]
+        ds.append(dv)
+        if im.shape[:2] == (h, w):
+            content |= visible & ((d.max(-1) > 16) if a is None else True)
+    d = np.concatenate(ds)
     inten = d.max(-1)
-    content = np.zeros((h, w), bool)
-    for im in imgs:
-        content |= (im - bg).max(-1) > 16
     ys, xs = np.nonzero(content)
     bbox = (xs.min(), ys.min(), xs.max(), ys.max()) if len(xs) else (0, 0, w - 1, h - 1)
 
@@ -179,16 +264,26 @@ def detect(src_dir, max_colors=8):
     sel = d[inten >= max(thr, 24)]
     if len(sel) > 400_000:
         sel = sel[np.random.default_rng(0).choice(len(sel), 400_000, replace=False)]
+    colors = {}
+    if len(sel):
+        colors = cluster_colours(sel, bg, max_colors)
+    if not colors:
+        colors["white"] = {"source": "#ffffff", "share": 1.0}
+    auto_targets(colors, single_to_accent=not is_ui)
+    return {"background": rgb2hex(bg), "transparent": transparent, "colors": colors,
+            "_bbox": bbox, "_size": (w, h)}
+
+
+def cluster_colours(sel, bg, max_colors):
     I = sel.max(-1, keepdims=True)
     c = sel / I                                  # chroma, max channel = 1
-    mn = c.min(-1)
-    sat = 1 - mn
+    sat = 1 - c.min(-1)
     r, g, b = c.T
     delta = np.maximum(sat, 1e-6)
     hue = np.where(r >= 1 - 1e-6, ((g - b) / delta) % 6,
           np.where(g >= 1 - 1e-6, (b - r) / delta + 2, (r - g) / delta + 4)) * 60
 
-    clusters = []                                # (mask over sel)
+    clusters = []
     gray = sat < 0.25
     if gray.mean() > 0.02:
         clusters.append(gray)
@@ -199,8 +294,7 @@ def detect(src_dir, max_colors=8):
         peaks = [i for i in range(72) if sm[i] >= sm[i - 1] and sm[i] > sm[(i + 1) % 72]
                  and sm[i] >= 0.03 * sm.sum()]
         budget = max_colors - len(clusters)
-        peaks = sorted(peaks, key=lambda i: -sm[i])[:budget]
-        centers = [(i + 0.5) * 5 for i in peaks]
+        centers = [(i + 0.5) * 5 for i in sorted(peaks, key=lambda i: -sm[i])[:budget]]
         hc = hue[col]
 
         def nearest_dist(cs):
@@ -234,24 +328,13 @@ def detect(src_dir, max_colors=8):
         while n in colors:
             n, i = f"{name}-{i}", i + 1
         colors[n] = {"source": rgb2hex(key), "share": round(float(m.mean()), 3)}
-    if not colors:
-        colors["white"] = {"source": "#ffffff", "share": 1.0}
-
-    auto_targets(colors)
-    bottom_gap = h - 1 - bbox[3]                 # empty rows under the content
-    return {
-        "background": rgb2hex(bg),
-        "bar": None,
-        "bar_gap": int(20 - bottom_gap),
-        "bar_width": round(float(0.6 * (bbox[2] - bbox[0] + 1) / w), 2),
-        "colors": colors,
-    }
+    return colors
 
 
-def auto_targets(colors):
-    """One colour -> accent; otherwise grays -> text, hues -> closest Catppuccin hue."""
+def auto_targets(colors, single_to_accent=True):
+    """One colour -> accent (text for UI); else grays -> text, hues -> closest hue."""
     if len(colors) == 1:
-        next(iter(colors.values()))["target"] = "accent"
+        next(iter(colors.values()))["target"] = "accent" if single_to_accent else "text"
         return
     ref = {t: hue_of(rgb("mocha", t)) for t in AUTO_HUE_TARGETS}
     pairs, used = [], set()
@@ -264,9 +347,22 @@ def auto_targets(colors):
             pairs += [(hue_dist(hue_of(src), h), name, t) for t, h in ref.items()]
     for _, name, t in sorted(pairs):
         if "target" not in colors[name] and t not in used:
-            colors[name]["target"], _ = t, used.add(t)
+            colors[name]["target"] = t
+            used.add(t)
     for _, name, t in sorted(pairs):            # more colours than targets: reuse
         colors[name].setdefault("target", t)
+
+
+def detect(theme):
+    groups = {g: detect_group(paths, g == UI_GROUP) for g, paths in theme.groups.items()}
+    cfg = {"bar": None, "bar_gap": 20, "bar_width": 0.5, "groups": groups}
+    anim = next((g for g in groups.values() if g is not groups.get(UI_GROUP)), None)
+    if anim:
+        x0, _, x1, y1 = anim["_bbox"]
+        w, h = anim["_size"]
+        cfg["bar_gap"] = int(20 - (h - 1 - y1))
+        cfg["bar_width"] = round(float(0.6 * (x1 - x0 + 1) / w), 2)
+    return cfg
 
 
 # -------------------------------------------------------------------- config
@@ -274,138 +370,217 @@ def config_path(name):
     return CONFIGS / f"{name}.toml"
 
 
-def save_config(name, pack, cfg):
+def save_config(theme, cfg):
     CONFIGS.mkdir(exist_ok=True)
+    src = theme.dir
+    try:
+        src = src.relative_to(ROOT)
+    except ValueError:
+        pass
     lines = [
-        f"# Colour mapping for adi1090x/plymouth-themes {pack}",
+        f"# Colour mapping for the Plymouth theme {theme.title!r} ({src})",
         "# Edit the targets: any Catppuccin colour name (" + ", ".join(ACCENTS) + ",",
         "# text, subtext1/0, overlay2/1/0, surface2/1/0, base, mantle, crust) or \"accent\"",
         "# (\"accent\" = one theme per accent chosen with -a). You can also add colours.",
         "",
-        f'background = "{cfg["background"]}"   # detected background of the source frames',
         f'bar_gap = {cfg["bar_gap"]}              # -status: px between frame bottom and bar',
         f'bar_width = {cfg["bar_width"]}          # -status: bar width / frame width',
+        f'bar = "{cfg["bar"]}"            # progress bar colour' if cfg.get("bar") else
+        '# bar = "blue"          # progress bar colour (default: accent or main colour)',
     ]
-    if cfg.get("bar"):
-        lines.append(f'bar = "{cfg["bar"]}"            # -status: bar colour (default: auto)')
-    else:
-        lines.append('# bar = "blue"          # -status: bar colour (default: accent or main colour)')
-    for n, c in cfg["colors"].items():
-        lines += ["", f"[colors.{n}]", f'source = "{c["source"]}"', f'target = "{c["target"]}"']
-        if "share" in c:
-            lines.append(f'share = {c["share"]}   # informative: share of coloured pixels')
-    config_path(name).write_text("\n".join(lines) + "\n")
+    for g, grp in cfg["groups"].items():
+        files = ", ".join(p.name for p in theme.groups.get(g, [])[:3])
+        if len(theme.groups.get(g, [])) > 3:
+            files += f", ... ({len(theme.groups[g])} files)"
+        lines += ["", f"[groups.{g}]   # {files}",
+                  f'background = "{grp["background"]}"',
+                  f'transparent = {"true" if grp["transparent"] else "false"}']
+        for n, c in grp["colors"].items():
+            lines += ["", f"[groups.{g}.colors.{n}]",f'source = "{c["source"]}"',
+                      f'target = "{c["target"]}"']
+            if "share" in c:
+                lines.append(f'share = {c["share"]}   # informative')
+    config_path(theme.name).write_text("\n".join(lines) + "\n")
 
 
-def load_config(name):
-    cfg = tomllib.loads(config_path(name).read_text())
+def load_config(theme):
+    cfg = tomllib.loads(config_path(theme.name).read_text())
+    if "colors" in cfg:                          # legacy single-group format
+        first = next(iter(theme.groups), "progress")
+        cfg["groups"] = {first: {"background": cfg.pop("background", "#000000"),
+                                 "transparent": False, "colors": cfg.pop("colors")}}
     cfg.setdefault("bar", None)
     cfg.setdefault("bar_gap", 20)
     cfg.setdefault("bar_width", 0.5)
-    for n, c in cfg["colors"].items():
-        if c.get("target") not in TARGETS:
-            raise SystemExit(f"{config_path(name)}: [colors.{n}] target "
-                             f"'{c.get('target')}' is not a Catppuccin colour or 'accent'")
+    for g, grp in cfg["groups"].items():
+        grp.setdefault("transparent", False)
+        for n, c in grp["colors"].items():
+            if c.get("target") not in TARGETS:
+                raise SystemExit(f"{config_path(theme.name)}: [groups.{g}.colors.{n}] target "
+                                 f"'{c.get('target')}' is not a Catppuccin colour or 'accent'")
+    missing = set(theme.groups) - set(cfg["groups"])
+    if missing:   # new images since the config was written
+        fresh = detect(theme)["groups"]
+        for g in missing:
+            cfg["groups"][g] = fresh[g]
     return cfg
 
 
 def apply_maps(cfg, maps):
+    groups = cfg["groups"]
     for m in maps:
         if "=" not in m:
             raise SystemExit(f"--map expects NAME=TARGET, got '{m}'")
         k, t = (s.strip() for s in m.split("=", 1))
         if t not in TARGETS:
             raise SystemExit(f"--map {m}: unknown target '{t}' (choose from: {', '.join(TARGETS)})")
-        if k in cfg["colors"]:
-            cfg["colors"][k]["target"] = t
-        elif re.fullmatch(r"#?[0-9a-fA-F]{6}", k):
-            k = "#" + k.lstrip("#").lower()
-            hit = [n for n, c in cfg["colors"].items() if c["source"] == k]
-            if hit:
-                cfg["colors"][hit[0]]["target"] = t
-            else:                                 # new source colour
-                cfg["colors"][k] = {"source": k, "target": t}
-        else:
+        gname, _, k2 = k.rpartition(".") if "." in k and k.split(".")[0] in groups else ("", "", k)
+        scope = {gname: groups[gname]} if gname else groups
+        hit = False
+        for grp in scope.values():
+            if k2 in grp["colors"]:
+                grp["colors"][k2]["target"], hit = t, True
+            elif re.fullmatch(r"#?[0-9a-fA-F]{6}", k2):
+                hx = "#" + k2.lstrip("#").lower()
+                for c in grp["colors"].values():
+                    if c["source"] == hx:
+                        c["target"], hit = t, True
+        if not hit and re.fullmatch(r"#?[0-9a-fA-F]{6}", k2):
+            hx = "#" + k2.lstrip("#").lower()      # new source colour in the first group
+            next(iter(scope.values()))["colors"][hx] = {"source": hx, "target": t}
+            hit = True
+        if not hit:
+            have = sorted({f"{g}.{n}" for g, grp in groups.items() for n in grp["colors"]})
             raise SystemExit(f"--map {m}: no colour named '{k}' "
-                             f"(have: {', '.join(cfg['colors'])}; or use a #rrggbb source)")
+                             f"(have: {', '.join(have)}; or use a #rrggbb source)")
 
 
-def print_mapping(name, cfg):
-    print(f"{name}: background {cfg['background']}")
-    for n, c in cfg["colors"].items():
-        share = f"  ({c['share'] * 100:.0f}%)" if "share" in c else ""
-        print(f"  {n:10s} {c['source']} -> {c['target']}{share}")
+def print_mapping(theme, cfg):
+    print(f"{theme.title} [{theme.module}]")
+    for g, grp in cfg["groups"].items():
+        n = len(theme.groups.get(g, []))
+        bg = "transparent" if grp["transparent"] else f"background {grp['background']}"
+        print(f"  {g} ({n} image{'s' if n > 1 else ''}, {bg})")
+        for name, c in grp["colors"].items():
+            share = f"  ({c['share'] * 100:.0f}%)" if "share" in c else ""
+            print(f"    {name:10s} {c['source']} -> {c['target']}{share}")
 
 
 # --------------------------------------------------------------- recolouring
-def recolor(path, dst, src_bg, keys, targets, base):
+def recolor_image(path, src_bg, keys, targets, base):
     """Each pixel ~ bg + t * (key - bg): find the key and intensity t that explain
-    it best, then rebuild it as base + t * (target - base)."""
-    px = load_rgb(path)
+    it best, then rebuild it as base + t * (target - base). Alpha is kept."""
+    px, alpha = load_rgba(path)
     flat = px.reshape(-1, 3) - src_bg
     k = keys - src_bg
     t = np.clip((flat @ k.T) / np.maximum((k ** 2).sum(1), 1e-6), 0, 1)       # (N, K)
-    if len(keys) == 1:
+    if len(keys) == 1 and alpha is None:
         # single colour: indexed PNG whose palette is the exact base -> target ramp
         idx = np.round(t[:, 0] * 255).astype(np.uint8).reshape(px.shape[:2])
         ramp = np.arange(256, dtype=np.float32)[:, None] / 255
         pal = np.clip(base + ramp * (targets[0] - base) + 0.5, 0, 255).astype(np.uint8)
         im = Image.fromarray(idx, "P")
         im.putpalette(pal.flatten().tolist())
-    else:
-        resid = ((flat[:, None, :] - t[..., None] * k[None]) ** 2).sum(-1)
-        best = resid.argmin(1)
-        tb = t[np.arange(len(flat)), best][:, None]
-        out = (base + tb * (targets[best] - base)).reshape(px.shape)
-        im = Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGB")
-        im = im.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    if dst is None:
         return im
-    im.save(dst, optimize=True)
+    if len(keys) == 1:
+        best = np.zeros(len(flat), int)
+    else:
+        best = (((flat[:, None, :] - t[..., None] * k[None]) ** 2).sum(-1)).argmin(1)
+    tb = t[np.arange(len(flat)), best][:, None]
+    out = np.clip((base + tb * (targets[best] - base)).reshape(px.shape) + 0.5, 0, 255)
+    if alpha is not None:
+        rgba = np.dstack([out, alpha]).astype(np.uint8)
+        return Image.fromarray(rgba, "RGBA")
+    im = Image.fromarray(out.astype(np.uint8), "RGB")
+    return im.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
 
 
 def _job(args):
-    recolor(*args)
+    path, dst, src_bg, keys, targets, base = args
+    recolor_image(path, src_bg, keys, targets, base).save(dst, optimize=True)
 
 
-# ------------------------------------------------------------------- scripts
+# --------------------------------------------------------------- theme files
 def color_args(flavor, name):
     c = rgb(flavor, name) / 255
     return f"{c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f}"
 
 
 def patch_script(text, flavor):
-    """Flavour base for the whole window + flavour `text` colour for messages."""
+    """Flavour base for the whole window + flavour `text` colour for white text."""
     b = color_args(flavor, "base")
-    bg = (f"// Catppuccin {FLAVOR_TITLES[flavor]} background\n"
-          f"Window.SetBackgroundTopColor({b});\n"
-          f"Window.SetBackgroundBottomColor({b});\n\n")
-    if "// Screen size" in text:
-        text = text.replace("// Screen size", bg + "// Screen size", 1)
+    text, n = re.subn(r"Window\.SetBackground(Top|Bottom)Color\s*\([^)]*\)",
+                      lambda m: f"Window.SetBackground{m.group(1)}Color({b})", text)
+    if not n:
+        bg = (f"// Catppuccin {FLAVOR_TITLES[flavor]} background\n"
+              f"Window.SetBackgroundTopColor({b});\n"
+              f"Window.SetBackgroundBottomColor({b});\n\n")
+        if "// Screen size" in text:
+            text = text.replace("// Screen size", bg + "// Screen size", 1)
+        else:
+            text = bg + text
+    white = r",\s*1(?:\.0*)?\s*,\s*1(?:\.0*)?\s*,\s*1(?:\.0*)?\s*([,)])"
+    return re.sub(white, lambda m: f", {color_args(flavor, 'text')}{m.group(1)}", text)
+
+
+def plymouth_colour(flavor, name, old):
+    """0xRRGGBB / 0xAARRGGBB value keeping the original alpha byte, if any."""
+    hx = PALETTES[flavor][name]
+    v = old.strip().lower().removeprefix("0x")
+    return "0x" + (v[:2] + hx if len(v) == 8 else hx)
+
+
+def colour_key_target(key, bar):
+    k = key.lower()
+    if "progressbarforeground" in k:
+        return bar
+    if "progressbarbackground" in k:
+        return "surface0"
+    if "background" in k:
+        return "base"
+    return "text"
+
+
+def patch_plymouth(theme, new_name, desc, flavor, bar):
+    text = theme.conf_text
+    text = re.sub(r"^Name(\[[^]]*\])?=.*\n?", "", text, flags=re.M)
+    text = re.sub(r"^Description(\[[^]]*\])?=.*\n?", "", text, flags=re.M)
+    text = re.sub(r"^(\[Plymouth Theme\]\s*\n)",
+                  f"\\1Name={new_name}\nDescription={desc}\n", text, count=1, flags=re.M)
+    comment = f"Catppuccin {FLAVOR_TITLES[flavor]} recolour of {theme.title}"
+    old = re.search(r"^Comment=(.*)$", text, flags=re.M)
+    if old:
+        text = text.replace(old.group(0), f"Comment={comment} ({old.group(1).strip()})", 1)
     else:
-        text = bg + text
-    return text.replace(", 1, 1, 1)", f", {color_args(flavor, 'text')})")
+        text = re.sub(r"^(Description=.*\n)", f"\\1Comment={comment}\n", text, count=1, flags=re.M)
+    text = re.sub(r"^(\s*ImageDir\s*=).*$", rf"\g<1>{INSTALL_DIR}/{new_name}", text, flags=re.M)
+    text = re.sub(r"^(\s*ScriptFile\s*=).*$", rf"\g<1>{INSTALL_DIR}/{new_name}/{new_name}.script",
+                  text, flags=re.M)
+    if theme.module == "two-step":
+        text = re.sub(r"^(\s*(\w*Color)\s*=\s*)(0x[0-9a-fA-F]{6,8})\s*$",
+                      lambda m: m.group(1) + plymouth_colour(
+                          flavor, colour_key_target(m.group(2), bar), m.group(3)),
+                      text, flags=re.M)
+        if not re.search(r"^\s*BackgroundStartColor", text, flags=re.M):
+            base = plymouth_colour(flavor, "base", "0x000000")
+            text = re.sub(r"^(\[two-step\]\s*\n)",
+                          f"\\1BackgroundStartColor={base}\nBackgroundEndColor={base}\n",
+                          text, count=1, flags=re.M)
+    return text
 
 
-def write_theme(src_dir, name, desc, dst_dir, flavor):
-    old = src_dir.name
+def write_theme(theme, new_name, flavor, acc, bar, dst_dir):
     if dst_dir.exists():
         shutil.rmtree(dst_dir)
     dst_dir.mkdir(parents=True)
-    (dst_dir / f"{name}.script").write_text(
-        patch_script((src_dir / f"{old}.script").read_text(), flavor))
-    conf = (src_dir / f"{old}.plymouth").read_text()
-    conf = re.sub(r"^Name=.*$", f"Name={name}", conf, flags=re.M)
-    conf = re.sub(r"^Description=.*$", f"Description={desc}", conf, flags=re.M)
-    conf = re.sub(r"^Comment=.*$",
-                  f"Comment=Catppuccin {FLAVOR_TITLES[flavor]} adaptation of a theme "
-                  "by Aditya Shakya (@adi1090x)", conf, flags=re.M)
-    conf = re.sub(r"^ImageDir=.*$", f"ImageDir={INSTALL_DIR}/{name}", conf, flags=re.M)
-    conf = re.sub(r"^ScriptFile=.*$", f"ScriptFile={INSTALL_DIR}/{name}/{name}.script",
-                  conf, flags=re.M)
-    (dst_dir / f"{name}.plymouth").write_text(conf)
-    if (src_dir / "LICENSE").exists():
-        shutil.copy(src_dir / "LICENSE", dst_dir / "LICENSE")
+    skip = {theme.conf_file.name, theme.script.name if theme.script else None}
+    for f in theme.dir.iterdir():                # fonts, licences, ... (symlinks followed)
+        if f.is_file() and f.suffix != ".png" and f.name not in skip:
+            shutil.copy(f, dst_dir / f.name)
+    desc = f"{theme.title} - Catppuccin {FLAVOR_TITLES[flavor]}" + (f" {acc}" if acc else "")
+    (dst_dir / f"{new_name}.plymouth").write_text(patch_plymouth(theme, new_name, desc, flavor, bar))
+    if theme.script:
+        (dst_dir / f"{new_name}.script").write_text(patch_script(theme.script.read_text(), flavor))
 
 
 def write_status_variant(base_dir, flavor, bar, bar_width, bar_gap):
@@ -433,6 +608,36 @@ def write_status_variant(base_dir, flavor, bar, bar_width, bar_gap):
         Image.new("RGB", (1, 1), tuple(int(v) for v in rgb(flavor, col))).save(dst / fname)
 
 
+# ------------------------------------------------------------------- preview
+def preview_sheet(theme, plan, base, out):
+    """One row per image group: original (over its background) | recoloured (over base)."""
+    rows = []
+    for g, (src_bg, keys, targets) in plan.items():
+        paths = theme.groups[g]
+        if g == UI_GROUP:   # the largest UI image is the most telling
+            path = max(paths, key=lambda p: Image.open(p).size[0] * Image.open(p).size[1]
+                       if Image.open(p).size[0] < 4000 else 0)
+        else:
+            path = paths[len(paths) // 2]
+        im = Image.open(path).convert("RGBA")
+        before = Image.new("RGBA", im.size, tuple(int(v) for v in src_bg) + (255,))
+        before.alpha_composite(im)
+        after = Image.new("RGBA", im.size, tuple(int(v) for v in base) + (255,))
+        after.alpha_composite(recolor_image(path, src_bg, keys, targets, base).convert("RGBA"))
+        scale = min(240 / im.height, 560 / im.width, 8)
+        size = (max(1, round(im.width * scale)), max(1, round(im.height * scale)))
+        rows.append((before.resize(size), after.resize(size)))
+    W = max(a.width for a, _ in rows) * 2 + 8
+    H = sum(a.height + 8 for a, _ in rows)
+    sheet = Image.new("RGB", (W, H), (69, 71, 90))
+    y = 0
+    for a, b in rows:
+        sheet.paste(a.convert("RGB"), (0, y))
+        sheet.paste(b.convert("RGB"), (W // 2 + 4, y))
+        y += a.height + 8
+    sheet.save(out)
+
+
 # ---------------------------------------------------------------------- main
 def expand(values, allowed, what):
     if "all" in values:
@@ -445,26 +650,26 @@ def expand(values, allowed, what):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Generate Catppuccin adaptations of adi1090x Plymouth themes.",
+        description="Recolour Plymouth themes with Catppuccin.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"flavors: {', '.join(FLAVORS)}\naccents: {', '.join(ACCENTS)}\n"
                f"targets: {', '.join(TARGETS)}")
     p.add_argument("themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME",
-                   help="adi1090x theme name(s) (default: hexa_retro infinite_seal)")
+                   help="theme folder, or adi1090x theme name (default: hexa_retro infinite_seal)")
     p.add_argument("-f", "--flavor", nargs="+", default=["mocha"], metavar="FLAVOR",
                    help="one or more flavors, or 'all' (default: mocha)")
     p.add_argument("-a", "--accent", nargs="+", default=["all"], metavar="ACCENT",
                    help="accent(s) for colours mapped to 'accent', or 'all' (default: all)")
     p.add_argument("-m", "--map", nargs="+", default=[], metavar="NAME=TARGET",
-                   help="override the mapping, e.g. yellow=red green=mauve '#ffad03=peach'")
+                   help="override the mapping: white=mauve, ui.white=text, '#ffad03=peach'")
     p.add_argument("-s", "--suffix", default="", help="extra suffix for the theme names")
-    p.add_argument("--bar", metavar="COLOUR", help="-status progress bar colour")
+    p.add_argument("--bar", metavar="COLOUR", help="progress bar colour")
     p.add_argument("--no-status", action="store_true", help="skip the -status variants")
     p.add_argument("--detect", action="store_true",
                    help="(re)detect colours, overwrite configs/<theme>.toml, then stop")
     p.add_argument("--preview", action="store_true",
-                   help="only render one before/after image per theme into <out>/previews/")
-    p.add_argument("--list", action="store_true", help="list upstream themes and exit")
+                   help="only render a before/after image per theme into <out>/previews/")
+    p.add_argument("--list", action="store_true", help="list adi1090x themes and exit")
     p.add_argument("-o", "--out", type=Path, default=ROOT / "themes",
                    help="output folder (default: themes/)")
     p.add_argument("--src", type=Path,
@@ -491,68 +696,69 @@ def main():
     if a.list:
         return list_themes()
 
-    jobs, status, previews = [], [], []
-    for theme in a.themes:
-        src = theme_dir(theme, a.src)
-        name = src.name
-        pack = "/".join(src.parts[-2:])
-        if a.detect or not config_path(name).exists():
-            print(f"Detecting colours of {name} ...", flush=True)
-            save_config(name, pack, detect(src))
-            print(f"  -> {config_path(name)}")
-        cfg = load_config(name)
+    jobs, status = [], []
+    for arg in a.themes:
+        theme = Theme(resolve_theme(arg, a.src))
+        if not theme.groups:
+            print(f"{theme.title}: no PNG images, nothing to recolour")
+            continue
+        if a.detect or not config_path(theme.name).exists():
+            print(f"Detecting colours of {theme.title} ...", flush=True)
+            save_config(theme, detect(theme))
+            print(f"  -> {config_path(theme.name)}")
+        cfg = load_config(theme)
         apply_maps(cfg, a.map)
-        print_mapping(name, cfg)
+        print_mapping(theme, cfg)
         if a.detect:
             continue
 
-        src_bg = hex2rgb(cfg["background"])
-        keys = np.array([hex2rgb(c["source"]) for c in cfg["colors"].values()])
-        tnames = [c["target"] for c in cfg["colors"].values()]
-        uses_accent = "accent" in tnames
-        fr = frames(src)
-        slug = name.replace("_", "-")
+        uses_accent = any(c["target"] == "accent"
+                          for grp in cfg["groups"].values() for c in grp["colors"].values())
+        main_colours = [c["target"] for grp in cfg["groups"].values()
+                        for c in sorted(grp["colors"].values(), key=lambda c: -c.get("share", 0))
+                        if c["target"] in ACCENTS]
+        with_status = not a.no_status and theme.adi_template
+        if not a.no_status and not theme.adi_template and not a.preview:
+            print("  (no -status variant: only for adi1090x-style script themes)")
         for flv in a.flavor:
+            base = rgb(flv, "base")
             for acc in (a.accent if uses_accent else [None]):
-                out_name = "-".join(x for x in (f"catppuccin-{flv}-{slug}", acc, a.suffix) if x)
-                targets = np.array([rgb(flv, acc if t == "accent" else t) for t in tnames])
-                base = rgb(flv, "base")
-                if a.preview:
-                    previews.append((fr[len(fr) // 2], out_name, src_bg, keys, targets, base))
-                    continue
-                desc = f"{name.replace('_', ' ').title()} - Catppuccin {FLAVOR_TITLES[flv]}" + (f" {acc}" if acc else "")
-                write_theme(src, out_name, desc, a.out / out_name, flv)
-                jobs += [(f, a.out / out_name / f.name, src_bg, keys, targets, base) for f in fr]
-                # bar colour: option > config > accent > most common non-gray target
-                coloured = [c["target"] for c in sorted(cfg["colors"].values(),
-                            key=lambda c: -c.get("share", 0)) if c["target"] in ACCENTS]
-                bar = a.bar or cfg["bar"] or acc or (coloured[0] if coloured else "blue")
+                out_name = "-".join(x for x in (f"catppuccin-{flv}-{theme.slug}", acc, a.suffix) if x)
+                # bar colour: option > config > accent > most common colour target
+                bar = a.bar or cfg["bar"] or acc or (main_colours[0] if main_colours else "blue")
                 bar = acc if bar == "accent" else bar
-                status.append((a.out / out_name, flv, bar, cfg["bar_width"], cfg["bar_gap"]))
+                plan = {}
+                for g, grp in cfg["groups"].items():
+                    if g not in theme.groups:
+                        continue
+                    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
+                    targets = np.array([rgb(flv, acc if c["target"] == "accent" else c["target"])
+                                        for c in grp["colors"].values()])
+                    plan[g] = (hex2rgb(grp["background"]), keys, targets)
+                if a.preview:
+                    (a.out / "previews").mkdir(parents=True, exist_ok=True)
+                    out = a.out / "previews" / f"{out_name}.png"
+                    preview_sheet(theme, plan, base, out)
+                    print(f"  preview: {out}")
+                    continue
+                write_theme(theme, out_name, flv, acc, bar, a.out / out_name)
+                for g, (src_bg, keys, targets) in plan.items():
+                    jobs += [(p, a.out / out_name / p.name, src_bg, keys, targets, base)
+                             for p in theme.groups[g]]
+                status.append(((a.out / out_name, flv, bar, cfg["bar_width"], cfg["bar_gap"]),
+                               with_status))
 
-    if previews:
-        (a.out / "previews").mkdir(parents=True, exist_ok=True)
-        for f, out_name, src_bg, keys, targets, base in previews:
-            before = Image.fromarray(load_rgb(f).astype(np.uint8))
-            after = recolor(f, None, src_bg, keys, targets, base).convert("RGB")
-            sheet = Image.new("RGB", (before.width * 2, before.height))
-            sheet.paste(before, (0, 0))
-            sheet.paste(after, (before.width, 0))
-            sheet.save(a.out / "previews" / f"{out_name}.png")
-            print(f"  preview: {a.out / 'previews' / out_name}.png")
-        return
     if not jobs:
         return
-
     print(f"{len(status)} theme(s), {len(jobs)} images", flush=True)
     with Pool() as pool:
         for i, _ in enumerate(pool.imap_unordered(_job, jobs, chunksize=8), 1):
             if i % 500 == 0 or i == len(jobs):
                 print(f"{i}/{len(jobs)} images", flush=True)
-    for args in status:
-        if not a.no_status:
+    for args, with_st in status:
+        if with_st:
             write_status_variant(*args)
-        print(f"  {args[0].name}" + ("" if a.no_status else f"  (+ {args[0].name}-status)"))
+        print(f"  {args[0].name}" + (f"  (+ {args[0].name}-status)" if with_st else ""))
 
 
 if __name__ == "__main__":
