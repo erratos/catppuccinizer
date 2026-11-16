@@ -1,8 +1,10 @@
 # catppuccin-adi1090x-plymouth
 
 [Catppuccin](https://catppuccin.com) adaptations (Latte, Frappé, Macchiato,
-Mocha) of two Plymouth boot animations from [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes):
-**hexa_retro** and **infinite_seal**.
+Mocha) of Plymouth boot animations from [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes).
+**hexa_retro** and **infinite_seal** are prebuilt; the generator can recolour
+**any of the 80 adi1090x themes**, with automatic colour detection and manual
+remapping.
 
 | hexa_retro | infinite_seal (mauve) |
 |:---:|:---:|
@@ -64,52 +66,106 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 
 ### From source
 
-Requires Python 3 with `numpy` and `Pillow`, and `git`.
+Requires Python 3.11+ with `numpy` and `Pillow`, and `git`.
 
 ```bash
 git clone https://github.com/erratos/catppuccin-adi1090x-plymouth.git
 cd catppuccin-adi1090x-plymouth
-python3 generate.py          # fetches the upstream themes, writes themes/
+python3 generate.py          # hexa_retro + infinite_seal, Mocha, all accents
 ./install.sh catppuccin-mocha-hexa-retro-status
 ```
 
-Pick the flavour(s) and accent(s) you want:
+Upstream themes are fetched on demand (sparse git checkout into `upstream/`).
+
+## Generator
+
+### Any adi1090x theme
+
+![other themes](assets/other-themes.png)
 
 ```bash
-python3 generate.py -f macchiato -a mauve            # macchiato hexa_retro + mauve seal
-python3 generate.py -f latte frappe -a pink blue     # several at once
-python3 generate.py -f all -a all                    # everything: 120 themes, ~2.3 GB
-python3 generate.py -f mocha -a teal -t seal --no-status
+python3 generate.py --list                     # the 80 upstream themes
+python3 generate.py rings_2 owl -f macchiato   # recolour any of them
 ```
+
+The first time a theme is used, its colours are **detected automatically** and
+saved to `configs/<theme>.toml`:
+
+```
+$ python3 generate.py rings_2 --detect
+rings_2: background #000000
+  blue       #32bcff -> sapphire  (46%)
+  green      #8cff4a -> green  (32%)
+  pink       #ff42a5 -> pink  (22%)
+```
+
+- a theme with **a single colour** (white, cyan, orange…) is mapped to `accent`
+  and built once per accent chosen with `-a`;
+- otherwise whites/grays go to `text` and each hue to the closest Catppuccin
+  colour (red, peach, yellow, green, teal, sky, sapphire, blue, mauve, pink).
+
+### Manual mapping
+
+Override any colour on the command line, using the names printed above (or a
+`#rrggbb` source colour):
+
+```bash
+python3 generate.py rings_2 -m pink=mauve green=peach
+python3 generate.py hexa_retro -m yellow=red white=lavender -s alt   # -s: name suffix
+python3 generate.py owl -m white=accent -a mauve                     # turn a colour into the accent
+```
+
+or edit `configs/<theme>.toml` for a permanent change (targets can be any
+Catppuccin colour: the 14 accents, `text`, `subtext1/0`, `overlay2/1/0`,
+`surface2/1/0`, `base`, `mantle`, `crust`, or `accent`). Use `--preview` to
+render a single before/after image per theme in `themes/previews/` instead of
+building everything.
+
+### Options
 
 | Option | Default | Meaning |
 |---|---|---|
-| `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` (several allowed) |
-| `-a, --accent` | `all` | infinite_seal accent(s) or `all` |
-| `-t, --theme` | `hexa seal` | which animations to build |
-| `--hexa-bar` | `blue` | progress bar accent of `hexa-retro-status` |
+| `THEME …` | `hexa_retro infinite_seal` | adi1090x theme name(s) |
+| `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` |
+| `-a, --accent` | `all` | accent(s) for colours mapped to `accent`, or `all` |
+| `-m, --map` | | `NAME=TARGET …` overrides for this run |
+| `-s, --suffix` | | extra suffix for the theme names |
+| `--bar` | auto | `-status` progress bar colour |
 | `--no-status` | | skip the `-status` variants |
+| `--detect` | | re-detect colours, overwrite the config, stop |
+| `--preview` | | only render before/after images |
+| `--list` | | list upstream themes (`[config]` = has a config) |
 | `-o, --out` | `themes/` | output folder |
-| `--src` | fetched into `upstream/` | local copy of `adi1090x/plymouth-themes/pack_3` |
+| `--src` | | local `adi1090x/plymouth-themes` checkout instead of fetching |
+
+Output names: `catppuccin-<flavor>-<theme>[-<accent>][-<suffix>]` (+ `-status`).
 
 ## Tools
 
 | Script | What it does |
 |---|---|
-| `generate.py` | Fetches the two upstream themes and generates the chosen flavours/accents in `themes/`. Palettes and colour mapping live at the top of the file. |
+| `generate.py` | The generator described above. |
+| `configs/*.toml` | Colour mappings (hand-tuned for hexa_retro and infinite_seal, auto-created for others). |
 | `extras.script` | Plymouth script code appended to the `-status` variants (progress bar + service list). |
 | `install.sh <name\|folder>` | Installs a theme, sets it as default and rebuilds the initramfs. |
 | `preview.sh [theme] [seconds]` | Shows the theme without rebooting, with simulated service messages. Always quits Plymouth at the end, even after Ctrl+C, and restores your previous default theme. Run it from a text console (Ctrl+Alt+F3) if nothing appears. |
 | `boot-delay.sh <seconds\|off>` | Keeps the splash up to 15 s longer at boot, handy on fast machines to actually see the theme. Remember to turn it `off`. |
 
-## How the recolouring works
+## How it works
 
-- **infinite_seal** is white on black: each pixel's intensity becomes a blend
-  between the flavour's `base` and the accent, stored as an indexed PNG whose palette
-  is that exact gradient (lossless, same size as the original).
-- **hexa_retro** has five neon colours over black: each pixel is matched to the
-  nearest original colour and its intensity, then rebuilt with the flavour's colour
-  over `base`, so anti-aliasing and glow are preserved.
+- **Detection**: on ~24 frames, the background is the most common border
+  colour; bright content pixels are split into grays and hues, hue clusters are
+  found from histogram peaks (plus extra centres for spread-out rainbows), and
+  each cluster's brightest pixels give its source colour.
+- **Recolouring**: every pixel is modelled as `background + t × (source −
+  background)`. For each pixel the source colour and intensity `t` that explain
+  it best are found, then it is rebuilt as `base + t × (target − base)`, so
+  anti-aliasing, glow and shading are preserved over the Catppuccin background.
+  Single-colour themes are stored as indexed PNGs whose palette is the exact
+  `base → target` ramp (lossless).
+- **Limits**: where two colours blend (overlapping lines, gradients between
+  hues) a pixel is attached to one of them; very photographic themes keep their
+  shapes but lose subtle hue variations.
 
 ## Credits & licence
 

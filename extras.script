@@ -1,7 +1,7 @@
 
 //------------------------ Catppuccin extras: progress bar + status ------------------------
 // Appended by generate.py to the "-status" variants.
-// @SUBTEXT@ / @OVERLAY@ / @BARFRAC@ / @BARGAP@ are filled in by generate.py.
+// Placeholders (@-delimited) are filled in by generate.py from the flavour and config.
 
 anim.h = flyingman_image[0].GetHeight();
 anim.w = flyingman_image[0].GetWidth();
