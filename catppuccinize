@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""Recolour boot themes and wallpapers with Catppuccin. See --help."""
+from catppuccinizer.cli import main
+
+if __name__ == "__main__":
+    main()
