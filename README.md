@@ -204,7 +204,8 @@ password prompts and messages.
 ### Installation
 
 `--install` copies the theme to `/usr/share/plymouth/themes/`, sets it as default
-and rebuilds the initramfs (it asks for sudo). From a release archive:
+and rebuilds the initramfs (it asks for sudo). From an archive of
+[catppuccinized-themes](https://github.com/erratos/catppuccinized-themes/releases):
 
 ```bash
 tar xf catppuccin-mocha-infinite-seal-mauve.tar.gz
