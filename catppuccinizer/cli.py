@@ -14,7 +14,7 @@ def common_parser():
                         help="one or more flavors, or 'all' (default: mocha)")
     common.add_argument("-a", "--accent", nargs="+", metavar="ACCENT",
                         help="accent(s) for colours mapped to 'accent', or 'all'")
-    common.add_argument("-m", "--map", nargs="+", default=[], metavar="NAME=TARGET",
+    common.add_argument("-m", "--map", nargs="+", action="extend", default=[], metavar="NAME=TARGET",
                         help="override the colour mapping: white=mauve, ui.white=text, '#ffad03=peach'")
     common.add_argument("--preview", action="store_true",
                         help="only render before/after images into <out>/previews/")
