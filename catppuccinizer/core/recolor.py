@@ -92,6 +92,15 @@ def sharpness(path):
     im = Image.open(path).convert("L")
     im.thumbnail((1024, 1024))
     a = np.asarray(im, np.float32)
+    # measure on the content's bounding box: a small logo on a plain background
+    # would otherwise leave nothing but background in the percentiles
+    border = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
+    ys, xs = np.nonzero(np.abs(a - np.median(border)) > 8)
+    if len(ys):
+        pad = 8
+        a = a[max(ys.min() - pad, 0):ys.max() + pad + 1, max(xs.min() - pad, 0):xs.max() + pad + 1]
+    if min(a.shape) < 2:
+        return 0.0
     g = np.maximum(np.abs(np.diff(a, axis=1))[:-1], np.abs(np.diff(a, axis=0))[:, :-1])
     return float(np.percentile(g, 99) / (np.percentile(a, 99) - np.percentile(a, 1) + 1))
 

@@ -54,6 +54,10 @@ def make_images(d):
     dr.ellipse([8, 8, 88, 88], fill=(255, 255, 255, 255))
     dr.ellipse([30, 30, 66, 66], fill=(23, 147, 209, 255))
     im.save(d / "logo.png")
+    # tiny logo on a big plain background: still flat art (keys), not the LUT
+    im = Image.new("RGB", (320, 180), (0, 0, 0))
+    ImageDraw.Draw(im).ellipse([150, 80, 162, 92], fill=(232, 232, 232))
+    im.save(d / "speck.png")
     # vector logo: stays an SVG, only the colours written in it change
     (d / "mark.svg").write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
