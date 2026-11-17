@@ -108,6 +108,16 @@ def list_packages():
         print(f"{pid:42s} {package_name(d)}  ({d.parent})")
 
 
+def preview_group(preview, rasters):
+    """Colours of the animation the preview is a still of (the one that rebuilds it
+    best), or None when no animation explains it well enough."""
+    scored = [(recolor.fit_error(preview, g)[0], g) for m, g, _ in rasters.values() if m == "anim"]
+    if not scored:
+        return None
+    err, grp = min(scored, key=lambda x: x[0])
+    return grp if err < 2 * recolor.FIT_THRESHOLD else None
+
+
 # ---------------------------------------------------------------------- main
 def run(a):
     if a.list:
@@ -131,8 +141,14 @@ def run(a):
     tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
     rasters = {}                                   # path -> ("anim"|method, grp, extra)
     previews = pkg / "contents/previews/splash.png"
-    for f in sorted([*splash.rglob("*"), *([previews] if previews.exists() else [])]):
+    for f in [*sorted(splash.rglob("*")), *([previews] if previews.exists() else [])]:
         ext = f.suffix.lower()
+        if f == previews and (grp := preview_group(f, rasters)):
+            # the preview is a still of an animation: same colours and -m, so it
+            # matches the splash in System Settings (alone it may go to the LUT)
+            rasters[f] = ("keys", grp, None)
+            print(f"  {f.relative_to(pkg)}: keys (colours of the animation)")
+            continue
         if is_animated(f):
             n, durations, loop = anim_info(f)
             grp = detect_group(anim_sample(f, n, tmp), is_ui=False)

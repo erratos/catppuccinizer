@@ -20,6 +20,14 @@
   "speck-catppuccin-mocha-mauve.png": "62f8364518002804"
  },
  "ksplash": {
+  "catppuccin-mocha-test-splash-mauve-lav/contents/previews/splash.png": "e7d9f3645897dbcf",
+  "catppuccin-mocha-test-splash-mauve-lav/contents/splash/Splash.qml": "32ae720c190699f1",
+  "catppuccin-mocha-test-splash-mauve-lav/contents/splash/images/bg.png": "21b6927039a7136d",
+  "catppuccin-mocha-test-splash-mauve-lav/contents/splash/images/logo.svg": "0edc018f293540d1",
+  "catppuccin-mocha-test-splash-mauve-lav/contents/splash/images/rain.webp": "62b105c57ea7ee4e",
+  "catppuccin-mocha-test-splash-mauve-lav/contents/splash/images/spin.gif": "f03d64b4f3d100d0",
+  "catppuccin-mocha-test-splash-mauve-lav/metadata.json": "50da58d191d8b34f",
+  "catppuccin-mocha-test-splash-peach/contents/previews/splash.png": "e86f9d44fb610d4a",
   "catppuccin-mocha-test-splash-peach/contents/splash/Splash.qml": "d60cfe6c3d459568",
   "catppuccin-mocha-test-splash-peach/contents/splash/images/bg.png": "21b6927039a7136d",
   "catppuccin-mocha-test-splash-peach/contents/splash/images/logo.svg": "c7cc85d2b293d098",
@@ -27,6 +35,7 @@
   "catppuccin-mocha-test-splash-peach/contents/splash/images/spin.gif": "8a137029f3da1274",
   "catppuccin-mocha-test-splash-peach/metadata.json": "2ece10c2e833268b"
  },
+ "ksplash_preview_lavender": true,
  "limine": {
   "keep": "ab9420334b75a598",
   "recolor": "cee9f207d827e2cb",

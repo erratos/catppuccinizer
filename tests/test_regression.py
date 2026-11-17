@@ -101,6 +101,10 @@ def make_splash(d):
         frames.append(im)
     frames[0].save(s / "images/rain.webp", save_all=True, append_images=frames[1:],
                    duration=33, loop=0, lossless=True)
+    # preview = a glowing still of that animation: alone it would go to the LUT
+    # (which ignores -m); it must take the animation's colours instead
+    (d / "contents/previews").mkdir(parents=True)
+    frames[1].filter(ImageFilter.GaussianBlur(8)).save(d / "contents/previews/splash.png")
 
 
 LIMINE_CONF = """timeout: 3
@@ -214,7 +218,11 @@ def run_all():
 
         make_splash(tmp / "splash-src")
         cli("ksplash", tmp / "splash-src", "-a", "peach", "-o", tmp / "ksplash")
+        cli("ksplash", tmp / "splash-src", "-m", "green=lavender", "-s", "lav", "-o", tmp / "ksplash")
         out["ksplash"] = tree(tmp / "ksplash", tmp)
+        pv = next((tmp / "ksplash").glob("*-lav/contents/previews/splash.png"))
+        r, g, b = np.asarray(Image.open(pv).convert("RGB"), np.int32)[18, 19]   # centre of the bar
+        out["ksplash_preview_lavender"] = bool(b > g > r)    # lavender, not a LUT green
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return out
@@ -258,6 +266,7 @@ class Regression(unittest.TestCase):
 
     def test_ksplash(self):
         self.check("ksplash")      # the rain.webp digest includes its frame count
+        self.assertTrue(self.result["ksplash_preview_lavender"])   # -m reaches the preview
 
 
 if __name__ == "__main__":

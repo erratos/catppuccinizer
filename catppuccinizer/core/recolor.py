@@ -109,6 +109,13 @@ def analyse(path):
     """Detect source colours; return them with the reconstruction error on the
     content pixels and the share of the image covered by the plain background."""
     grp = detect_group([path], is_ui=False)
+    err, bg_share = fit_error(path, grp)
+    return grp, err, bg_share, sharpness(path)
+
+
+def fit_error(path, grp):
+    """How well a group's background + source colours rebuild an image: mean error
+    (0..255) on the content pixels, and the share covered by the background."""
     im = Image.open(path)
     im.thumbnail((512, 512))
     px = np.asarray(im.convert("RGB"), np.float32).reshape(-1, 3)
@@ -119,8 +126,7 @@ def analyse(path):
     recon = t[..., None] * keys[None]
     err = np.abs(d[:, None, :] - recon).mean(-1).min(1)
     content = np.abs(d).max(-1) > 24
-    return (grp, float(err[content].mean() if content.any() else 0), float(1 - content.mean()),
-            sharpness(path))
+    return float(err[content].mean() if content.any() else 0), float(1 - content.mean())
 
 
 def sharpness(path):
