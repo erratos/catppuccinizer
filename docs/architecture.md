@@ -13,7 +13,7 @@ catppuccinizer/
     detect.py         background + source colours of a group of images
     mapping.py        --map overrides, automatic mapping of plain colour lists
     recolor.py        keys method, LUT method, auto choice, render/save/preview
-    formats.py        colours written as text (QML, SVG/SVGZ), animated GIFs
+    formats.py        colours written as text (QML, SVG/SVGZ), animations (GIF, WebP)
     paths.py          user config / cache folders, sudo-aware ownership
     target.py         Target base class + discovery
   targets/
@@ -38,7 +38,8 @@ tests/
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
 | `recolor.add_method_arguments(parser)` | `--method`, `--keep-lum`, `--smooth` |
 | `formats.collect_text_colours(files)` / `recolour_text_file(f, lookup)` | colours inside QML / SVG / SVGZ |
-| `formats.gif_frames(...)` / `save_gif(...)` | animated GIFs |
+| `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
+| `recolor.recolor_frames(frames, ...)` | keys method over a stream of frames, in parallel |
 | `paths.config_dir(target)` / `cache_dir()` / `give_back(path)` | where to store things, sudo ownership |
 
 ## Writing a target

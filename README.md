@@ -337,7 +337,7 @@ Breeze (/usr/share/plasma/look-and-feel/org.kde.breeze.desktop)
 | `Splash.qml` | `"#rrggbb"` / `"#aarrggbb"` strings, `"black"`/`"white"`, `Qt.rgba()` |
 | SVG / SVGZ | `fill`, `stroke`, `stop-color`, `color` (incl. Plasma colour-scheme stylesheets) |
 | PNG / JPEG | like the [image](#wallpapers) target (keys for flat art, LUT for photos) |
-| animated GIF | every frame, with one mapping detected over the animation |
+| animated GIF or WebP | every frame, with one mapping detected over the animation |
 
 QML/SVG colours: grays go to the neutral ramp (`base` … `text`, by lightness),
 the most used saturated colour becomes the **accent**, the others the closest
@@ -354,7 +354,7 @@ Settings → Colours & Themes → Splash Screen*).
 ```
 catppuccinizer/
   core/        palette (+ Oklab), detect, recolor (keys / LUT / auto), mapping (--map,
-               colour lists), formats (QML/SVG colours, GIF), paths, target (interface)
+               colour lists), formats (QML/SVG colours, GIF, WebP), paths, target (interface)
   targets/     plymouth/  image.py  limine.py  ksplash.py
 tests/         regression (golden outputs) + architecture rules
 ```

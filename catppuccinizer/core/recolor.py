@@ -6,6 +6,8 @@
   nearest accents for hue), for photos and soft gradients.
 - plan(): picks the method for an image ("auto"), applies --map, prints it.
 """
+import os
+from concurrent.futures import ProcessPoolExecutor
 from functools import lru_cache
 
 import numpy as np
@@ -33,9 +35,10 @@ def add_method_arguments(p):
 
 
 # ---------------------------------------------------------------------- keys
-def recolor_image(path, src_bg, keys, targets, base):
+def recolor_image(path, src_bg, keys, targets, base, quantize=True):
     """Each pixel ~ bg + t * (key - bg): find the key and intensity t that explain
-    it best, then rebuild it as base + t * (target - base). Alpha is kept."""
+    it best, then rebuild it as base + t * (target - base). Alpha is kept.
+    path may be a PIL image; quantize=False keeps opaque results in RGB."""
     px, alpha = load_rgba(path)
     flat = px.reshape(-1, 3) - src_bg
     k = keys - src_bg
@@ -58,7 +61,35 @@ def recolor_image(path, src_bg, keys, targets, base):
         rgba = np.dstack([out, alpha]).astype(np.uint8)
         return Image.fromarray(rgba, "RGBA")
     im = Image.fromarray(out.astype(np.uint8), "RGB")
+    if not quantize:
+        return im
     return im.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+
+
+def _recolor_frame(args):
+    frame, src_bg, keys, targets, base, quantize = args
+    return recolor_image(frame, src_bg, keys, targets, base, quantize)
+
+
+def recolor_frames(frames, src_bg, keys, targets, base, quantize=True, parallel=True, batch=None):
+    """recolor_image over an iterable of PIL frames, in order; in worker processes
+    when parallel (worth it for long animations). Frames are read a batch at a
+    time, so long animations never sit in memory."""
+    if not parallel:
+        for fr in frames:
+            yield recolor_image(fr, src_bg, keys, targets, base, quantize)
+        return
+    workers = os.cpu_count() or 1
+    batch = batch or workers * 2
+    with ProcessPoolExecutor(workers) as pool:
+        chunk = []
+        for fr in frames:
+            chunk.append((fr, src_bg, keys, targets, base, quantize))
+            if len(chunk) == batch:
+                yield from pool.map(_recolor_frame, chunk)
+                chunk = []
+        if chunk:
+            yield from pool.map(_recolor_frame, chunk)
 
 
 def recolor_job(args):

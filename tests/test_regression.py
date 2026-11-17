@@ -93,6 +93,14 @@ def make_splash(d):
     frames[0].save(s / "images/spin.gif", save_all=True, append_images=frames[1:],
                    duration=40, loop=0, disposal=2)
     Image.new("RGB", (64, 36), (40, 60, 90)).save(s / "images/bg.png")
+    # animated WebP: every frame must survive (it used to be saved as one still)
+    frames = []
+    for k in range(4):
+        im = Image.new("RGB", (64, 36), (0, 0, 0))
+        ImageDraw.Draw(im).rectangle([4 + k * 10, 8, 14 + k * 10, 28], fill=(120, 240, 100))
+        frames.append(im)
+    frames[0].save(s / "images/rain.webp", save_all=True, append_images=frames[1:],
+                   duration=33, loop=0, lossless=True)
 
 
 LIMINE_CONF = """timeout: 3
@@ -110,7 +118,14 @@ term_palette: 000000;aa0000;00aa00;aa5500;0000aa;aa00aa;00aaaa;aaaaaa
 
 # ------------------------------------------------------------------- hashing
 def digest(path, tmp):
-    if path.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+    if path.suffix.lower() == ".webp":
+        # lossy: the exact pixels depend on the libwebp version, so hash the frame
+        # count and each frame's rounded mean colour instead
+        with Image.open(path) as im:
+            means = [tuple(int(v) // 8 for v in np.asarray(fr.convert("RGBA"), np.float32)
+                           .reshape(-1, 4).mean(0)) for fr in ImageSequence.Iterator(im)]
+            return hashlib.sha256(f"{im.size}{means}".encode()).hexdigest()[:16]
+    if path.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif"):
         with Image.open(path) as im:
             h = hashlib.sha256(f"{im.size}".encode())
             for fr in ImageSequence.Iterator(im):
@@ -203,7 +218,7 @@ class Regression(unittest.TestCase):
         self.assertTrue(self.result["limine"]["removed_is_original"])
 
     def test_ksplash(self):
-        self.check("ksplash")
+        self.check("ksplash")      # the rain.webp digest includes its frame count
 
 
 if __name__ == "__main__":

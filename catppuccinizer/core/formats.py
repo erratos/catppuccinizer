@@ -1,4 +1,4 @@
-"""File formats: colours written as text (QML, SVG/SVGZ) and animated GIFs."""
+"""File formats: colours written as text (QML, SVG/SVGZ) and animations (GIF, WebP)."""
 import gzip
 import re
 from collections import Counter
@@ -9,6 +9,7 @@ from PIL import Image, ImageSequence
 from .palette import hex2rgb, rgb2hex
 
 RASTER = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+ANIMATED = {".gif", ".webp"}
 NAMED = {"black": "#000000", "white": "#ffffff", "gray": "#808080", "grey": "#808080"}
 
 # ---------------------------------------------------------------- text colours
@@ -100,18 +101,76 @@ def recolour_text_file(f, lookup):
     write_text(f, recolour_text(read_text(f), f.suffix.lower() == ".qml", lookup))
 
 
-# ------------------------------------------------------------------------ GIF
-def gif_frames(path, tmp):
-    """Write every (composited) frame as PNG in tmp -> (frame paths, durations, loop)."""
-    frames, durations = [], []
+# ----------------------------------------------------------------- animations
+def is_animated(path):
+    """GIF, or a WebP with more than one frame."""
+    ext = path.suffix.lower()
+    if ext == ".gif":
+        return True
+    if ext not in ANIMATED:
+        return False
+    with Image.open(path) as im:
+        return getattr(im, "n_frames", 1) > 1
+
+
+def anim_info(path):
+    """-> (frame count, durations in ms, loop)."""
+    durations = []
+    with Image.open(path) as im:
+        for fr in ImageSequence.Iterator(im):
+            fr.load()
+            d = fr.info.get("duration", im.info.get("duration", 50))
+            durations.append(50 if d is None else d)
+        loop = im.info.get("loop", 0)
+    return len(durations), durations, loop
+
+
+def anim_frames(path, indices=None):
+    """Composited RGBA frames, one at a time (only `indices` when given)."""
     with Image.open(path) as im:
         for k, fr in enumerate(ImageSequence.Iterator(im)):
-            f = tmp / f"{path.stem}-{k:04d}.png"
-            fr.convert("RGBA").save(f)
-            frames.append(f)
-            durations.append(fr.info.get("duration", im.info.get("duration", 50)))
-        loop = im.info.get("loop", 0)
-    return frames, durations, loop
+            if indices is None or k in indices:
+                yield fr.convert("RGBA")
+
+
+def anim_sample(path, n_frames, tmp, n=24):
+    """Write n evenly spaced frames as PNG in tmp (for colour detection) -> paths."""
+    idx = sorted({int(i) for i in np.linspace(0, n_frames - 1, min(n, n_frames))})
+    paths = []
+    for k, fr in zip(idx, anim_frames(path, set(idx))):
+        f = tmp / f"{path.stem}-{k:04d}.png"
+        fr.save(f)
+        paths.append(f)
+    return paths
+
+
+class _LazyFrames:
+    """Stands in for a multi-frame image in Pillow's animated WebP writer, which
+    seeks through it frame by frame: each frame is produced only when needed."""
+    def __init__(self, frames, n):
+        self.n_frames, self._it, self._im, self._k = n, iter(frames), None, -1
+
+    def seek(self, k):
+        while self._k < k:
+            self._im, self._k = next(self._it), self._k + 1
+
+    def tell(self):
+        return self._k
+
+    def __getattr__(self, name):
+        return getattr(self._im, name)
+
+
+def save_animation(frames, n, out, durations, loop):
+    """Save an iterable of n frames as GIF or animated WebP (by out's suffix)."""
+    if out.suffix.lower() == ".gif":
+        save_gif(list(frames), out, durations, loop)
+        return
+    frames = iter(frames)
+    first = next(frames).convert("RGBA")
+    rest = _LazyFrames((f.convert("RGB") if f.mode == "P" else f for f in frames), n - 1)
+    first.save(out, save_all=True, append_images=[rest] if n > 1 else [], duration=durations,
+               loop=loop, quality=90, method=4)
 
 
 def rgba_to_p(im):

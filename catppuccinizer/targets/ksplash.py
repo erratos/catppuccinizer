@@ -6,7 +6,8 @@ package: Splash.qml plus images. Colours are recoloured everywhere:
   (base ... text, by lightness), the most used saturated colour becomes the
   accent, the others the closest Catppuccin hue;
 - PNG/JPEG images: like the image target (keys for flat art, LUT for photos);
-- animated GIFs: frame by frame, with the same mapping for every frame.
+- animated GIFs and WebPs: frame by frame, with the same mapping for every
+  frame (frames are streamed, so long animations do not fill the memory).
 The result is a new look-and-feel package containing only the splash screen.
 """
 import json
@@ -20,8 +21,8 @@ import numpy as np
 
 from ..core import recolor
 from ..core.detect import detect_group
-from ..core.formats import (RASTER, collect_text_colours, gif_frames, recolour_text_file,
-                            save_gif, text_files)
+from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect_text_colours,
+                            is_animated, recolour_text_file, save_animation, text_files)
 from ..core.mapping import (apply_maps, map_colour_counts, print_colours, resolve_target,
                             uses_accent)
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
@@ -110,17 +111,17 @@ def run(a):
         print_colours(vcolors)
 
     tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
-    rasters = {}                                   # path -> ("gif"|method, grp, extra)
+    rasters = {}                                   # path -> ("anim"|method, grp, extra)
     previews = pkg / "contents/previews/splash.png"
     for f in sorted([*splash.rglob("*"), *([previews] if previews.exists() else [])]):
         ext = f.suffix.lower()
-        if ext == ".gif":
-            frames, durations, loop = gif_frames(f, tmp)
-            grp = detect_group(frames, is_ui=False)
+        if is_animated(f):
+            n, durations, loop = anim_info(f)
+            grp = detect_group(anim_sample(f, n, tmp), is_ui=False)
             cfg = {"groups": {"image": grp}}
             apply_maps(cfg, a.map, strict=False)
-            rasters[f] = ("gif", grp, (frames, durations, loop))
-            print(f"  {f.relative_to(pkg)}: {len(frames)} frames")
+            rasters[f] = ("anim", grp, (n, durations, loop))
+            print(f"  {f.relative_to(pkg)}: {n} frames")
         elif ext in RASTER:
             a.strict_map = False
             method, grp = recolor.plan(f, a, verbose=False)
@@ -162,14 +163,18 @@ def run(a):
             for src, (method, grp, extra) in rasters.items():
                 rel = src.relative_to(splash) if src.is_relative_to(splash) else None
                 out = dst / "contents/splash" / rel if rel else dst / "contents/previews/splash.png"
-                if method == "gif":
-                    frames, durations, loop = extra
+                if method == "anim":
+                    n, durations, loop = extra
                     keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
                     targets = np.array([resolve_target(flv, acc, c["target"])
                                         for c in grp["colors"].values()])
-                    save_gif([recolor.recolor_image(fr, hex2rgb(grp["background"]), keys, targets,
-                                                    rgb(flv, "base")) for fr in frames],
-                             out, durations, loop)
+                    if n > 100:
+                        print(f"  recolouring {n} frames of {src.name}…", flush=True)
+                    frames = recolor.recolor_frames(
+                        anim_frames(src), hex2rgb(grp["background"]), keys, targets,
+                        rgb(flv, "base"), quantize=out.suffix.lower() == ".gif",
+                        parallel=n > 48)
+                    save_animation(frames, n, out, durations, loop)
                 else:
                     im = recolor.render(src, method, grp, flv, acc, a)
                     if out.suffix.lower() in (".jpg", ".jpeg"):
