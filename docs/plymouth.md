@@ -162,7 +162,7 @@ To install from an archive of
 [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes/releases):
 
 ```bash
-tar xf catppuccin-mocha-infinite-seal-mauve.tar.gz
+tar xf plymouth-catppuccin-mocha-infinite-seal-mauve.tar.gz
 sudo cp -r catppuccin-mocha-infinite-seal-mauve /usr/share/plymouth/themes/
 sudo plymouth-set-default-theme -R catppuccin-mocha-infinite-seal-mauve
 ```

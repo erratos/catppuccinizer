@@ -85,6 +85,24 @@ def package_name(pkg):
         return pkg.name
 
 
+def metadata(pkg, pid, name, description):
+    """metadata.json of the recoloured package: keeps the original authors, licence
+    and website (it is a derived work), adds catppuccinizer as an author."""
+    try:
+        orig = json.loads((pkg / "metadata.json").read_text()).get("KPlugin", {})
+    except (OSError, ValueError):
+        orig = {}
+    authors = [x for x in orig.get("Authors", []) if isinstance(x, dict) and x.get("Name")]
+    plugin = {"Id": pid, "Name": name, "Category": "Plasma Look And Feel",
+              "Description": description,
+              "License": orig.get("License") or "unknown (see the original package)",
+              "Version": "1.0", "EnabledByDefault": True,
+              "Authors": [*authors, {"Name": "catppuccinizer (Catppuccin recolour)"}]}
+    if orig.get("Website"):
+        plugin["Website"] = orig["Website"]
+    return {"KPackageStructure": "Plasma/LookAndFeel", "KPlugin": plugin}
+
+
 def list_packages():
     for pid, d in sorted(splash_packages().items()):
         print(f"{pid:42s} {package_name(d)}  ({d.parent})")
@@ -138,7 +156,8 @@ def run(a):
     for flv in a.flavor:
         for acc in (a.accent if accent_used else [None]):
             pid = "-".join(x for x in (f"catppuccin-{flv}-{slug}", acc, a.suffix) if x)
-            name = f"{title} - Catppuccin {FLAVOR_TITLES[flv]}" + (f" {acc.title()}" if acc else "")
+            name = (f"{title} - Catppuccin {FLAVOR_TITLES[flv]}" + (f" {acc.title()}" if acc else "")
+                    + (f" ({a.suffix})" if a.suffix else ""))
             dst = a.out / pid
             if dst.exists():
                 shutil.rmtree(dst)
@@ -147,13 +166,12 @@ def run(a):
             if previews.exists():
                 (dst / "contents/previews").mkdir(parents=True)
                 shutil.copy(previews, dst / "contents/previews/splash.png")
-            (dst / "metadata.json").write_text(json.dumps({
-                "KPackageStructure": "Plasma/LookAndFeel",
-                "KPlugin": {"Id": pid, "Name": name, "Category": "Plasma Look And Feel",
-                            "Description": f"Catppuccin {FLAVOR_TITLES[flv]} recolour of the "
-                                           f"{title} splash screen",
-                            "License": "GPL-3.0", "Version": "1.0", "EnabledByDefault": True,
-                            "Authors": [{"Name": "catppuccinizer"}]}}, indent=4) + "\n")
+            for lic in pkg.iterdir():                # the original licence travels with it
+                if lic.is_file() and re.match(r"(licen[cs]e|copying)", lic.name, re.I):
+                    shutil.copy(lic, dst / lic.name)
+            (dst / "metadata.json").write_text(json.dumps(metadata(
+                pkg, pid, name, f"Catppuccin {FLAVOR_TITLES[flv]} recolour of the "
+                                f"{title} splash screen"), indent=4) + "\n")
 
             lookup = {c["source"]: rgb2hex(resolve_target(flv, acc, c["target"]))
                       for c in vcolors.values()}

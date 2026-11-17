@@ -34,8 +34,8 @@ unless you pass `--install` or `--apply`.
 
 **New here?** Follow the [getting started guide](docs/getting-started.md).
 
-Ready-made themes built with the tool (Plymouth hexa_retro and infinite_seal in
-Mocha) are published in [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
+Ready-made themes built with the tool (Plymouth, KDE splash screens, Limine,
+wallpapers) are published in [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
 
 ## Documentation
 
