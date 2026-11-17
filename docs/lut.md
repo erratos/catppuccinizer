@@ -31,7 +31,7 @@ magick in.jpg luts/catppuccin-mocha-hald.png -hald-clut out.jpg
 | `--format` | `hald cube` | `hald` (PNG image), `cube` (text), or both |
 | `--hald-level` | `8` | Hald level 2–16: a level³ × level³ PNG (8 → 512×512, 64³ points) |
 | `--cube-size` | `33` | `.cube` points per axis (33 is the usual size; 65 for more precision) |
-| `--keep-lum`, `--smooth`, `--lutgen-*` | | as for [images](wallpapers.md#options) |
+| `--keep-lum`, `--smooth`, `--lutgen-*` | | as for [images](images.md#options) |
 | `-s, --suffix` | | extra suffix for the file names |
 | `-o, --out` | `luts/` | output folder |
 

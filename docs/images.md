@@ -1,8 +1,8 @@
-# Wallpapers and images
+# Images
 
 [← Back to the README](../README.md) · [Getting started](getting-started.md)
 
-Recolours wallpapers, photos, flat art and SVG logos.
+Recolours any picture: wallpapers, photos, flat art, SVG logos and icons.
 
 ```bash
 catppuccinize image wall.png                     # Mocha, method chosen automatically

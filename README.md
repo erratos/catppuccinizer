@@ -12,7 +12,7 @@ transparency are preserved, and any colour can be remapped by hand.
 | Command | What | Guide |
 |---|---|---|
 | `catppuccinize plymouth` | boot splash themes, including the 80 of [adi1090x](https://github.com/adi1090x/plymouth-themes) | [Plymouth](docs/plymouth.md) |
-| `catppuccinize image` | wallpapers: flat art, photos, SVG logos | [Wallpapers](docs/wallpapers.md) |
+| `catppuccinize image` | images: wallpapers, photos, flat art, SVG logos | [Images](docs/images.md) |
 | `catppuccinize limine` | the Limine boot menu, with its wallpaper | [Limine](docs/limine.md) |
 | `catppuccinize ksplash` | the KDE Plasma splash screen shown after login | [KDE splash](docs/ksplash.md) |
 | `catppuccinize lut` | a colour table (`.cube`, Hald CLUT) for ffmpeg, GIMP, OBS… | [LUT export](docs/lut.md) |
@@ -41,7 +41,7 @@ images) are published in [catppuccinized-themes](https://github.com/erratos/catp
 
 - [Getting started](docs/getting-started.md): install and first steps
 - [Colours and mapping](docs/colours.md): shared options, colour names, `-m`, how it works
-- [Wallpapers](docs/wallpapers.md): photo vs flat art, built-in `lut` vs lutgen,
+- [Images](docs/images.md): photo vs flat art, SVG, built-in `lut` vs lutgen,
   every option shown side by side
 - [Plymouth](docs/plymouth.md) ·
   [Limine](docs/limine.md) · [KDE splash](docs/ksplash.md) · [LUT export](docs/lut.md)
@@ -51,7 +51,7 @@ images) are published in [catppuccinized-themes](https://github.com/erratos/catp
 
 Python 3.11+ with `numpy` and `Pillow`; `git` for adi1090x themes. Optional:
 [lutgen](https://github.com/ozwaldorf/lutgen-rs) for the
-[`lutgen` method](docs/wallpapers.md#lutgen-method), `rsvg-convert` for SVG
+[`lutgen` method](docs/images.md#lutgen-method), `rsvg-convert` for SVG
 previews.
 
 ## Credits & licence

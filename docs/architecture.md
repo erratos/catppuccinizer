@@ -22,7 +22,7 @@ catppuccinizer/
     target.py         Target base class + discovery
   targets/
     plymouth/         Plymouth themes (+ adi1090x fetcher, shipped configs, scripts)
-    image.py          wallpapers
+    image.py          images (wallpapers, logos…)
     limine.py         Limine boot menu
     ksplash.py        KDE Plasma splash screen
     lut.py            LUT export (Hald CLUT, .cube)

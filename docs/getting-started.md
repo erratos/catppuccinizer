@@ -100,7 +100,7 @@ The list of colour names you can use is in [Colours and mapping](colours.md).
 ## Where to go next
 
 - [Plymouth](plymouth.md): any theme folder, `-status` variants, installing by hand;
-- [Wallpapers](wallpapers.md): methods for photos vs flat art, SVG, lutgen;
+- [Images](images.md): wallpapers and logos, methods for photos vs flat art, SVG, lutgen;
 - [Limine](limine.md): boot menu colours;
 - [KDE splash screen](ksplash.md): the splash shown after login;
 - [LUT export](lut.md): use the same colours in ffmpeg, GIMP, OBS…;

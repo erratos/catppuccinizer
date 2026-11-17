@@ -69,5 +69,5 @@ enrollment is enabled, run `sudo limine-enroll-config` afterwards.
 | `--apply` | write the theme into `limine.conf` (with sudo) |
 | `--remove` | remove the theme from `limine.conf` |
 | `--conf`, `--esp` | `limine.conf` to edit, ESP mount point (searched by default) |
-| `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](wallpapers.md#options) |
+| `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) |
 | `-o, --out` | output folder (default `themes/`) |

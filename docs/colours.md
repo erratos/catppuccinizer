@@ -78,7 +78,7 @@ last one winning.
   it best are found, then it is rebuilt as `base + t × (target − base)`.
   Single-colour themes are stored as indexed PNGs whose palette is the exact
   `base → target` ramp (lossless). Transparent images keep their alpha channel.
-- **Wallpapers, LUT method**: a 33³ colour look-up table built in Oklab. Each
+- **Images, LUT method**: a 33³ colour look-up table built in Oklab. Each
   colour's lightness is mapped onto the flavour's neutral ramp (`crust` →
   `text`) and blended with the original (`--keep-lum`); its hue goes to a soft
   mix of the nearest accents (`--smooth`), in proportion to its original
