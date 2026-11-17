@@ -12,7 +12,7 @@ catppuccinize image logo.svg -m blue=lavender    # SVG stays SVG
 catppuccinize image photo.jpg --method lutgen --lutgen-algo rbf   # LUT made by lutgen
 ```
 
-Output: `wallpapers/<name>-catppuccin-<flavor>[-<accent>].png` (JPEG/WebP photos
+Output: `images/<name>-catppuccin-<flavor>[-<accent>].png` (JPEG/WebP photos
 keep their format).
 
 ## Reading the comparison images
@@ -90,7 +90,7 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
 | `--preview` | | only render before/after images in `<out>/previews/` |
 | `-s, --suffix` | | extra suffix for the file names |
-| `-o, --out` | `wallpapers/` | output folder |
+| `-o, --out` | `images/` | output folder |
 | `--lutgen-*` | | see [lutgen method](#lutgen-method) |
 
 ## lutgen method

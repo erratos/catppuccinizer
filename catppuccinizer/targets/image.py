@@ -46,7 +46,7 @@ def collect(paths):
 class ImageTarget(Target):
     name = "image"
     help = "recolour wallpapers and other images"
-    default_out = "wallpapers"
+    default_out = "images"
     default_accent = ("mauve",)
 
     def add_arguments(self, p):

@@ -24,7 +24,7 @@ pipx install git+https://github.com/erratos/catppuccinizer.git
 ```
 
 ```bash
-catppuccinize image ~/Pictures/wall.jpg -f macchiato     # -> ./wallpapers/
+catppuccinize image ~/Pictures/wall.jpg -f macchiato     # -> ./images/
 catppuccinize plymouth rings_2 -a mauve --test           # boot splash, shown without rebooting
 ```
 

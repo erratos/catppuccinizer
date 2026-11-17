@@ -43,7 +43,7 @@ That is all you need for most commands.
 catppuccinize image ~/Pictures/wall.jpg
 ```
 
-The result lands in `./wallpapers/wall-catppuccin-mocha.jpg`. The tool decides
+The result lands in `./images/wall-catppuccin-mocha.jpg`. The tool decides
 on its own whether your image is flat art or a photo, and treats it
 accordingly.
 
@@ -54,7 +54,7 @@ and `-f all` tries the four flavours at once:
 catppuccinize image ~/Pictures/wall.jpg -f all --preview
 ```
 
-Look in `./wallpapers/previews/`.
+Look in `./images/previews/`.
 
 ## 4. Try a boot splash (Plymouth)
 

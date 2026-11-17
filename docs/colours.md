@@ -12,7 +12,7 @@ What the options shared by every target mean, and how colours are chosen.
 | `-a, --accent` | accent colour(s) used for colours mapped to `accent`, or `all` (the 14 accents) |
 | `-m, --map` | `NAME=TARGET …`: change where a source colour goes; repeated `-m` add up |
 | `--preview` | only render before/after images in `<out>/previews/`, nothing else |
-| `-o, --out` | output folder (`themes/`, `wallpapers/` or `luts/` by default) |
+| `-o, --out` | output folder (`themes/`, `images/` or `luts/` by default) |
 
 ## Flavours
 

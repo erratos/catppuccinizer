@@ -2,6 +2,7 @@ themes/
 upstream/
 dist/
 __pycache__/
-wallpapers/
+/wallpapers/
+/images/
 build/
 *.egg-info/
