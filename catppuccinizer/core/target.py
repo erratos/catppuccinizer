@@ -10,7 +10,7 @@ catppuccinizer.core. Built-in targets live in catppuccinizer/targets/<name>
 from importlib import import_module
 from importlib.metadata import entry_points
 
-BUILTIN = ["plymouth", "image", "limine", "ksplash"]
+BUILTIN = ["plymouth", "image", "limine", "ksplash", "lut"]
 
 
 class Target:

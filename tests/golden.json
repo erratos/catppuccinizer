@@ -41,6 +41,22 @@
   "limine-catppuccin-mocha-lavender/limine-theme.conf": "30258f8696d46051",
   "limine-catppuccin-mocha-lavender/wallpaper-mocha-lavender.png": "bd66ee1b1040e291"
  },
+ "lut": {
+  "catppuccin-frappe-soft.cube": "fa4b56d79d7db2bc",
+  "catppuccin-latte-hald.png": "a35daf4950cb176a",
+  "catppuccin-latte.cube": "51abef1891e6a302",
+  "catppuccin-mocha-hald.png": "0da105baed16bc25",
+  "catppuccin-mocha.cube": "46a51fbba1a56316"
+ },
+ "lutgen": {
+  "catppuccin-mocha-lutgen-hald.png": "af6d75d27fa3b01f",
+  "catppuccin-mocha-lutgen.cube": "ef68bc9f955bb506",
+  "logo-catppuccin-mocha.png": "f9f25271b0aaff8f",
+  "photo-catppuccin-mocha-blur.jpg": "787fbcc88cbf05b1",
+  "photo-catppuccin-mocha-nearest.jpg": "9deaf3a2eefed784",
+  "photo-catppuccin-mocha-rbf.jpg": "fd73df48f2996bd8",
+  "photo-catppuccin-mocha-shepard.jpg": "8a3517e3062d1c24"
+ },
  "plymouth": {
   "catppuccin-latte-glow-mini-teal/box.png": "e73b9a65bbe81f8d",
   "catppuccin-latte-glow-mini-teal/bullet.png": "bdd886421a262178",

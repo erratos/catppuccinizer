@@ -151,6 +151,17 @@ def cli(*argv):
 
 
 # --------------------------------------------------------------------- cases
+def has_lutgen():
+    from catppuccinizer.core import lutgen
+    try:
+        return bool(lutgen.binary())
+    except SystemExit:
+        return False
+
+
+HAS_LUTGEN = has_lutgen()
+
+
 def run_all():
     tmp = Path(tempfile.mkdtemp(prefix="catppuccinizer-test-"))
     os.environ["CATPPUCCINIZER_CONFIGS"] = str(tmp / "configs")
@@ -168,6 +179,21 @@ def run_all():
         cli("image", tmp / "img/flat.png", "-m", "pink=peach", "-s", "mapped", "-o", tmp / "image")
         cli("image", tmp / "img/mark.svg", "-m", "blue=lavender", "-s", "mapped", "-o", tmp / "image")
         out["image"] = tree(tmp / "image", tmp)
+
+        cli("lut", "-f", "mocha", "latte", "--hald-level", "4", "--cube-size", "9", "-o", tmp / "lut")
+        cli("lut", "-f", "frappe", "--format", "cube", "--cube-size", "5", "--keep-lum", "0.8",
+            "-s", "soft", "-o", tmp / "lut")
+        out["lut"] = tree(tmp / "lut", tmp)
+
+        if HAS_LUTGEN:     # external binary: only checked where it is installed
+            for algo in ("blur", "rbf", "shepard", "nearest"):
+                cli("image", tmp / "img/photo.jpg", "--method", "lutgen", "--lutgen-algo", algo,
+                    "--lutgen-level", "6", "-s", algo, "-o", tmp / "lutgen")
+            cli("image", tmp / "img/logo.png", "--method", "lutgen", "--lutgen-preserve",
+                "--lutgen-lum", "0.5", "--lutgen-level", "6", "-o", tmp / "lutgen")
+            cli("lut", "--method", "lutgen", "--lutgen-algo", "rbf", "--lutgen-shape", "64",
+                "--lutgen-level", "4", "--hald-level", "4", "--cube-size", "5", "-o", tmp / "lutgen")
+            out["lutgen"] = tree(tmp / "lutgen", tmp)
 
         esp = tmp / "esp"
         esp.mkdir()
@@ -212,6 +238,19 @@ class Regression(unittest.TestCase):
     def test_image(self):
         self.check("image")
 
+    def test_lut(self):
+        self.check("lut")
+
+    @unittest.skipUnless(HAS_LUTGEN, "lutgen is not installed")
+    def test_lutgen(self):
+        self.check("lutgen")
+
+    def test_lutgen_options(self):
+        from catppuccinizer.cli import main
+        with self.assertRaises(SystemExit) as e:
+            main(["lut", "--method", "lutgen", "--lutgen-algo", "rbf", "--lutgen-radius", "3"])
+        self.assertIn("does not apply", str(e.exception))
+
     def test_limine(self):
         self.check("limine")
         self.check("limine_out")
@@ -223,7 +262,12 @@ class Regression(unittest.TestCase):
 
 if __name__ == "__main__":
     if "--update" in sys.argv:
-        GOLDEN.write_text(json.dumps(run_all(), indent=1, sort_keys=True) + "\n")
+        new = run_all()
+        if not HAS_LUTGEN and GOLDEN.exists():      # keep the lutgen outputs of a machine that has it
+            old = json.loads(GOLDEN.read_text())
+            if "lutgen" in old:
+                new["lutgen"] = old["lutgen"]
+        GOLDEN.write_text(json.dumps(new, indent=1, sort_keys=True) + "\n")
         print(f"updated {GOLDEN}")
     else:
         unittest.main()

@@ -12,7 +12,9 @@ catppuccinizer/
     palette.py        Catppuccin palettes, colour helpers, Oklab
     detect.py         background + source colours of a group of images
     mapping.py        --map overrides, automatic mapping of plain colour lists
-    recolor.py        keys method, LUT method, auto choice, render/save/preview
+    recolor.py        keys method, LUT methods (lut, lutgen), auto choice, render/save/preview
+    clut.py           3D LUTs: trilinear application, resampling, Hald CLUT and .cube files
+    lutgen.py         --lutgen-* options, runs the external lutgen binary
     formats.py        colours written as text (QML, SVG/SVGZ), animations (GIF, WebP)
     paths.py          user config / cache folders, sudo-aware ownership
     target.py         Target base class + discovery
@@ -21,6 +23,7 @@ catppuccinizer/
     image.py          wallpapers
     limine.py         Limine boot menu
     ksplash.py        KDE Plasma splash screen
+    lut.py            LUT export (Hald CLUT, .cube)
 tests/
   test_regression.py  every target on small fixtures, compared with golden.json
   test_architecture.py
@@ -36,7 +39,9 @@ tests/
 | `mapping.resolve_target(flavor, accent, target)` | target name -> RGB |
 | `recolor.recolor_image(path, bg, keys, targets, base)` | keys method on one image (alpha kept) |
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
-| `recolor.add_method_arguments(parser)` | `--method`, `--keep-lum`, `--smooth` |
+| `recolor.add_method_arguments(parser)` | `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` |
+| `recolor.LUT_METHODS` / `recolor.lut_for(method, flavor, args, n)` | the LUT methods (no source colours, no accent) and their cube |
+| `clut.apply_cube` / `resample` / `read_hald` / `write_hald` / `write_cube` | 3D LUT application and files |
 | `formats.collect_text_colours(files)` / `recolour_text_file(f, lookup)` | colours inside QML / SVG / SVGZ |
 | `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
 | `recolor.recolor_frames(frames, ...)` | keys method over a stream of frames, in parallel |

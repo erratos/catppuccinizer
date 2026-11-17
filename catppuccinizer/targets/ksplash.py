@@ -129,11 +129,11 @@ def run(a):
             print(f"  {f.relative_to(pkg)}: {method}")
         else:
             continue
-        if rasters[f][1] is not None and rasters[f][0] != "lut":
+        if rasters[f][1] is not None and rasters[f][0] not in recolor.LUT_METHODS:
             print_colours(rasters[f][1]["colors"], show_share=False)
 
     accent_used = uses_accent(vcolors) or any(
-        m != "lut" and uses_accent(g["colors"]) for m, g, _ in rasters.values())
+        m not in recolor.LUT_METHODS and uses_accent(g["colors"]) for m, g, _ in rasters.values())
     built = []
     for flv in a.flavor:
         for acc in (a.accent if accent_used else [None]):
