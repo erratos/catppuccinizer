@@ -1,5 +1,7 @@
 # Architecture
 
+[← Back to the README](../README.md)
+
 catppuccinizer is a small **core library** plus independent **targets**
 (subcommands of `catppuccinize`). The rule that keeps it from turning into a
 tangle: *a target only talks to the core, never to another target*, and the
