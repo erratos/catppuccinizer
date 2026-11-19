@@ -47,6 +47,12 @@ class PlymouthTarget(Target):
     def run(self, a):
         run(a)
 
+    def sources(self):
+        themes = upstream_themes()
+        return [{"value": name, "label": name,
+                 "note": path.split("/")[0] + ("  · tuned" if config_path(name).exists() else "")}
+                for name, path in sorted(themes.items(), key=lambda kv: kv[1])]
+
 
 def add_arguments(p):
     p.add_argument("themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME",

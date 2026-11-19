@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>catppuccinizer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='11' r='7' fill='%23cba6f7'/%3E%3Ccircle cx='21' cy='11' r='7' fill='%23f5c2e7'/%3E%3Ccircle cx='11' cy='21' r='7' fill='%2389b4fa'/%3E%3Ccircle cx='21' cy='21' r='7' fill='%23a6e3a1'/%3E%3C/svg%3E">
+<style>
+:root {
+  /* replaced live by the selected flavour (see applyTheme) */
+  --base:#1e1e2e; --mantle:#181825; --crust:#11111b; --surface0:#313244; --surface1:#45475a;
+  --surface2:#585b70; --overlay0:#6c7086; --overlay1:#7f849c; --overlay2:#9399b2;
+  --subtext0:#a6adc8; --subtext1:#bac2de; --text:#cdd6f4; --accent:#cba6f7; --red:#f38ba8;
+  --green:#a6e3a1; --yellow:#f9e2af; --peach:#fab387; --blue:#89b4fa;
+  --on-accent: var(--crust);
+  --radius: 12px;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", "Inter", "Noto Sans", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--base); color: var(--text); font: 14px/1.45 var(--sans);
+  transition: background .25s, color .25s; min-height: 100vh;
+}
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--accent); }
+.mono { font-family: var(--mono); }
+
+/* ---------------------------------------------------------------- header */
+header {
+  position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--mantle) 92%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--surface0);
+}
+.bar { max-width: 1440px; margin: 0 auto; padding: 10px 20px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.brand { display: flex; gap: 10px; align-items: center; font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+.brand .dots { display: grid; grid-template-columns: 9px 9px; gap: 2px; }
+.brand .dots i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+.brand small { color: var(--overlay1); font-weight: 400; font-size: 12px; }
+nav.targets { display: flex; gap: 4px; flex-wrap: wrap; }
+nav.targets button {
+  border: 0; background: transparent; padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  color: var(--subtext0); font-weight: 600;
+}
+nav.targets button:hover { background: var(--surface0); color: var(--text); }
+nav.targets button.on { background: var(--accent); color: var(--on-accent); }
+
+/* ---------------------------------------------------------------- layout */
+main { max-width: 1440px; margin: 0 auto; padding: 20px; display: grid; gap: 20px;
+       grid-template-columns: minmax(0, 1fr) minmax(360px, 520px); align-items: start; }
+@media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); padding: 16px; } }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.side { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; scrollbar-width: thin; border-radius: var(--radius); }
+@media (max-width: 1000px) { .side { position: static; max-height: none; overflow: visible; } }
+.intro { color: var(--subtext0); margin: 0; }
+.intro b { color: var(--text); }
+
+.card { background: var(--mantle); border: 1px solid var(--surface0); border-radius: var(--radius); padding: 16px 18px; }
+.card > h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--subtext0);
+             display: flex; align-items: center; gap: 8px; }
+.card > h2 .n { width: 20px; height: 20px; border-radius: 50%; background: var(--surface0); color: var(--accent);
+                display: inline-grid; place-items: center; font-size: 11px; }
+.hint { color: var(--overlay1); font-size: 12.5px; margin: 4px 0 0; }
+.hint code, .help code { font-family: var(--mono); font-size: 12px; background: var(--surface0); padding: 0 4px; border-radius: 4px; }
+
+/* ---------------------------------------------------------------- controls */
+.btn {
+  border: 1px solid var(--surface1); background: var(--surface0); padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500;
+}
+.btn:hover { border-color: var(--overlay0); background: var(--surface1); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--subtext0); }
+.btn.ghost:hover { background: var(--surface0); color: var(--text); }
+.btn.danger { color: var(--red); }
+.btn.small { padding: 4px 10px; font-size: 12.5px; }
+.btn.big { padding: 11px 20px; font-size: 15px; }
+input[type=text], input[type=number], select {
+  background: var(--base); border: 1px solid var(--surface1); border-radius: 8px; padding: 7px 10px; min-width: 0;
+}
+input[type=text]:focus, input[type=number]:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 0; border-color: var(--accent); }
+input::placeholder { color: var(--overlay0); }
+input[type=range] { accent-color: var(--accent); width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > .grow { flex: 1 1 200px; }
+
+/* chips (flavours, accents, choices) */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  border: 1px solid var(--surface1); background: var(--base); padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; font-size: 13px;
+}
+.chip:hover { border-color: var(--overlay0); }
+.chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--base)); }
+.chip .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+.chip.def { font-style: italic; }
+.seg { display: inline-flex; background: var(--base); border: 1px solid var(--surface1); border-radius: 9px; padding: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 7px; cursor: pointer; color: var(--subtext0); }
+.seg button.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.seg button.dflt:not(.on)::after { content: "•"; margin-left: 4px; color: var(--overlay0); }
+
+.flavors { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.flavor {
+  border: 2px solid var(--surface0); border-radius: 10px; padding: 10px 12px; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.flavor .name { font-weight: 700; }
+.flavor .strip { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
+.flavor .strip i { flex: 1; }
+.flavor.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.accents { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
+.accent {
+  border: 1px solid var(--surface1); background: var(--base); border-radius: 8px; padding: 6px 8px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; font-size: 13px;
+}
+.accent .sw { width: 16px; height: 16px; border-radius: 50%; flex: none; }
+.accent.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--base)); }
+.accent.def { border-style: dashed; border-color: var(--overlay0); }
+.accent.on .sw { box-shadow: 0 0 0 2px var(--base), 0 0 0 4px currentColor; }
+.label { font-size: 12px; color: var(--subtext0); font-weight: 600; margin: 14px 0 6px; display: flex; justify-content: space-between; gap: 8px; }
+.label:first-child { margin-top: 0; }
+
+/* options */
+.opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.opt { background: var(--base); border: 1px solid var(--surface0); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.opt.wide { grid-column: 1 / -1; }
+.opt .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.opt .name { font-weight: 600; }
+.opt .flag { font-family: var(--mono); font-size: 11.5px; color: var(--overlay1); }
+.opt .help { color: var(--overlay2); font-size: 12.5px; }
+.opt.set { border-color: color-mix(in srgb, var(--accent) 55%, var(--surface0)); }
+.badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 4px;
+         background: color-mix(in srgb, var(--peach) 22%, transparent); color: var(--peach); }
+.group { margin-top: 14px; border: 1px dashed var(--surface1); border-radius: 10px; padding: 10px 12px; }
+.group > summary { cursor: pointer; color: var(--subtext1); font-weight: 600; }
+.group[open] > summary { margin-bottom: 10px; }
+.num { display: flex; gap: 10px; align-items: center; }
+.num input[type=number] { width: 96px; }
+.switch { position: relative; width: 38px; height: 22px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch span { position: absolute; inset: 0; background: var(--surface1); border-radius: 999px; transition: .15s; cursor: pointer; }
+.switch span::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; border-radius: 50%; background: var(--text); transition: .15s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::before { transform: translateX(16px); background: var(--on-accent); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* sources */
+.drop { border: 2px dashed var(--surface1); border-radius: 10px; padding: 14px; text-align: center; color: var(--overlay1); transition: .15s; }
+.drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--text); }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 10px 0; }
+.item { position: relative; background: var(--base); border: 1px solid var(--surface0); border-radius: 10px; overflow: hidden; }
+.item .im { aspect-ratio: 16/10; background: var(--crust) center/contain no-repeat; display: grid; place-items: center; color: var(--overlay0); font-size: 28px; }
+.item .cap { padding: 6px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.item .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; cursor: pointer;
+           background: color-mix(in srgb, var(--crust) 80%, transparent); color: var(--text); }
+.item .x:hover { background: var(--red); color: var(--crust); }
+
+/* run panel */
+.cmd { position: relative; background: var(--crust); border-radius: 10px; padding: 12px 70px 12px 14px; font-family: var(--mono); font-size: 12.5px;
+       word-break: break-all; color: var(--subtext1); min-height: 44px; }
+.cmd b { color: var(--accent); font-weight: 600; }
+.cmd .copy { position: absolute; top: 6px; right: 6px; }
+.err { color: var(--red); font-size: 13px; margin: 8px 0 0; display: flex; gap: 6px; }
+.warn { color: var(--yellow); font-size: 13px; margin: 8px 0 0; }
+.actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+.actions .sp { flex: 1; }
+.check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; color: var(--subtext1); font-size: 13px; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--subtext0); margin: 12px 0 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--overlay0); }
+.dot.run { background: var(--yellow); animation: pulse 1s infinite; }
+.dot.ok { background: var(--green); } .dot.fail { background: var(--red); }
+@keyframes pulse { 50% { opacity: .35; } }
+.progress { height: 4px; background: var(--surface0); border-radius: 2px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.log { background: var(--crust); border-radius: 10px; padding: 10px 12px; font: 12px/1.5 var(--mono); height: 260px; overflow: auto;
+       white-space: pre-wrap; word-break: break-word; color: var(--subtext0); margin-top: 8px; }
+.log .c { color: var(--accent); } .log .e { color: var(--red); } .log .o { color: var(--green); }
+.log:empty::before { content: "The output of a run appears here."; color: var(--overlay0); }
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 10px; }
+.result { background: var(--base); border: 1px solid var(--surface0); border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; padding: 0; }
+.result:hover { border-color: var(--accent); }
+.result .im { aspect-ratio: 16/10; background: var(--crust) center/cover no-repeat; display: grid; place-items: center; color: var(--overlay0); font-size: 26px; }
+.result.wide { grid-column: 1 / -1; } .result.wide .im { aspect-ratio: auto; height: 220px; background-size: contain; }
+.result .cap { padding: 6px 8px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.detected { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.det { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 4px; border-radius: 999px; border: 1px solid var(--surface1);
+       background: var(--base); cursor: pointer; font-size: 12px; font-family: var(--mono); }
+.det:hover { border-color: var(--accent); }
+.det .sw { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(127,127,127,.4); }
+.maprow { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+.maprow .eq { color: var(--overlay1); }
+
+/* modal */
+dialog { border: 1px solid var(--surface1); background: var(--mantle); color: var(--text); border-radius: 14px; padding: 0;
+         width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
+.dlg { display: flex; flex-direction: column; max-height: calc(100vh - 50px); }
+.dlg header { position: static; padding: 14px 16px; display: flex; gap: 8px; align-items: center; background: transparent; backdrop-filter: none; }
+.dlg header h3 { margin: 0; font-size: 15px; flex: 1; }
+.dlg .body { display: grid; grid-template-columns: 180px minmax(0,1fr); min-height: 0; flex: 1; border-top: 1px solid var(--surface0); border-bottom: 1px solid var(--surface0); }
+.dlg .body.single { grid-template-columns: minmax(0,1fr); }
+@media (max-width: 700px) { .dlg .body { grid-template-columns: minmax(0,1fr); } .places { display: none; } }
+.places { border-right: 1px solid var(--surface0); padding: 8px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.places button { text-align: left; border: 0; background: transparent; padding: 6px 10px; border-radius: 7px; cursor: pointer; color: var(--subtext1); }
+.places button:hover { background: var(--surface0); }
+.files { overflow: auto; padding: 8px; min-height: 340px; max-height: 60vh; }
+.fentry { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 7px; cursor: pointer; user-select: none; }
+.fentry:hover { background: var(--surface0); }
+.fentry.sel { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.fentry .ic { width: 34px; height: 26px; flex: none; border-radius: 4px; background: var(--crust) center/cover no-repeat; display: grid; place-items: center; font-size: 15px; }
+.fentry .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fentry .tag { font-size: 11px; color: var(--accent); }
+.fentry.dim { opacity: .45; }
+.dlg footer { padding: 12px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dlg footer .sp { flex: 1; }
+.lightbox { width: min(1400px, calc(100vw - 32px)); }
+.lightbox img { display: block; max-width: 100%; max-height: calc(100vh - 160px); margin: 0 auto; }
+.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.catalog button { text-align: left; border: 1px solid var(--surface0); background: var(--base); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.catalog button:hover { border-color: var(--accent); }
+.catalog button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--base)); }
+.catalog .note { display: block; color: var(--overlay1); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { color: var(--overlay1); padding: 20px; text-align: center; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface0); border: 1px solid var(--surface1);
+         padding: 8px 16px; border-radius: 999px; opacity: 0; transition: .2s; pointer-events: none; z-index: 99; }
+.toast.on { opacity: 1; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand"><span class="dots" id="dots"></span>catppuccinizer <small id="ver"></small></div>
+    <nav class="targets" id="tabs" aria-label="Target"></nav>
+  </div>
+</header>
+
+<main>
+  <div class="col" id="form">
+    <p class="intro" id="intro"></p>
+  </div>
+  <div class="col side">
+    <section class="card">
+      <h2>Command</h2>
+      <div class="cmd" id="cmd"><span id="cmdtext"></span><button class="btn ghost small copy" id="copy" title="Copy the command">Copy</button></div>
+      <div class="err hidden" id="err"></div>
+      <div class="warn hidden" id="sudowarn"></div>
+      <div class="actions">
+        <label class="check hidden" id="sudobox" title="Run the command with sudo (a password prompt opens)"><input type="checkbox" id="sudo"> Run with sudo</label>
+        <span class="sp"></span>
+        <button class="btn big" id="previewbtn" title="Only render before/after images (--preview)">Preview</button>
+        <button class="btn primary big" id="runbtn">Run</button>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Output</h2>
+      <div class="row">
+        <div class="status" style="margin:0;flex:1"><span class="dot" id="dot"></span><span id="statustext">Ready</span></div>
+        <button class="btn small danger hidden" id="stopbtn">Stop</button>
+        <button class="btn small hidden" id="openout">Open folder</button>
+      </div>
+      <div class="progress" style="margin-top:8px"><i id="prog"></i></div>
+      <div class="log" id="log"></div>
+      <div id="detbox" class="hidden">
+        <div class="label" style="margin-top:12px"><span>Detected colours</span><span class="hint" style="margin:0">click one to remap it</span></div>
+        <div class="detected" id="detected"></div>
+      </div>
+      <div class="results" id="results"></div>
+    </section>
+  </div>
+</main>
+
+<dialog id="browser">
+  <div class="dlg">
+    <header>
+      <button class="btn small" id="fbup" title="Parent folder">↑</button>
+      <input type="text" id="fbpath" class="mono" style="flex:1" spellcheck="false">
+      <label class="check" style="font-size:12px"><input type="checkbox" id="fbhidden"> hidden</label>
+    </header>
+    <div class="body"><div class="places" id="fbplaces"></div><div class="files" id="fblist"></div></div>
+    <footer>
+      <span class="hint" id="fbhint" style="margin:0"></span><span class="sp"></span>
+      <button class="btn" id="fbcancel">Cancel</button>
+      <button class="btn" id="fbfolder">Use this folder</button>
+      <button class="btn primary" id="fbok">Select</button>
+    </footer>
+  </div>
+</dialog>
+
+<dialog id="catalog">
+  <div class="dlg">
+    <header><h3 id="cattitle">Catalogue</h3><input type="text" id="catsearch" placeholder="Filter…" style="width:220px"></header>
+    <div class="body single"><div class="files" id="catlist"></div></div>
+    <footer><span class="hint" id="cathint" style="margin:0"></span><span class="sp"></span>
+      <button class="btn" id="catcancel">Close</button><button class="btn primary" id="catok">Use selection</button></footer>
+  </div>
+</dialog>
+
+<dialog id="lightbox" class="lightbox">
+  <div class="dlg">
+    <header><h3 id="lbtitle" class="mono" style="font-size:13px;word-break:break-all"></h3>
+      <button class="btn small" id="lbopen">Open</button><button class="btn small" id="lbclose">Close</button></header>
+    <div style="padding:12px;background:var(--crust)"><img id="lbimg" alt=""></div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const $ = (id) => document.getElementById(id);
+const S = { schema: null, target: null, values: {}, sudo: {}, job: null, since: 0, detected: new Map(), cmd: null, lastOut: null };
+
+// ------------------------------------------------------------------ helpers
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "style" && typeof v === "object") Object.assign(el.style, v);
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "html") el.innerHTML = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? { headers: { "X-Token": TOKEN } }
+    : { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok && r.status === 403) throw new Error("This page needs the address printed by catppuccinize gui (with its token).");
+  return r.json();
+}
+const thumb = (p, s = 256) => `/api/thumb?s=${s}&path=${encodeURIComponent(p)}&t=${encodeURIComponent(TOKEN)}`;
+const fileURL = (p) => `/api/file?path=${encodeURIComponent(p)}&t=${encodeURIComponent(TOKEN)}`;
+const baseName = (p) => String(p).replace(/\/+$/, "").split("/").pop() || p;
+const tidy = (p) => S.schema && String(p).startsWith(S.schema.home + "/") ? "~" + String(p).slice(S.schema.home.length) : String(p);
+const isImage = (p) => /\.(png|jpe?g|webp|bmp|gif|qoi|svgz?)$/i.test(p);
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 1800); }
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("catppuccinizer." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("catppuccinizer." + k, JSON.stringify(v)); } catch { /* private mode */ } },
+};
+function nice(o) {
+  if (o.positional) return (o.metavar || o.dest).toLowerCase().replace(/_/g, " ");
+  const f = o.flags.find((x) => x.startsWith("--")) || o.flags[0];
+  return f.replace(/^--/, "").replace(/^lutgen-/, "").replace(/-/g, " ");
+}
+function helpText(o) {
+  // "(default: 0.5)" and "lut: " prefixes are shown elsewhere
+  return o.help.replace(/^lut: /, "");
+}
+
+// ------------------------------------------------------------------- theme
+function pal(f) { return S.schema.palettes[f] || S.schema.palettes.mocha; }
+function uiFlavor() { const f = vals().flavor; return (f && f.length ? f[0] : "mocha"); }
+function uiAccent() {
+  const a = vals().accent, t = cur();
+  if (a && a.length) return a[0];
+  return (t.default_accent.find((x) => x !== "all")) || "mauve";
+}
+function applyTheme() {
+  const f = uiFlavor(), p = pal(f), r = document.documentElement.style;
+  for (const k of ["base","mantle","crust","surface0","surface1","surface2","overlay0","overlay1","overlay2",
+                   "subtext0","subtext1","text","red","green","yellow","peach","blue"]) r.setProperty("--" + k, p[k]);
+  r.setProperty("--accent", p[uiAccent()] || p.mauve);
+  r.setProperty("--on-accent", f === "latte" ? p.base : p.crust);
+  document.documentElement.style.colorScheme = f === "latte" ? "light" : "dark";
+  const dots = $("dots"); dots.replaceChildren(...["mauve", "pink", "blue", "green"].map((c) => h("i", { style: { background: p[c] } })));
+}
+
+// ------------------------------------------------------------------- state
+const SHARED = new Set(["flavor", "accent"]);
+const cur = () => S.schema.targets.find((t) => t.name === S.target);
+const vals = () => (S.values[S.target] ||= {});
+const opt = (dest) => cur().options.find((o) => o.dest === dest);
+function setVal(dest, v, rerender = false) {
+  const empty = v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length);
+  // flavour and accent are shared by every target: pick Mocha / mauve once
+  for (const V of SHARED.has(dest) ? Object.values(S.values) : [vals()]) { if (empty) delete V[dest]; else V[dest] = v; }
+  store.set("values", S.values);
+  if (dest === "flavor" || dest === "accent") applyTheme();
+  if (rerender) render(); else refreshVisibility();
+  scheduleCommand();
+}
+function sendVals() {
+  // drop what the page does not show for this target (a shared accent for lut...)
+  const v = { ...vals() }, t = cur();
+  if (!t.default_accent.length) delete v.accent;
+  if (!t.options.some((o) => o.role === "source")) delete v.map;
+  for (const o of t.options) if (o.when && !shown(o)) delete v[o.dest];
+  return v;
+}
+function shown(o) {
+  if (!o.when) return true;
+  return Object.entries(o.when).every(([k, v]) => (vals()[k] ?? opt(k)?.default) === v);
+}
+
+// ------------------------------------------------------------------ render
+function renderTabs() {
+  $("tabs").replaceChildren(...S.schema.targets.map((t) => h("button", {
+    class: t.name === S.target ? "on" : "", title: t.help,
+    onclick: () => { if (t.name === S.target) return; S.target = t.name; store.set("target", t.name); S.detected.clear(); renderDetected(); renderTabs(); render(); applyTheme(); scheduleCommand(); },
+  }, t.name)));
+}
+
+function render() {
+  const t = cur(), form = $("form");
+  const intro = h("p", { class: "intro" }, h("b", {}, t.name), " — ", t.summary || t.help);
+  const cards = [intro];
+  let n = 0;
+  const sources = t.options.filter((o) => o.role === "source");
+  if (sources.length) cards.push(card(++n, "Source", sources.map(sourceField)));
+  cards.push(card(++n, "Colours", coloursCard(t, sources.length > 0)));
+  const options = t.options.filter((o) => o.role === "option");
+  if (options.length) cards.push(card(++n, "Options", optionsCard(options)));
+  cards.push(card(++n, "Output folder", [pathField(opt("out"), { placeholder: `${tidy(S.schema.cwd)}/${t.default_out}`, accept: "dir" }),
+    h("p", { class: "hint" }, "Nothing is installed on the system unless you turn on an install / apply option.")]));
+  form.replaceChildren(...cards.filter(Boolean));
+  $("previewbtn").classList.toggle("hidden", !(sources.length && opt("preview")));
+  refreshVisibility();
+}
+function card(n, title, body) {
+  return h("section", { class: "card" }, h("h2", {}, h("span", { class: "n" }, n), title), ...[body].flat());
+}
+
+// ------------------------------------------------------------------ source
+function sourceAccept(o) {
+  if (o.metavar === "IMAGE") return o.multiple ? "any" : "image";
+  return "dir";
+}
+function sourceField(o) {
+  const t = cur(), wrap = h("div", { class: "source" });
+  const V = () => { const v = vals()[o.dest]; return v === undefined ? [] : [v].flat(); };
+  const draw = () => {
+    const list = V();
+    const items = h("div", { class: "items" }, list.map((p, i) => {
+      const img = isImage(p) || o.metavar === "IMAGE";
+      const im = h("div", { class: "im" }, img ? "" : (p.includes("/") ? "📁" : "🎨"));
+      if (p.includes("/")) im.style.backgroundImage = `url("${thumb(p, 320)}")`;
+      return h("div", { class: "item", title: p }, im, h("div", { class: "cap" }, h("bdi", {}, tidy(p))),
+        h("button", { class: "x", title: "Remove", onclick: () => { const l = V(); l.splice(i, 1); setVal(o.dest, o.multiple ? l : l[0], true); } }, "×"));
+    }));
+    const add = (paths) => {
+      if (!paths || !paths.length) return;
+      if (o.multiple) setVal(o.dest, [...new Set([...V(), ...paths])], true);
+      else setVal(o.dest, paths[0], true);
+    };
+    const accept = sourceAccept(o);
+    const manual = h("input", { type: "text", class: "grow mono", placeholder: o.multiple ? "Type a path or a name, then Enter" : "Path or name", spellcheck: "false",
+      onkeydown: (e) => { if (e.key === "Enter" && e.target.value.trim()) { add([e.target.value.trim()]); } } });
+    const buttons = h("div", { class: "row" },
+      t.has_sources ? h("button", { class: "btn primary", onclick: () => openCatalog(o, add) }, "Choose from catalogue…") : null,
+      h("button", { class: "btn", onclick: async () => add(await browse({ accept, multiple: o.multiple, start: V()[0] })) },
+        accept === "dir" ? "Browse folders…" : "Browse files…"),
+      manual);
+    const def = Array.isArray(o.default) ? o.default.join(", ") : o.default;
+    const kids = [h("div", { class: "label" }, h("span", {}, nice(o)), o.multiple ? h("span", {}, list.length ? `${list.length} selected` : "") : null),
+      list.length ? items : null, buttons,
+      h("p", { class: "hint" }, o.help, !list.length && def && def !== "None" ? [" — empty: ", h("code", {}, def)] : null)];
+    if (o.metavar === "IMAGE") {
+      const drop = h("div", { class: "drop" }, "Drop images here");
+      drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+      drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+      drop.addEventListener("drop", async (e) => {
+        e.preventDefault(); drop.classList.remove("over");
+        const files = [...e.dataTransfer.files].filter((f) => isImage(f.name));
+        if (!files.length) return toast("No image in what was dropped");
+        drop.textContent = `Copying ${files.length} image(s)…`;
+        const paths = [];
+        for (const f of files) {
+          const r = await fetch("/api/upload", { method: "POST", headers: { "X-Token": TOKEN, "X-Filename": encodeURIComponent(f.name).replace(/%20/g, " ") }, body: f }).then((r) => r.json());
+          if (r.path) paths.push(r.path); else toast(r.error || "upload failed");
+        }
+        add(paths);
+      });
+      kids.splice(2, 0, h("div", { style: { marginBottom: "8px" } }, drop));
+    }
+    wrap.replaceChildren(...kids.filter(Boolean));
+  };
+  draw();
+  return wrap;
+}
+
+// ----------------------------------------------------------------- colours
+function coloursCard(t, hasSource) {
+  const out = [];
+  const flv = vals().flavor || ["mocha"];
+  const fset = new Set(flv[0] === "all" ? S.schema.flavors : flv);
+  out.push(h("div", { class: "label" }, h("span", {}, "Flavour"), h("span", {}, "several = one result each")));
+  out.push(h("div", { class: "flavors" }, S.schema.flavors.map((f) => {
+    const p = pal(f);
+    return h("button", { class: "flavor" + (fset.has(f) ? " on" : ""), style: { background: p.base, color: p.text },
+      onclick: (e) => {
+        const s = new Set(fset);
+        if (e.shiftKey || e.ctrlKey || e.metaKey) { s.has(f) ? s.delete(f) : s.add(f); } else if (s.size === 1 && s.has(f)) return; else { s.clear(); s.add(f); }
+        if (!s.size) s.add(f);
+        const l = S.schema.flavors.filter((x) => s.has(x));
+        setVal("flavor", l.length === 1 && l[0] === "mocha" ? undefined : l, true);
+      } },
+      h("span", { class: "name" }, S.schema.flavor_titles[f]),
+      h("span", { class: "strip" }, ["rosewater","pink","mauve","red","peach","yellow","green","teal","blue","lavender"].map((c) => h("i", { style: { background: p[c] } }))));
+  })));
+  out.push(h("div", { class: "row", style: { marginTop: "6px" } },
+    h("button", { class: "btn small ghost", onclick: () => setVal("flavor", fset.size === 4 ? undefined : [...S.schema.flavors], true) }, fset.size === 4 ? "Only Mocha" : "All four"),
+    h("span", { class: "hint", style: { margin: 0 } }, "Ctrl/Shift+click to pick several.")));
+
+  if (t.default_accent.length) {
+    const acc = vals().accent || [];
+    const all = acc[0] === "all";
+    const aset = new Set(all ? S.schema.accents : acc);
+    const p = pal(uiFlavor());
+    const dflt = t.default_accent.join(", ");
+    out.push(h("div", { class: "label" }, h("span", {}, "Accent"), h("span", {}, acc.length ? `${all ? 14 : aset.size} selected` : `default: ${dflt}`)));
+    out.push(h("div", { class: "accents" }, S.schema.accents.map((a) => h("button", {
+      class: "accent" + (aset.has(a) ? " on" : "") + (!acc.length && t.default_accent.includes(a) ? " def" : ""), style: { color: p[a] },
+      title: !acc.length && t.default_accent.includes(a) ? "default" : null,
+      onclick: (e) => {
+        const s = new Set(aset);
+        if (e.shiftKey || e.ctrlKey || e.metaKey) { s.has(a) ? s.delete(a) : s.add(a); } else if (s.size === 1 && s.has(a)) s.clear(); else { s.clear(); s.add(a); }
+        const l = S.schema.accents.filter((x) => s.has(x));
+        setVal("accent", l.length === 14 ? ["all"] : l, true);
+      } }, h("span", { class: "sw", style: { background: p[a] } }), h("span", { style: { color: "var(--text)" } }, a)))));
+    out.push(h("div", { class: "row", style: { marginTop: "6px" } },
+      h("button", { class: "btn small ghost", onclick: () => setVal("accent", all ? undefined : ["all"], true) }, all ? "Default" : "All 14"),
+      h("span", { class: "hint", style: { margin: 0 } }, "Used by the colours mapped to “accent”. Click again to go back to the default.")));
+  }
+
+  if (hasSource && opt("map")) out.push(mapEditor());
+  return out;
+}
+
+function mapEditor() {
+  const rows = (vals().map || []).map((m) => { const i = m.indexOf("="); return i < 0 ? [m, ""] : [m.slice(0, i), m.slice(i + 1)]; });
+  const p = pal(uiFlavor());
+  const save = () => setVal("map", rows.filter(([a, b]) => a.trim() && b).map(([a, b]) => `${a.trim()}=${b}`));
+  const dl = h("datalist", { id: "detnames" }, [...S.detected.keys()].map((k) => h("option", { value: k })));
+  const box = h("div", {}, h("div", { class: "label" }, h("span", {}, "Colour remapping (-m)"), h("span", {}, "optional")), dl);
+  const list = h("div");
+  const draw = () => {
+    list.replaceChildren(...rows.map((r, i) => {
+      const sel = h("select", { onchange: (e) => { r[1] = e.target.value; save(); draw(); } },
+        h("option", { value: "" }, "→ target…"), S.schema.map_targets.map((x) => h("option", { value: x, selected: r[1] === x }, x)));
+      const sw = h("span", { class: "sw", style: { width: "14px", height: "14px", borderRadius: "50%", display: "inline-block",
+        background: r[1] ? (r[1] === "accent" ? p[uiAccent()] : p[r[1]]) : "transparent", border: "1px solid var(--surface2)" } });
+      return h("div", { class: "maprow" },
+        h("input", { type: "text", class: "mono", value: r[0], list: "detnames", placeholder: "name or #rrggbb", spellcheck: "false",
+          oninput: (e) => { r[0] = e.target.value; save(); } }),
+        h("span", { class: "eq" }, "="), h("div", { class: "row", style: { flexWrap: "nowrap" } }, sw, sel),
+        h("button", { class: "btn small ghost", title: "Remove", onclick: () => { rows.splice(i, 1); save(); draw(); } }, "×"));
+    }));
+  };
+  draw();
+  box.append(list, h("div", { class: "row" },
+    h("button", { class: "btn small", onclick: () => { rows.push(["", ""]); draw(); list.querySelector(".maprow:last-child input")?.focus(); } }, "+ Add a remap"),
+    h("span", { class: "hint", style: { margin: 0 } }, "Names are shown after a run (Preview is enough), e.g. ", h("code", {}, "white"), ", ", h("code", {}, "ui.white"), ", or a ", h("code", {}, "#hex"), ".")));
+  S.addMap = (name, target) => { rows.push([name, target || ""]); save(); draw(); };
+  return box;
+}
+
+// ----------------------------------------------------------------- options
+function optionsCard(options) {
+  const plain = options.filter((o) => !o.group);
+  const groups = {};
+  for (const o of options.filter((o) => o.group)) (groups[o.group] ||= []).push(o);
+  const out = [h("div", { class: "opts" }, plain.map(optionField))];
+  for (const [title, list] of Object.entries(groups)) {
+    const when = list[0].when;
+    const d = h("details", { class: "group", "data-when": when ? JSON.stringify(when) : null, open: true },
+      h("summary", {}, title), h("div", { class: "opts" }, list.map(optionField)));
+    out.push(d);
+  }
+  return out;
+}
+
+function optionField(o) {
+  const V = vals(), v = V[o.dest];
+  const box = h("div", { class: "opt" + (v !== undefined ? " set" : ""), "data-dest": o.dest });
+  const head = h("div", { class: "head" }, h("div", {}, h("div", { class: "name" }, nice(o)), h("div", { class: "flag" }, o.flags.join(", "))));
+  const extra = [];
+  if (o.sudo) head.append(h("span", { class: "badge", title: "Needs administrator rights" }, "sudo"));
+  let control;
+  const def = o.default;
+  if (o.kind === "bool") {
+    const inp = h("input", { type: "checkbox", checked: !!v, onchange: (e) => { setVal(o.dest, e.target.checked || undefined); box.classList.toggle("set", e.target.checked); } });
+    head.append(h("label", { class: "switch" }, inp, h("span")));
+  } else if (o.kind === "choice") {
+    const curv = v ?? def;
+    if (o.choices.length <= 6) {
+      control = h("div", { class: "seg" }, def === null ? h("button", { class: v === undefined ? "on" : "", title: "let the tool decide",
+        onclick: () => setVal(o.dest, undefined, true) }, "default") : null, o.choices.map((c) => h("button", { class: (c === curv ? "on" : "") + (c === def ? " dflt" : ""), title: c === def ? "default" : null,
+        onclick: () => setVal(o.dest, c === def ? undefined : c, true) }, c)));
+    } else {
+      control = h("select", { onchange: (e) => setVal(o.dest, e.target.value === String(def) ? undefined : e.target.value, true) },
+        def === null ? h("option", { value: "" }, "(default)") : null,
+        o.choices.map((c) => h("option", { value: c, selected: c === curv }, c + (c === def ? " (default)" : ""))));
+    }
+  } else if (o.kind === "multichoice") {
+    const s = new Set(v ?? def ?? []);
+    control = h("div", { class: "chips" }, o.choices.map((c) => h("button", { class: "chip" + (s.has(c) ? " on" : ""),
+      onclick: () => { s.has(c) ? s.delete(c) : s.add(c); const l = o.choices.filter((x) => s.has(x));
+        setVal(o.dest, JSON.stringify(l) === JSON.stringify(def) || !l.length ? undefined : l, true); } }, c)));
+  } else if (o.kind === "int" || o.kind === "float") {
+    const step = o.kind === "int" ? 1 : (o.range && o.range[1] - o.range[0] <= 1 ? 0.05 : 0.01);
+    const num = h("input", { type: "number", step, value: v ?? "", placeholder: def ?? "default", min: o.range?.[0], max: o.range?.[1],
+      oninput: (e) => { const x = e.target.value; if (range) range.value = x === "" ? (def ?? o.range[0]) : x; setVal(o.dest, x === "" ? undefined : Number(x)); box.classList.toggle("set", x !== ""); } });
+    let range = null;
+    if (o.range) {
+      range = h("input", { type: "range", min: o.range[0], max: o.range[1], step, value: v ?? def ?? o.range[0],
+        oninput: (e) => { num.value = e.target.value; const x = Number(e.target.value); setVal(o.dest, x === def ? undefined : x); box.classList.toggle("set", x !== def); } });
+    }
+    control = h("div", { class: "num" }, range, num, v !== undefined ? h("button", { class: "btn small ghost", title: "Back to the default", onclick: () => setVal(o.dest, undefined, true) }, "reset") : null);
+  } else if (o.kind === "optional") {
+    const on = v !== undefined;
+    const inp = h("input", { type: "checkbox", checked: on, onchange: (e) => setVal(o.dest, e.target.checked ? true : undefined, true) });
+    head.append(h("label", { class: "switch" }, inp, h("span")));
+    if (on) control = h("div", { class: "num" }, h("span", { class: "hint", style: { margin: 0 } }, o.metavar?.toLowerCase() || "value"),
+      h("input", { type: "number", value: v === true ? "" : v, placeholder: o.const, oninput: (e) => setVal(o.dest, e.target.value === "" ? true : Number(e.target.value)) }));
+  } else if (o.kind === "path") {
+    control = pathField(o, { accept: /folder|checkout|mount point/.test(o.help) ? "dir" : "any" });
+    box.classList.add("wide");
+  } else if (o.metavar === "COLOUR") {
+    const p = pal(uiFlavor());
+    control = h("div", { class: "row" }, h("select", { onchange: (e) => setVal(o.dest, e.target.value || undefined, true) },
+      h("option", { value: "" }, "(automatic)"), Object.keys(p).map((c) => h("option", { value: c, selected: v === c }, c))),
+      v ? h("span", { class: "chip", style: { cursor: "default" } }, h("span", { class: "sw", style: { background: p[v] } }), p[v]) : null);
+  } else {
+    control = h("input", { type: "text", value: v ?? "", placeholder: def && def !== "" ? String(def) : (o.metavar || ""), spellcheck: "false",
+      oninput: (e) => { setVal(o.dest, e.target.value || undefined); box.classList.toggle("set", !!e.target.value); } });
+  }
+  box.append(head);
+  if (control) box.append(control);
+  box.append(h("div", { class: "help" }, helpText(o)), ...extra);
+  return box;
+}
+
+function pathField(o, { placeholder, accept = "dir" } = {}) {
+  const v = vals()[o.dest];
+  const inp = h("input", { type: "text", class: "grow mono", value: v ?? "", placeholder: placeholder || (o.default ? String(o.default) : "default"), spellcheck: "false",
+    oninput: (e) => setVal(o.dest, e.target.value.trim() || undefined) });
+  return h("div", { class: "row" }, inp,
+    h("button", { class: "btn", onclick: async () => { const r = await browse({ accept, start: inp.value || null }); if (r && r[0]) { inp.value = r[0]; setVal(o.dest, r[0]); } } }, "Browse…"),
+    v ? h("button", { class: "btn ghost", title: "Clear", onclick: () => setVal(o.dest, undefined, true) }, "×") : null);
+}
+
+function refreshVisibility() {
+  document.querySelectorAll("[data-when]").forEach((el) => {
+    const w = JSON.parse(el.dataset.when);
+    el.classList.toggle("hidden", !Object.entries(w).every(([k, v]) => (vals()[k] ?? opt(k)?.default) === v));
+  });
+  // sudo: on by default when an option says it needs it, until the user changes it
+  const t = cur(), needs = t.options.some((o) => o.sudo && vals()[o.dest]);
+  const chosen = S.sudo[S.target];
+  $("sudo").checked = chosen === undefined ? needs : chosen;
+  $("sudobox").classList.toggle("hidden", !needs && !$("sudo").checked);
+  const w = $("sudowarn");
+  const sudoOn = $("sudo").checked;
+  const helperNeeded = sudoOn || t.options.some((o) => ["install", "test", "boot_delay"].includes(o.dest) && vals()[o.dest] && S.target === "plymouth");
+  w.classList.toggle("hidden", !(helperNeeded && !S.schema.askpass));
+  w.textContent = "No graphical sudo prompt (ksshaskpass, ssh-askpass) was found: copy the command and run it in a terminal.";
+}
+
+// ----------------------------------------------------------------- command
+let cmdTimer = null;
+function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCommand, 120); }
+async function updateCommand() {
+  const r = await api("/api/command", { target: S.target, values: sendVals(), sudo: $("sudo").checked });
+  S.cmd = r;
+  const c = $("cmdtext");
+  const parts = (r.command || "").split(" ");
+  c.replaceChildren(...parts.map((p, i) => i === 0 || (i === 1 && parts[0] === "sudo") || (p === "catppuccinize") ? h("b", {}, p + " ") : (/^-/.test(p) ? h("span", { style: { color: "var(--blue)" } }, p + " ") : p + " ")));
+  $("err").classList.toggle("hidden", !r.error);
+  $("err").replaceChildren("⚠ ", r.error || "");
+  const busy = S.job && !S.job.done;
+  $("runbtn").disabled = !!r.error || busy;
+  $("previewbtn").disabled = !!r.error || busy;
+}
+
+// --------------------------------------------------------------------- run
+async function run(preview) {
+  const values = sendVals();
+  if (preview) values.preview = true;
+  const r = await api("/api/run", { target: S.target, values, sudo: $("sudo").checked });
+  if (r.error) { toast(r.error); return; }
+  S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.detected.clear(); S.group = "";
+  $("log").replaceChildren(); $("results").replaceChildren(); renderDetected();
+  $("prog").style.width = "0"; setStatus("run", preview ? "Rendering previews…" : "Running…");
+  $("stopbtn").classList.remove("hidden"); $("openout").classList.add("hidden");
+  updateCommand(); poll();
+}
+function setStatus(kind, text) { $("dot").className = "dot " + kind; $("statustext").textContent = text; }
+async function poll() {
+  if (!S.job) return;
+  let r;
+  try { r = await api(`/api/job?id=${S.job.id}&since=${S.since}`); } catch { setTimeout(poll, 1000); return; }
+  S.since = r.next;
+  const log = $("log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  for (const line of r.lines) log.append(logLine(line));
+  if (atEnd) log.scrollTop = log.scrollHeight;
+  if (r.lines.length) renderDetected();
+  if (!r.done) { setTimeout(poll, 350); return; }
+  S.job.done = true;
+  $("stopbtn").classList.add("hidden");
+  $("prog").style.width = r.code === 0 ? "100%" : $("prog").style.width;
+  setStatus(r.code === 0 ? "ok" : "fail", r.code === 0 ? `Done — ${r.outputs.length} item(s) written` : `Failed (exit code ${r.code})`);
+  S.lastOut = r.out;
+  $("openout").classList.toggle("hidden", !r.outputs.length);
+  renderResults(r.outputs || []);
+  updateCommand();
+}
+function logLine(line) {
+  let cls = "";
+  if (line.startsWith("$ ")) cls = "c";
+  else if (/\b(error:|Error\b|Traceback|failed|not found|unknown|cannot|denied)/i.test(line) && !/fit error/.test(line)) cls = "e";
+  else if (/->|installed|updated|done/i.test(line)) cls = "o";
+  // detected colours: "    name       #rrggbb -> target"
+  const g = line.match(/^  (\S+) \(\d+ images?, /);
+  if (g) S.group = g[1] + ".";
+  else if (!/^\s{4}/.test(line)) S.group = "";
+  const m = line.match(/^\s{3,}(\S+)\s+(#[0-9a-f]{6}) -> (\S+)/i);
+  if (m) S.detected.set(S.group + m[1], { source: m[2], target: m[3] });
+  const pr = line.match(/(\d+)\/(\d+) images/);
+  if (pr) $("prog").style.width = `${Math.round(100 * pr[1] / pr[2])}%`;
+  return h("div", { class: cls }, line);
+}
+function renderDetected() {
+  const box = $("detected"), p = pal(uiFlavor());
+  $("detbox").classList.toggle("hidden", !S.detected.size);
+  box.replaceChildren(...[...S.detected.entries()].slice(0, 60).map(([name, c]) => h("button", { class: "det", title: `${c.source} → ${c.target}`,
+    onclick: () => { if (S.addMap) { S.addMap(name, ""); toast(`Pick a target for ${name} in Colours`); } } },
+    h("span", { class: "sw", style: { background: c.source } }), name, " → ",
+    h("span", { class: "sw", style: { background: p[c.target === "accent" ? uiAccent() : c.target] || "transparent" } }), c.target)));
+  const dl = $("detnames");
+  if (dl) dl.replaceChildren(...[...S.detected.keys()].map((k) => h("option", { value: k })));
+}
+function renderResults(list) {
+  const single = list.length === 1;
+  $("results").replaceChildren(...list.map((o) => {
+    const im = h("div", { class: "im" }, o.thumb ? "" : (o.dir ? "📁" : "📄"));
+    if (o.thumb) im.style.backgroundImage = `url("${thumb(o.thumb, single || o.preview ? 900 : 320)}")`;
+    return h("button", { class: "result" + (single || o.preview && list.length < 3 ? " wide" : ""), title: o.path,
+      onclick: () => (o.thumb ? lightbox(o) : api("/api/open", { path: o.path })) },
+      im, h("div", { class: "cap" }, (o.dir ? "📁 " : "") + o.name));
+  }));
+}
+function lightbox(o) {
+  $("lbtitle").textContent = tidy(o.path);
+  $("lbimg").src = o.thumb.match(/\.(png|jpe?g|webp|gif|svg)$/i) && !o.dir ? fileURL(o.thumb) : thumb(o.thumb, 1600);
+  $("lbopen").onclick = () => api("/api/open", { path: o.path });
+  $("lightbox").showModal();
+}
+
+// ------------------------------------------------------------ file browser
+let fb = null;
+function browse({ accept = "any", multiple = false, start = null } = {}) {
+  return new Promise((resolve) => {
+    fb = { accept, multiple, sel: new Set(), resolve, path: start || store.get("lastdir", S.schema.home) };
+    $("fbfolder").classList.toggle("hidden", accept === "image" || accept === "file");
+    $("fbok").classList.toggle("hidden", accept === "dir");
+    $("fbhint").textContent = accept === "dir" ? "Open a folder, then “Use this folder”." :
+      multiple ? "Click files to select them (folders: “Use this folder” adds the whole folder)." : "Click a file to select it.";
+    $("fbplaces").replaceChildren(...S.schema.places.map((p) => h("button", { onclick: () => fbLoad(p.path) }, p.label)));
+    $("browser").showModal();
+    fbLoad(fb.path);
+  });
+}
+async function fbLoad(path) {
+  const r = await api(`/api/ls?path=${encodeURIComponent(path)}&hidden=${$("fbhidden").checked ? 1 : 0}`);
+  fb.path = r.path; $("fbpath").value = r.path; fb.parent = r.parent; store.set("lastdir", r.path);
+  const list = $("fblist");
+  if (r.error) { list.replaceChildren(h("div", { class: "empty" }, r.error)); return; }
+  if (!r.entries.length) { list.replaceChildren(h("div", { class: "empty" }, "Empty folder")); return; }
+  list.replaceChildren(...r.entries.map((e) => {
+    const usable = e.dir || (fb.accept === "dir" ? false : fb.accept === "file" || fb.accept === "any" ? true : e.image);
+    const ic = h("div", { class: "ic" }, e.dir ? "📁" : (e.image ? "" : "📄"));
+    if (e.image) { ic.style.backgroundImage = `url("${thumb(e.path, 64)}")`; }
+    const row = h("div", { class: "fentry" + (fb.sel.has(e.path) ? " sel" : "") + (usable ? "" : " dim"), title: e.path },
+      ic, h("span", { class: "nm" }, e.name), e.theme ? h("span", { class: "tag" }, "theme") : null,
+      e.dir && (e.theme || fb.accept !== "image") ? h("button", { class: "btn small", onclick: (ev) => { ev.stopPropagation(); fbDone([e.path]); } }, "Use") : null);
+    row.addEventListener("click", () => {
+      if (e.dir) return fbLoad(e.path);
+      if (!usable) return;
+      if (!fb.multiple) return fbDone([e.path]);
+      fb.sel.has(e.path) ? fb.sel.delete(e.path) : fb.sel.add(e.path);
+      row.classList.toggle("sel");
+      $("fbok").textContent = fb.sel.size ? `Add ${fb.sel.size}` : "Select";
+    });
+    return row;
+  }));
+  $("fbok").textContent = fb.sel.size ? `Add ${fb.sel.size}` : "Select";
+}
+function fbDone(paths) { const r = fb.resolve; $("browser").close(); fb = null; r(paths); }
+$("fbup").onclick = () => fbLoad(fb.parent);
+$("fbpath").onkeydown = (e) => { if (e.key === "Enter") fbLoad(e.target.value); };
+$("fbhidden").onchange = () => fbLoad(fb.path);
+$("fbcancel").onclick = () => fbDone([]);
+$("fbfolder").onclick = () => fbDone([fb.path]);
+$("fbok").onclick = () => fbDone([...fb.sel]);
+$("browser").addEventListener("cancel", () => { if (fb) { const r = fb.resolve; fb = null; r([]); } });
+
+// ---------------------------------------------------------------- catalogue
+const catalogCache = {};
+async function openCatalog(o, add) {
+  const sel = new Set();
+  $("cattitle").textContent = `${cur().name}: ${nice(o)}`;
+  $("catsearch").value = "";
+  $("catlist").replaceChildren(h("div", { class: "empty" }, "Loading… (the first time, the adi1090x themes are fetched with git)"));
+  $("cathint").textContent = o.multiple ? "Click to select one or more, then “Use selection”." : "Click one to use it.";
+  $("catok").classList.toggle("hidden", !o.multiple);
+  $("catalog").showModal();
+  let r = catalogCache[S.target];
+  if (!r) { r = await api(`/api/sources?target=${S.target}`); if (!r.error) catalogCache[S.target] = r; }
+  if (r.error) { $("catlist").replaceChildren(h("div", { class: "empty" }, r.error)); return; }
+  const draw = () => {
+    const q = $("catsearch").value.toLowerCase();
+    const items = r.sources.filter((s) => !q || (s.value + " " + s.label + " " + (s.note || "")).toLowerCase().includes(q));
+    $("catlist").replaceChildren(items.length ? h("div", { class: "catalog" }, items.map((s) => h("button", { class: sel.has(s.value) ? "on" : "", title: s.value,
+      onclick: (e) => {
+        if (!o.multiple) { $("catalog").close(); add([s.value]); return; }
+        sel.has(s.value) ? sel.delete(s.value) : sel.add(s.value); e.currentTarget.classList.toggle("on");
+        $("catok").textContent = sel.size ? `Use ${sel.size}` : "Use selection";
+      } }, s.label, h("span", { class: "note" }, s.label !== s.value ? s.value + " · " : "", s.note || "")))) : h("div", { class: "empty" }, "Nothing matches"));
+  };
+  $("catsearch").oninput = draw;
+  $("catok").textContent = "Use selection";
+  $("catok").onclick = () => { $("catalog").close(); add([...sel]); };
+  draw();
+  $("catsearch").focus();
+}
+$("catcancel").onclick = () => $("catalog").close();
+$("lbclose").onclick = () => $("lightbox").close();
+$("lightbox").addEventListener("click", (e) => { if (e.target === $("lightbox")) $("lightbox").close(); });
+
+// -------------------------------------------------------------------- wire
+$("copy").onclick = async () => {
+  const text = S.cmd?.command || "";
+  try { await navigator.clipboard.writeText(text); toast("Command copied"); }
+  catch { const r = document.createRange(); r.selectNodeContents($("cmdtext")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("Selected: Ctrl+C to copy"); }
+};
+$("runbtn").onclick = () => run(false);
+$("previewbtn").onclick = () => run(true);
+$("stopbtn").onclick = () => S.job && api("/api/stop", { id: S.job.id });
+$("openout").onclick = () => S.lastOut && api("/api/open", { path: S.lastOut });
+$("sudo").onchange = (e) => { S.sudo[S.target] = e.target.checked; refreshVisibility(); scheduleCommand(); };
+setInterval(() => api("/api/ping").catch(() => setStatus("fail", "The catppuccinize gui server stopped")), 30000);
+
+(async function init() {
+  try { S.schema = await api("/api/schema"); }
+  catch (e) { document.body.replaceChildren(h("p", { style: { padding: "40px", fontFamily: "sans-serif" } }, e.message)); return; }
+  $("ver").textContent = "v" + S.schema.version;
+  S.values = store.get("values", {}) || {};
+  const names = S.schema.targets.map((t) => t.name);
+  S.target = names.includes(store.get("target")) ? store.get("target") : (names.includes("image") ? "image" : names[0]);
+  for (const t of names) if (typeof S.values[t] !== "object" || Array.isArray(S.values[t])) S.values[t] = {};
+  renderTabs(); applyTheme(); render(); updateCommand();
+})();
+</script>
+</body>
+</html>

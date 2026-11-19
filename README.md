@@ -32,6 +32,9 @@ catppuccinize plymouth rings_2 -a mauve --test           # boot splash, shown wi
 before/after image instead of the result. Nothing is installed on your system
 unless you pass `--install` or `--apply`.
 
+Prefer clicking? `catppuccinize gui` opens a [graphical interface](docs/gui.md)
+in your browser: choose the source and the options, preview, run.
+
 **New here?** Follow the [getting started guide](docs/getting-started.md).
 
 Ready-made themes built with the tool (Plymouth, KDE splash screens, Limine,
@@ -40,6 +43,7 @@ images) are published in [catppuccinized-themes](https://github.com/erratos/catp
 ## Documentation
 
 - [Getting started](docs/getting-started.md): install and first steps
+- [Graphical interface](docs/gui.md): `catppuccinize gui`
 - [Colours and mapping](docs/colours.md): shared options, colour names, `-m`, how it works
 - [Images](docs/images.md): photo vs flat art, SVG, built-in `lut` vs lutgen,
   every option shown side by side

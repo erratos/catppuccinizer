@@ -26,6 +26,11 @@ class Target:
     def check(self, args):
         """Validate options before running (raise SystemExit on error)."""
 
+    def sources(self):
+        """Ready-made sources a front-end can offer for the first positional argument
+        (the GUI's catalogue): [{"value", "label", "note"}], or None for none."""
+        return None
+
     def run(self, args):
         raise NotImplementedError
 

@@ -22,8 +22,9 @@ def common_parser():
     return common
 
 
-def main(argv=None):
-    sys.dont_write_bytecode = True       # no root-owned __pycache__ after a sudo run
+def build_parser(targets=None):
+    """(parser, {target name: its subparser}); the GUI builds its forms from the subparsers."""
+    targets = discover() if targets is None else targets
     p = argparse.ArgumentParser(prog="catppuccinize",
                                 description="Recolour boot themes, wallpapers and more with Catppuccin.")
     p.add_argument("--version", action="version", version=f"catppuccinizer {__version__}")
@@ -31,17 +32,42 @@ def main(argv=None):
     epilog = (f"flavors: {', '.join(FLAVORS)}\naccents: {', '.join(ACCENTS)}\n"
               f"targets: {', '.join(TARGETS)}")
     common = common_parser()
-    for name, t in discover().items():
+    subparsers = {}
+    for name, t in targets.items():
         doc = t.description or sys.modules[type(t).__module__].__doc__
         sp = sub.add_parser(name, parents=[common], help=t.help, description=doc, epilog=epilog,
                             formatter_class=argparse.RawDescriptionHelpFormatter)
         t.add_arguments(sp)
         sp.set_defaults(target=t)
+        subparsers[name] = sp
+    if "gui" not in targets:
+        g = sub.add_parser("gui", help="open the graphical interface in your browser",
+                           description="Choose a target, its source and options in a web page "
+                                       "served on this computer only (127.0.0.1).")
+        g.add_argument("--port", type=int, default=0, help="port (default: a free one)")
+        g.add_argument("--no-browser", action="store_true", help="only print the address")
+        g.set_defaults(target=None)
+    return p, subparsers
 
+
+def parse(argv=None, parser=None):
+    """Parsed and resolved arguments (flavours, accents, output folder), checked by the target."""
+    p = parser or build_parser()[0]
     a = p.parse_args(argv)
     t = a.target
+    if t is None:                     # gui
+        return a
     a.flavor = expand(a.flavor, FLAVORS, "flavor")
     a.accent = expand(a.accent or list(t.default_accent), ACCENTS, "accent")
     a.out = a.out or Path.cwd() / t.default_out
     t.check(a)
-    t.run(a)
+    return a
+
+
+def main(argv=None):
+    sys.dont_write_bytecode = True       # no root-owned __pycache__ after a sudo run
+    a = parse(argv)
+    if a.target is None:
+        from .gui import serve
+        return serve(port=a.port, browser=not a.no_browser)
+    a.target.run(a)

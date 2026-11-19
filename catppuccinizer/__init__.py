@@ -2,6 +2,7 @@
 
 catppuccinizer.core     palettes, colour detection, recolouring, formats
 catppuccinizer.targets  one module per target (plymouth, image, limine, ksplash)
+catppuccinizer.gui      `catppuccinize gui`, a local web page over the same targets
 
 A target only uses catppuccinizer.core, never another target. Third-party
 targets can be added with the "catppuccinizer.targets" entry point group.

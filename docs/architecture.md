@@ -10,6 +10,7 @@ core never knows about targets. `tests/test_architecture.py` enforces it.
 ```
 catppuccinizer/
   cli.py              builds the command line from the discovered targets
+  gui/                `catppuccinize gui`: local web page built from the same parsers
   core/
     palette.py        Catppuccin palettes, colour helpers, Oklab
     detect.py         background + source colours of a group of images
@@ -29,6 +30,7 @@ catppuccinizer/
 tests/
   test_regression.py  every target on small fixtures, compared with golden.json
   test_architecture.py
+  test_gui.py         forms, command lines, access control of the GUI
 ```
 
 ## Core API (what targets use)
@@ -74,6 +76,12 @@ class GrubTarget(Target):
 
 TARGET = GrubTarget()
 ```
+
+Optionally, `def sources(self)` returns ready-made sources for the first
+positional argument (`[{"value", "label", "note"}]`): the GUI shows them as a
+catalogue (Plymouth: the adi1090x themes, KDE splash: the installed splash
+screens). The GUI needs nothing else: its forms come from `add_arguments`
+(see [Graphical interface](gui.md#for-target-authors)).
 
 Then add `"grub"` to `BUILTIN` in `core/target.py`, or, from another package,
 declare an entry point and install it next to catppuccinizer:

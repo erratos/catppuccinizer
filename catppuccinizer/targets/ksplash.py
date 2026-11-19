@@ -54,6 +54,10 @@ class KSplashTarget(Target):
     def run(self, a):
         run(a)
 
+    def sources(self):
+        return [{"value": pid, "label": package_name(d), "note": str(d.parent)}
+                for pid, d in sorted(splash_packages().items())]
+
 
 # ------------------------------------------------------------------ packages
 def splash_packages():
