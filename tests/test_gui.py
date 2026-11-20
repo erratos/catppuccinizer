@@ -60,6 +60,7 @@ class Gui(unittest.TestCase):
         plymouth = next(t for t in s["targets"] if t["name"] == "plymouth")
         self.assertTrue(plymouth["has_sources"])
         self.assertEqual({o["dest"]: o["kind"] for o in plymouth["options"]}["test"], "optional")
+        self.assertNotIn("boot_delay", [o["dest"] for o in plymouth["options"]])
 
     def test_command_line(self):
         opts = self.app.options["image"]

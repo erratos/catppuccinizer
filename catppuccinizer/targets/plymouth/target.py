@@ -69,8 +69,6 @@ def add_arguments(p):
                    help="install the result (its -status variant if any) and rebuild the initramfs")
     p.add_argument("--test", nargs="?", const=10, type=int, metavar="SECONDS",
                    help="show the result without rebooting (default: 10 s)")
-    p.add_argument("--boot-delay", metavar="SECONDS|off",
-                   help="keep the splash N more seconds at boot (max 15), or 'off', then exit")
 
 
 def check_args(a):
@@ -385,8 +383,6 @@ def script(name, *args):
 def run(a):
     if a.list:
         return list_themes()
-    if a.boot_delay:
-        raise SystemExit(script("boot-delay.sh", a.boot_delay))
 
     jobs, status, copies = [], [], []
     for arg in a.themes:

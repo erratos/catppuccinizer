@@ -682,7 +682,7 @@ function refreshVisibility() {
   $("sudobox").classList.toggle("hidden", !needs && !$("sudo").checked);
   const w = $("sudowarn");
   const sudoOn = $("sudo").checked;
-  const helperNeeded = sudoOn || t.options.some((o) => ["install", "test", "boot_delay"].includes(o.dest) && vals()[o.dest] && S.target === "plymouth");
+  const helperNeeded = sudoOn || t.options.some((o) => ["install", "test"].includes(o.dest) && vals()[o.dest] && S.target === "plymouth");
   w.classList.toggle("hidden", !(helperNeeded && !S.schema.askpass));
   w.textContent = "No graphical sudo prompt (ksshaskpass, ssh-askpass) was found: copy the command and run it in a terminal.";
 }

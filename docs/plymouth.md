@@ -155,9 +155,6 @@ Plymouth and restores your default theme afterwards).
 `/usr/share/plymouth/themes/`, sets it as default and rebuilds the initramfs
 (it asks for sudo).
 
-On a fast machine the splash may vanish before you see it: `--boot-delay 5`
-keeps it up to 5 s longer at boot (max 15), `--boot-delay off` removes that.
-
 To install from an archive of
 [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes/releases):
 
@@ -171,6 +168,24 @@ sudo plymouth-set-default-theme -R catppuccin-mocha-infinite-seal-mauve
 can also pick the theme in *System Settings → Boot Splash Screen* once copied.
 Make sure `splash` is in your kernel command line and the `plymouth` hook is
 enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.conf`).
+
+## Tips
+
+### Seeing the splash on a fast machine
+
+On a fast machine the splash may vanish before you see it. A systemd drop-in
+can delay the end of Plymouth by a few seconds (and so the login screen):
+
+```bash
+sudo mkdir -p /etc/systemd/system/plymouth-quit.service.d
+printf '[Service]\nExecStartPre=/usr/bin/sleep 5\n' |
+    sudo tee /etc/systemd/system/plymouth-quit.service.d/delay.conf
+sudo systemctl daemon-reload
+```
+
+To remove it: `sudo rm /etc/systemd/system/plymouth-quit.service.d/delay.conf`,
+then `sudo systemctl daemon-reload`. Keep the delay short: the whole boot waits
+for it.
 
 ## Options
 
@@ -190,6 +205,5 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 | `--src` | | local `adi1090x/plymouth-themes` checkout instead of fetching |
 | `--test [S]` | `10` | show the result for S seconds without rebooting (always quits Plymouth, restores your default theme) |
 | `--install` | | install the result (its `-status` variant if any) and rebuild the initramfs |
-| `--boot-delay S\|off` | | keep the splash up to 15 s longer at boot, to actually see it on fast machines |
 
 Output names: `catppuccin-<flavor>-<theme>[-<accent>][-<suffix>]`.
