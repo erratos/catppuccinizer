@@ -32,6 +32,7 @@ from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
 from ..core.options import Option, step
 from ..core.paths import state_file
 from ..core.naming import check_name
+from ..core.sources import item, section, tidy
 from ..core.system import copy_folder, place, source_file, which
 from ..core.target import Target
 
@@ -51,8 +52,6 @@ class KSplashTarget(Target):
             Option("theme", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
                    accept="dir", help="look-and-feel id or folder (default: org.kde.breeze.desktop)"),
             *recolor.method_options(),
-            Option("--list", switch=True, stage="analyse", gui=False,   # the GUI's catalogue
-                   help="list installed splash screens and exit"),
             step("install", help=f"copy the result to {USER_DIR}"),
             step("apply", help="install, then select it as the splash screen"),
             step("test", help="show the result in a window (ksplashqml --test)"),
@@ -100,8 +99,13 @@ class KSplashTarget(Target):
         return colours(a)
 
     def sources(self):
-        return [{"value": pid, "label": package_name(d), "note": str(d.parent)}
-                for pid, d in sorted(splash_packages().items())]
+        try:
+            active = read_setting("Theme")
+        except SystemExit:                         # no kreadconfig6: nothing marked
+            active = None
+        return [section(f"{title} ({tidy(base)})", lambda base=base: installed(base, active))
+                for title, base in zip(("Your splash screens", "System splash screens"), SEARCH)
+                if base.is_dir()]
 
 
 # ------------------------------------------------------------------ packages
@@ -152,9 +156,13 @@ def metadata(pkg, pid, name, description):
     return {"KPackageStructure": "Plasma/LookAndFeel", "KPlugin": plugin}
 
 
-def list_packages():
-    for pid, d in sorted(splash_packages().items()):
-        print(f"{pid:42s} {package_name(d)}  ({d.parent})")
+def installed(base, active):
+    """The splash screens of a look-and-feel folder, the selected one marked."""
+    for d in sorted(base.iterdir(), key=lambda d: d.name):
+        if (d / "contents/splash/Splash.qml").exists():
+            preview = d / "contents/previews/splash.png"
+            yield item(d.name, package_name(d), current=d.name == active,
+                       thumb=preview if preview.is_file() else None)
 
 
 def preview_group(preview, rasters):
@@ -252,8 +260,6 @@ def set_settings(system, values):
 
 
 def build(a):
-    if a.list:
-        return list_packages()
     if a.preview:
         print("note: --preview is not available for splash screens, use --test to see the result")
     pkg = resolve(a.theme)

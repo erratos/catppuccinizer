@@ -28,6 +28,7 @@ from ..core.mapping import (apply_maps, colour_report, map_colour_counts, note_a
 from ..core.naming import output_name
 from ..core.options import Option
 from ..core.palette import FLAVOR_TITLES, rgb2hex
+from ..core.sources import wallpaper_sections
 from ..core.target import Target
 
 VECTOR = {".svg", ".svgz"}
@@ -56,6 +57,9 @@ class ImageTarget(Target):
         return [Option("images", nargs="+", metavar="IMAGE", accept="images",
                        help="image file(s) or folder(s)"),
                 *recolor.method_options()]
+
+    def sources(self):
+        return wallpaper_sections()
 
     def colours(self, a):
         files = collect(a.images)

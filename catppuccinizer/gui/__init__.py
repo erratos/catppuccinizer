@@ -43,7 +43,7 @@ from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.paths import cache_dir
 from ..core.options import STEPS, analysis, condition_met
 from ..core.recolor import LUT_METHODS
-from ..core.target import Target, discover
+from ..core.target import discover
 
 HERE = Path(__file__).resolve().parent
 PKG_PARENT = HERE.parent.parent
@@ -74,7 +74,7 @@ def schema(targets):
             "name": name, "help": t.help, "summary": first_paragraph(t.doc),
             "description": t.doc or "", "default_out": t.default_out,
             "default_accent": list(t.default_accent), "accent_also": t.accent_also,
-            "has_sources": type(t).sources is not Target.sources,
+            "has_sources": t.has_sources,
             "has_colours": t.has_colours,
             "options": [o.schema() for o in t.all_options() if o.gui],
         })
@@ -425,6 +425,8 @@ def thumbnail(path, size):
         return p.read_bytes(), "image/svg+xml"
     with Image.open(p) as im:
         im.seek(0)
+        if size:
+            im.draft("RGB", (size, size))     # JPEG: decoded at a fraction of its size, fast
         im = im.convert("RGBA")
         if size:
             im.thumbnail((size, size), Image.Resampling.LANCZOS)
@@ -511,9 +513,9 @@ def make_handler(app):
                     return self.send(404, {"error": "unknown target"})
                 try:
                     with contextlib.redirect_stdout(io.StringIO()):
-                        return self.send(200, {"sources": t.sources() or []})
+                        return self.send(200, {"sections": t.sources()})
                 except (SystemExit, Exception) as e:  # noqa: BLE001 - shown in the page
-                    return self.send(200, {"sources": [], "error": str(e) or type(e).__name__})
+                    return self.send(200, {"sections": [], "error": str(e) or type(e).__name__})
             if u.path == "/api/job":
                 job = app.jobs.get((q.get("id") or [""])[0])
                 if not job:

@@ -59,8 +59,8 @@ Look in `./images/previews/`.
 ## 4. Try a boot splash (Plymouth)
 
 Plymouth draws the animation shown while your computer boots. The tool can
-fetch 80 ready-made animations by name (list them with
-`catppuccinize plymouth --list`) and recolour them:
+fetch 80 ready-made animations by name (list them, with the themes already
+installed, with `catppuccinize plymouth --list`) and recolour them:
 
 ```bash
 sudo catppuccinize plymouth rings_2 -a mauve --test

@@ -101,6 +101,7 @@ is refused, to be fixed by hand.
 | `--recolor-wallpaper` | recolour the wallpaper(s) already set in `limine.conf` |
 | `--style` | `stretched`, `centered` or `tiled` |
 | `--preview` | also render before/after images of the wallpaper in `<out>/previews/` |
+| `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP) and the installed wallpapers |
 | `--colours` | only list the wallpaper colours `-m` can remap (the menu has none); `--json` for JSON |
 | `-s, --suffix` | extra word at the end of the folder and wallpaper names |
 | `--install` | copy the wallpaper to `<ESP>/catppuccin/` (sudo) |

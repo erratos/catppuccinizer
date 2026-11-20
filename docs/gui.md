@@ -22,14 +22,24 @@ ten minutes after the page is closed. `--port N` picks the port,
    `lut`).
 2. **Source**
    - images: *Browse files…* (several at once, or a whole folder), drop them on
-     the page, or type a path;
-   - Plymouth: *Choose from catalogue…* lists the 80 adi1090x themes (fetched
-     with git the first time, or those of your
+     the page, or type a path; *Choose from catalogue…* shows the wallpapers
+     installed in `/usr/share/wallpapers`, `/usr/share/backgrounds` and
+     `~/.local/share/wallpapers` (a KDE wallpaper package: its largest image);
+   - Plymouth: the catalogue shows the installed themes (the default one marked
+     *in use*) and the 80 adi1090x themes (fetched with git the first time, or
+     those of your
      [local copy](plymouth.md#using-a-local-copy-of-the-adi1090x-themes);
      *tuned* ones have a hand-made colour config), or browse to any theme folder;
-   - KDE splash: the catalogue lists the splash screens installed on the
-     system;
-   - Limine: the wallpaper is optional.
+   - KDE splash: the catalogue lists the splash screens installed for you and
+     for the system, the selected one marked *in use*;
+   - Limine: the wallpaper is optional; the catalogue shows the one set in
+     `limine.conf` and the installed wallpapers. When the ESP can only be read
+     by root, that section says so: use *recolour the wallpaper(s) already
+     set* instead.
+
+   The catalogue is grouped in sections; one that cannot be read (no network
+   for the adi1090x themes, an ESP only root can read) shows why, the others
+   are still there.
 3. **Colours**: click a flavour (Ctrl/Shift+click for several, one result
    each) and an accent. The page itself takes the colours you choose. Both are
    kept when you switch targets. When the chosen method cannot use the accent
@@ -130,6 +140,7 @@ GUI without GUI code:
   can be remapped);
 - `gui=False` keeps an option out of the forms (`--colours`: the page shows
   that list by itself; `--list` repeats the catalogue);
-- `Target.sources()` fills the catalogue (see [Architecture](architecture.md));
+- `Target.sources()` fills the catalogue, by sections, with thumbnails and
+  what is *in use* (see [Architecture](architecture.md#writing-a-target));
 - `Target.accent_also` names what still uses the accent when `--method` is a
   LUT (Limine: the menu colours); without it, the accents are dimmed then.

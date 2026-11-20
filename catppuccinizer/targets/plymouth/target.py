@@ -30,11 +30,12 @@ from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_arg
 from ...core.naming import output_name, slug
 from ...core.options import Option, step
 from ...core.paths import config_dir, state_file
+from ...core.sources import item, section, tidy
 from ...core.recolor import recolor_image, recolor_job
 from ...core.naming import check_name
 from ...core.system import place, source_file, which
 from ...core.target import Target
-from .upstream import local_src, resolve_theme, upstream_themes
+from .upstream import SRC_ENV, local_src, resolve_theme, upstream_themes
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIGS = HERE / "configs"
@@ -101,11 +102,10 @@ class PlymouthTarget(Target):
         return colours(a)
 
     def sources(self):
-        themes = upstream_themes()
-        return [{"value": name, "label": name,
-                 "note": "  · ".join(x for x in (path.rpartition("/")[0],
-                                                "tuned" if config_path(name).exists() else "") if x)}
-                for name, path in sorted(themes.items(), key=lambda kv: kv[1])]
+        src = local_src()
+        return [section(f"Installed ({INSTALL_DIR})", installed_themes),
+                section("adi1090x themes" + (f" ({tidy(src)}, ${SRC_ENV})" if src else ""),
+                        catalogue)]
 
 
 OPTIONS = [
@@ -117,8 +117,6 @@ OPTIONS = [
     Option("--redetect", switch=True,
            help="detect the colours again instead of using the theme's saved config "
                 "(a build saves the new one)"),
-    Option("--list", switch=True, stage="analyse", gui=False,       # the GUI's catalogue
-           help="list adi1090x themes and exit"),
     step("install", sudo="run",
          help=f"copy the result (its -status variant if any) to {INSTALL_DIR} (sudo)"),
     step("apply", sudo="run",
@@ -427,13 +425,28 @@ def preview_sheet(theme, plan, base, out):
     sheet.save(out)
 
 
-def list_themes():
-    themes = upstream_themes()
-    if local_src():
-        print(f"(from {local_src()})")
-    for name, path in sorted(themes.items(), key=lambda kv: kv[1]):
-        mark = "  [config]" if config_path(name).exists() else ""
-        print(f"{path}{mark}")
+def installed_themes():
+    """The installed themes that have images to recolour, the default one marked."""
+    active = default_theme()
+    for d in sorted(Path(INSTALL_DIR).iterdir()):
+        if not d.is_dir() or not any(d.glob("*.plymouth")):
+            continue
+        try:
+            theme = Theme(d)
+        except (SystemExit, OSError, configparser.Error):
+            continue
+        if theme.groups:                         # text, details: nothing to recolour
+            yield item(d, theme.title, " · ".join(x for x in (d.name if theme.title != d.name else "",
+                                                              theme.module) if x),
+                       current=d.name == active, thumb=d)
+
+
+def catalogue():
+    """The adi1090x themes, by name (fetched when chosen)."""
+    for name, path in sorted(upstream_themes().items(), key=lambda kv: kv[1]):
+        yield item(name, name, " · ".join(x for x in (path.rpartition("/")[0],
+                                                      "tuned" if config_path(name).exists() else "")
+                                          if x))
 
 
 def default_theme():
@@ -468,9 +481,6 @@ def colours(a):
 def build(a):
     """The themes; for the system steps, the folder to install (the -status variant
     if any) of the first one (they need a single theme)."""
-    if a.list:
-        return list_themes()
-
     jobs, status, copies = [], [], []
     for arg in a.themes:
         theme = Theme(resolve_theme(arg))

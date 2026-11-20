@@ -24,6 +24,7 @@ catppuccinizer/
     paths.py          user config / cache / restore state, sudo-aware home and ownership
     naming.py         output names (catppuccin-<flavor>-<source>[-<accent>][-<suffix>])
     target.py         Target base class + discovery
+    sources.py        ready-made sources (catalogue, --list): sections, items, wallpapers
   targets/
     plymouth/         Plymouth themes (+ adi1090x fetcher, shipped configs, scripts)
     image.py          images (wallpapers, logos…)
@@ -37,6 +38,7 @@ tests/
   test_options.py     every declared option is complete and coherent
   test_gui.py         forms, command lines, access control of the GUI
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
+  test_sources.py     catalogue sections, installed themes and wallpapers, --list
 ```
 
 ## Core API (what targets use)
@@ -115,10 +117,31 @@ class GrubTarget(Target):
 TARGET = GrubTarget()
 ```
 
-Optionally, `def sources(self)` returns ready-made sources for the first
-positional argument (`[{"value", "label", "note"}]`): the GUI shows them as a
-catalogue (Plymouth: the adi1090x themes, KDE splash: the installed splash
-screens). The GUI needs nothing else: its forms come from `options()`
+Optionally, `def sources(self)` returns ready-made sources for the source
+argument, in sections: the GUI shows them as a catalogue, and `--list` is added
+to the target's options to print them.
+
+```python
+from ..core.sources import item, section, wallpaper_sections
+
+def sources(self):
+    return [section("Installed (/boot/grub/themes)", installed),   # installed() yields items
+            *wallpaper_sections()]                             # the system's wallpapers
+
+def installed():
+    for d in sorted(Path("/boot/grub/themes").iterdir()):
+        yield item(d, label=d.name, note="", current=d.name == active_theme(), thumb=d)
+```
+
+`item(value, label, note, current, thumb)`: `value` goes into the argument
+(a path or a name), `current` marks what the system uses now (shown *in use*,
+`*` in `--list`), `thumb` is an image or folder for the GUI's thumbnail.
+`section(title, make)` calls `make()` and turns a failure (`SystemExit`, no
+network, no rights) into the section's `error`, so one section that cannot be
+read does not hide the others. Plymouth: installed themes + adi1090x; image:
+the wallpapers; Limine: the wallpaper of `limine.conf` + the wallpapers; KDE
+splash: the user's and the system's splash screens. The GUI needs nothing else:
+its forms come from `options()`
 (see [Graphical interface](gui.md#for-target-authors)).
 
 Optionally too, `def colours(self, a)` does only the analysis and returns the

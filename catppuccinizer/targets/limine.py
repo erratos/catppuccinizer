@@ -23,6 +23,7 @@ from ..core.mapping import colour_report
 from ..core.naming import output_name
 from ..core.options import Option, step
 from ..core.palette import FLAVOR_TITLES, PALETTES
+from ..core.sources import item, section, wallpaper_sections
 from ..core.system import place, read_text
 from ..core.target import Target
 
@@ -83,6 +84,9 @@ class LimineTarget(Target):
 
     def colours(self, a):
         return colours(a)
+
+    def sources(self):
+        return [section("Set in limine.conf", current_wallpapers), *wallpaper_sections()]
 
 
 OPTIONS = [
@@ -271,6 +275,21 @@ def wallpapers(a, esp, read_conf):
             if not src.is_file():
                 raise SystemExit(f"Wallpaper not found on the ESP: {src} (use --esp or --wallpaper)")
     return conf, current, style, sources
+
+
+def current_wallpapers():
+    """The wallpapers limine.conf sets (without the catppuccinizer theme: the one it
+    replaced, which is the one to recolour)."""
+    esp = default_esp()
+    if esp.is_dir() and not os.access(esp, os.R_OK | os.X_OK):
+        raise SystemExit(f"{esp} can only be read by root: to recolour the wallpaper set in "
+                         "limine.conf, use “recolour the wallpaper(s) already set” "
+                         "(--recolor-wallpaper) and run with sudo")
+    conf = find_conf(esp)
+    for ref in global_values(strip_theme(read(conf)), "wallpaper"):
+        f = resolve_on_esp(ref, esp)
+        yield item(f, f.name, f"{ref} in {conf}" + ("" if f.is_file() else ", not found"),
+                   current=True, thumb=f if f.is_file() else None)
 
 
 def colours(a):

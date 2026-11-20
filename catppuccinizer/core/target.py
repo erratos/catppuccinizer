@@ -30,20 +30,26 @@ class Target:
     def options(self):
         """The target's own options, as core.options.Option (scope "target"), plus
         core.recolor.method_options() when it recolours images with the methods.
-        The common ones (-f -a -m --preview -o -s, --colours) are added by
+        The common ones (-f -a -m --preview -o -s, --list, --colours) are added by
         all_options()."""
         return []
 
     def all_options(self):
-        """Every option of the subcommand, in order: common, the target's, --colours,
-        --dry-run (when it has system steps)."""
-        return [*opts.COMMON, *self.options(), *(opts.COLOURS if self.has_colours else []),
+        """Every option of the subcommand, in order: common, the target's, --list,
+        --colours, --dry-run (when it has system steps)."""
+        return [*opts.COMMON, *self.options(), *([opts.LIST] if self.has_sources else []),
+                *(opts.COLOURS if self.has_colours else []),
                 *([opts.DRY_RUN] if self.steps else [])]
 
     @property
     def steps(self):
         """The system steps the target defines, in order (core.options.STEPS)."""
         return [s for s in opts.STEPS if getattr(type(self), s) is not getattr(Target, s)]
+
+    @property
+    def has_sources(self):
+        """Whether the target defines sources() (--list, the GUI's catalogue)."""
+        return type(self).sources is not Target.sources
 
     @property
     def has_colours(self):
@@ -59,9 +65,9 @@ class Target:
         """Validate options before running (raise SystemExit on error)."""
 
     def sources(self):
-        """Ready-made sources a front-end can offer for the first positional argument
-        (the GUI's catalogue): [{"value", "label", "note"}], or None for none."""
-        return None
+        """Ready-made sources for the source argument (the GUI's catalogue, --list):
+        sections of items, made with core.sources.section() and item()."""
+        raise NotImplementedError
 
     def colours(self, args):
         """`--colours`: the source colours -m can remap, analysed but nothing

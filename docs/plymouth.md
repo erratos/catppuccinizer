@@ -8,7 +8,7 @@ Recolours any Plymouth boot splash theme folder (`script`, `two-step`,
 by name (needs `git`, or a [local copy](#using-a-local-copy-of-the-adi1090x-themes)).
 
 ```bash
-catppuccinize plymouth --list                          # adi1090x themes you can fetch by name
+catppuccinize plymouth --list                          # installed themes, adi1090x themes by name
 catppuccinize plymouth rings_2 -a mauve                # build it into themes/
 sudo catppuccinize plymouth rings_2 -a mauve --test    # build it and show it, no reboot
 sudo catppuccinize plymouth rings_2 -a mauve --apply   # install, make it the default
@@ -257,7 +257,7 @@ for it.
 | `--no-status` | | skip the `-status` variants |
 | `--redetect` | | detect the colours again instead of using the saved config (a build saves it) |
 | `--preview` | | only render one before/after image per theme in `<out>/previews/` |
-| `--list` | | list upstream themes (`[config]` = has a config) |
+| `--list` | | list the installed themes (`*` = the default one) and the adi1090x themes (*tuned* = has a config) |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |
 | `-o, --out` | `themes/` | output folder |
 | `--install` | | copy the result (its `-status` variant if any) to `/usr/share/plymouth/themes/` (sudo) |

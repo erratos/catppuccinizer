@@ -10,6 +10,7 @@ catppuccinize image ~/Pictures/walls -f all      # a whole folder, four flavours
 catppuccinize image photo.jpg --method lut --keep-lum 0.7 --preview
 catppuccinize image logo.svg -m blue=lavender    # SVG stays SVG
 catppuccinize image photo.jpg --method lutgen --lutgen-algo rbf   # LUT made by lutgen
+catppuccinize image --list                       # the wallpapers installed on the system
 ```
 
 Output: `images/catppuccin-<flavor>-<name>[-<accent>][-<suffix>].png` (JPEG/WebP
@@ -93,6 +94,7 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `-a` | `mauve` | accent for colours mapped to `accent` (keys) |
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
 | `--preview` | | only render before/after images in `<out>/previews/` |
+| `--list` | | list the wallpapers of `/usr/share/wallpapers`, `/usr/share/backgrounds`, `~/.local/share/wallpapers` |
 | `--colours` | | only list the colours `-m` can remap, and the method each image would get ([details](colours.md#manual-mapping)); `--json` for JSON |
 | `-s, --suffix` | | extra word at the end of the file names |
 | `-o, --out` | `images/` | output folder |

@@ -24,9 +24,13 @@ what a front-end needs to show it:
   folders, "dir", "file");
 - range: (low, high), checked after parsing ("--keep-lum must be between 0 and 1");
 - gui: False keeps it out of the GUI forms (--colours: the GUI shows that list
-  by itself; --list repeats the GUI's catalogue).
+  by itself; --list repeats the GUI's catalogue);
+- action: an argparse Action class, for an option that does its work while the
+  command line is parsed (--list, like --version).
 """
 import argparse
+import contextlib
+import sys
 from pathlib import Path
 
 from .naming import suffix_type
@@ -53,7 +57,7 @@ class Option:
               nargs=None, metavar=None, const=None, switch=False, extend=False,
               required=None, kind=None, range=None, accept=None, source=None, group=None,
               explain=None, image=None, scope="target", stage="build", sudo=None,
-              when=None, gui=True):
+              when=None, gui=True, action=None):
         if not flags:
             raise ValueError("an option needs at least one flag or a name")
         self.flags = tuple(flags)
@@ -68,7 +72,7 @@ class Option:
         self.required = required
         self.accept, self.group, self.scope, self.stage, self.sudo = accept, group, scope, stage, sudo
         self.source = self.positional if source is None else source
-        self.gui = gui
+        self.gui, self.action = gui, action
         if when is None and scope.startswith("method:"):
             when = {"method": [scope.partition(":")[2]]}
         self.when = {k: list(v) if isinstance(v, (list, tuple)) else [v]
@@ -125,6 +129,8 @@ class Option:
             kw["dest"] = self.dest
             if self.required is not None:
                 kw["required"] = self.required
+        if self.action:
+            kw["action"] = self.action
         return kw
 
     # ----------------------------------------------------------------- GUI
@@ -244,6 +250,26 @@ DRY_RUN = Option("--dry-run", switch=True, scope="common", stage="install",
                  help="with --install, --apply, --test or --restore: build as usual, then "
                       "only list the files the steps would copy, change or remove and the "
                       "commands they would run (reading the system may still need sudo)")
+
+class ListSources(argparse.Action):
+    """--list: print the target's ready-made sources (core.sources) and exit, during
+    parsing, so that a required source argument is not asked for."""
+    def __init__(self, option_strings, dest, **kw):
+        kw.pop("nargs", None)
+        super().__init__(option_strings, dest, nargs=0, default=False, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        from .sources import format_sources
+        with contextlib.redirect_stdout(sys.stderr):      # "Fetching …": not the list
+            sections = namespace.target.sources()
+        print(format_sources(sections))
+        parser.exit()
+
+
+# added to the targets that define sources() (core.target.Target.sources)
+LIST = Option("--list", switch=True, action=ListSources, scope="common", stage="analyse", gui=False,
+              help="list the ready-made sources (installed themes, wallpapers…, '*' = in use) "
+                   "and exit")
 
 # added to the targets that define colours() (core.target.Target.colours)
 COLOURS = [
