@@ -48,6 +48,8 @@ class LimineTarget(Target):
         return build(a)
 
     def install(self, a, built, system):
+        if not built["wallpapers"]:
+            print("  nothing to copy: no new wallpaper (the current one, if any, is kept)")
         for f in built["wallpapers"]:
             system.copy_file(f, built["esp"] / WALL_DIR / f.name)
 
