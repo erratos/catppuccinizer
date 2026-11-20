@@ -83,9 +83,27 @@ Each button builds, then runs its step; *Restore* only undoes. Their settings
 
 ## Security
 
-The address contains a random token; the server refuses any request without
-it, and any request whose `Host` is not the local address. It only listens on
-`127.0.0.1`. Dropped images are copied into `~/.cache/catppuccinizer/gui-uploads/`.
+The server only listens on `127.0.0.1` and runs as your user: started with
+sudo, it refuses (it would serve root's files); the steps that need root ask
+for the password themselves. It refuses any request:
+
+- without the random token of the address;
+- whose `Host` is not the local address (DNS rebinding);
+- sent by another site's page: an `Origin` that is not the GUI's, or a
+  `Sec-Fetch-Site` other than `same-origin` / `none` (CSRF).
+
+What the page can reach:
+
+| Request | Allowed |
+|---|---|
+| files and thumbnails | images only (by extension), readable by you, not in `/proc`, `/sys`, `/dev`, `/run`, up to 200 MB; a link is judged by the file it points to |
+| open (`xdg-open`) | folders, images and plain text outputs (`.conf`, `.txt`, `.json`, `.toml`, `.cube`), never a script or a `.desktop` file |
+| folder listing | any folder you can read (the file browser) |
+| upload | images up to 200 MB, in `~/.cache/catppuccinizer/gui-uploads/<random>/` (only for you, `700`), the name reduced to letters, digits, `.`, `_`, `-` |
+| run, command, colours | a known target and its declared options only; values are text, numbers or on/off, without control characters, and never start with `-` (no value can pass for an option) |
+
+Non-HTML answers forbid scripts (an SVG opened on its own cannot read the
+token), and requests are limited in size (1 MB of JSON).
 
 ## For target authors
 

@@ -255,8 +255,15 @@ How:
   them (`paths.give_back`): only files root owns, never through a link, never a
   file with other hard links.
 
+The GUI (`catppuccinize gui`) is a local server: it listens on `127.0.0.1`,
+never runs as root, and checks the token, the `Host`, the `Origin` and
+`Sec-Fetch-Site` of every request; it serves only images, opens only folders,
+images and plain text, and a run only gets declared options with values that
+cannot pass for options ([details](gui.md#security)).
+
 `tests/test_security.py` covers each point (malicious names, links out of a
-theme, atomic writes, backups, commands, `limine.conf` byte for byte).
+theme, atomic writes, backups, commands, `limine.conf` byte for byte, GUI
+requests without the token or from another origin, malicious paths and uploads).
 
 ## Performances
 

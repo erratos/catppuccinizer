@@ -7,8 +7,12 @@ GUI-specific code. A run is
 the equivalent `catppuccinize ...` command in a subprocess; its output is
 streamed to the page, and the files it wrote are shown as thumbnails.
 
-Every API call needs the random token printed with the address, and the Host
-header must be the local address (no other site or local user can drive it).
+Access (docs/gui.md, Security): it listens on 127.0.0.1 only and never runs as
+root; every request needs the random token printed with the address, a Host
+header that is the local address (DNS rebinding) and, when the browser says
+where it comes from (Origin, Sec-Fetch-Site), this page (no other site can
+drive it). Files are served only when they are images the user can read; a run
+only gets known options, and values that cannot pass for options.
 """
 import argparse
 import contextlib
@@ -46,6 +50,13 @@ PKG_PARENT = HERE.parent.parent
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".qoi", ".svg", ".svgz"}
 BROWSER_IMAGES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 IDLE_EXIT = 600            # seconds without any request (and no job) before the server stops
+MAX_JSON = 1 << 20         # bytes of a JSON request
+MAX_UPLOAD = 200 << 20     # bytes of a dropped image
+MAX_FILE = 200 << 20       # bytes of a file served whole (/api/file)
+SYSTEM_FS = ("/proc", "/sys", "/dev", "/run")      # never served, even when readable
+# what /api/open hands to xdg-open: folders, images and plain text outputs, never
+# something xdg-open could run (a script, a .desktop file)
+OPENABLE = IMAGE_EXTS | {".conf", ".txt", ".json", ".toml", ".cube"}
 # the subprocess: the installed package, or this checkout when run from the sources
 BOOT = (f"import sys; sys.dont_write_bytecode = True; sys.path.insert(0, {str(PKG_PARENT)!r}); "
         "from catppuccinizer.cli import main; main()")
@@ -96,6 +107,29 @@ NOT_ANALYSED = {"map", "preview", "out", "suffix", "dry_run", "flavor", "accent"
 
 
 # ---------------------------------------------------------------- arguments
+def check_values(values, options):
+    """None, or why the form values cannot become arguments: only plain values
+    (text, numbers, on/off, lists of them), no control characters, and no text
+    starting with '-' (it would pass for an option: a source "--apply")."""
+    if not isinstance(values, dict):
+        return "values: not an object"
+    for o in options:
+        v = values.get(o["dest"])
+        for x in (v if isinstance(v, list) else [v]):
+            if x is None or isinstance(x, (bool, int, float)):
+                continue
+            if not isinstance(x, str):
+                return f"{o['dest']}: not a plain value"
+            if re.search(r"[\x00-\x1f\x7f]", x):
+                return f"{o['dest']}: control characters are not allowed"
+            if x.startswith("-"):
+                try:
+                    float(x)                         # a negative number is fine
+                except ValueError:
+                    return f"{o['dest']}: a value cannot start with '-' ({x})"
+    return None
+
+
 def build_argv(target, values, options):
     """Command-line arguments for a target from the form values {dest: value};
     options whose `when` is not met (--lutgen-* without --method lutgen) are left out."""
@@ -266,7 +300,10 @@ class App:
         name = body.get("target")
         if name not in self.options:
             return {"error": f"unknown target {name}"}
-        argv = build_argv(name, body.get("values") or {}, self.options[name])
+        values = body.get("values") or {}
+        if err := check_values(values, self.options[name]):
+            return {"error": err}
+        argv = build_argv(name, values, self.options[name])
         a, err = check_argv(argv, self.parser)
         sudo = bool(body.get("sudo"))
         return {"argv": argv, "command": command_line(argv, sudo), "error": err,
@@ -291,8 +328,10 @@ class App:
         t = self.targets.get(name)
         if t is None or not t.has_colours:
             return {"error": f"{name}: no colours to list"}
-        values = {k: v for k, v in (body.get("values") or {}).items()
-                  if k not in NOT_ANALYSED and k not in STEPS}
+        values = body.get("values") or {}
+        if err := check_values(values, self.options[name]):
+            return {"error": err}
+        values = {k: v for k, v in values.items() if k not in NOT_ANALYSED and k not in STEPS}
         argv = [*build_argv(name, values, self.options[name]), "--colours", "--json"]
         a, err = check_argv(argv, self.parser)
         if err:
@@ -343,12 +382,43 @@ def listing(path, show_hidden=False):
     return {"path": str(p), "parent": str(p.parent), "entries": entries[:3000]}
 
 
-def thumbnail(path, size):
+def servable(path, folders=False, exts=IMAGE_EXTS):
+    """The image file (or, with folders, the folder) at path when the page may get
+    it, else None: an absolute path, readable by the user, not in /proc, /sys…,
+    an image by its extension (exts), a regular file of reasonable size."""
+    if not path or "\0" in path or not os.path.isabs(path):
+        return None
     p = Path(path)
+    try:
+        real = p.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    if any(real == Path(d) or real.is_relative_to(d) for d in SYSTEM_FS):
+        return None
+    if real.is_dir():
+        return p if folders and os.access(real, os.R_OK | os.X_OK) else None
+    if (real.suffix.lower() not in exts or not real.is_file()
+            or not os.access(real, os.R_OK) or real.stat().st_size > MAX_FILE):
+        return None
+    return p
+
+
+def upload_name(raw):
+    """A dropped file's name, reduced to letters, digits, '.', '_', '-' (no folder,
+    no leading dot), or None when it is not an image."""
+    name = Path(unquote(raw or "")).name
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name).lstrip("._")[:100] or "image"
+    return name if Path(name).suffix.lower() in IMAGE_EXTS else None
+
+
+def thumbnail(path, size):
+    p = servable(path, folders=True)
+    if p is None:
+        return None, None
     ext = p.suffix.lower()
     if p.is_dir():
         p = representative(p)
-        if p is None:
+        if p is None or servable(str(p)) is None:       # the image itself, checked too
             return None, None
         ext = p.suffix.lower()
     if ext == ".svg":
@@ -388,20 +458,35 @@ def make_handler(app):
                                  "default-src 'self'; img-src 'self' data: blob:; "
                                  "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
                                  "frame-ancestors 'none'")
+            else:       # an SVG opened on its own runs no script (it could read the token)
+                self.send_header("Content-Security-Policy",
+                                 "default-src 'none'; style-src 'unsafe-inline'; sandbox")
             self.end_headers()
             self.wfile.write(body)
 
         def allowed(self, query):
-            host = self.headers.get("Host", "")
-            if host not in (f"127.0.0.1:{app.port}", f"localhost:{app.port}"):
+            hosts = (f"127.0.0.1:{app.port}", f"localhost:{app.port}")
+            if self.headers.get("Host", "") not in hosts:            # DNS rebinding
+                return False
+            # sent by browsers: a request made by another site's page is refused
+            # (CSRF), even before the token is checked
+            origin = self.headers.get("Origin")
+            if origin is not None and origin not in {f"http://{h}" for h in hosts}:
+                return False
+            if self.headers.get("Sec-Fetch-Site", "same-origin") not in ("same-origin", "none"):
                 return False
             given = self.headers.get("X-Token") or (query.get("t") or [""])[0]
-            return secrets.compare_digest(given, app.token)
+            return secrets.compare_digest(given.encode(), app.token.encode())
 
-        def body(self):
-            n = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(n) if n else b""
-            return raw
+        def body(self, limit):
+            """The request body, or None when its size is missing, wrong or over limit."""
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return None
+            if n < 0 or n > limit:
+                return None
+            return self.rfile.read(n) if n else b""
 
         # ----------------------------------------------------------- routes
         def do_GET(self):
@@ -433,10 +518,12 @@ def make_handler(app):
                 job = app.jobs.get((q.get("id") or [""])[0])
                 if not job:
                     return self.send(404, {"error": "no such run"})
-                return self.send(200, job.state(int((q.get("since") or ["0"])[0])))
+                since = (q.get("since") or ["0"])[0]
+                return self.send(200, job.state(int(since) if since.isdigit() else 0))
             if u.path == "/api/thumb":
                 path = (q.get("path") or [""])[0]
-                size = int((q.get("s") or ["256"])[0])
+                size = (q.get("s") or ["256"])[0]
+                size = min(int(size), 4096) if size.isdigit() else 256
                 try:
                     data, ctype = thumbnail(path, size)
                 except (OSError, ValueError, Image.DecompressionBombError) as e:
@@ -444,14 +531,17 @@ def make_handler(app):
                 if data is None:
                     return self.send(404, {"error": "no image"})
                 return self.send(200, data, ctype, cache=True)
-            if u.path == "/api/file":
-                p = Path((q.get("path") or [""])[0])
-                if not p.is_file():
+            if u.path == "/api/file":            # the lightbox: images only
+                p = servable((q.get("path") or [""])[0])
+                if p is None:
                     return self.send(404, {"error": "not found"})
-                ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
+                ctype = mimetypes.guess_type(p.name)[0] or ""
                 if not ctype.startswith("image/"):
-                    ctype = "text/plain; charset=utf-8"
-                return self.send(200, p.read_bytes(), ctype)
+                    return self.send(404, {"error": "not an image"})
+                try:
+                    return self.send(200, p.read_bytes(), ctype)
+                except OSError as e:
+                    return self.send(404, {"error": str(e)})
             return self.send(404, {"error": "not found"})
 
         def do_POST(self):
@@ -460,16 +550,29 @@ def make_handler(app):
                 return self.send(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
             app.last_seen = time.time()
             if u.path == "/api/upload":
-                name = Path(unquote(self.headers.get("X-Filename") or "image")).name or "image"
-                if Path(name).suffix.lower() not in IMAGE_EXTS:
-                    return self.send(400, {"error": f"{name}: not an image"})
-                d = cache_dir() / "gui-uploads" / uuid.uuid4().hex[:8]
-                d.mkdir(parents=True, exist_ok=True)
-                (d / name).write_bytes(self.body())
+                name = upload_name(self.headers.get("X-Filename"))
+                if name is None:
+                    return self.send(400, {"error": "not an image"})
+                data = self.body(MAX_UPLOAD)
+                if data is None:
+                    return self.send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                                     {"error": f"images up to {MAX_UPLOAD >> 20} MB"})
+                base = cache_dir() / "gui-uploads"           # only for the user
+                base.mkdir(parents=True, exist_ok=True, mode=0o700)
+                os.chmod(base, 0o700)
+                d = base / uuid.uuid4().hex[:12]
+                d.mkdir(mode=0o700)
+                with open(d / name, "xb") as f:               # x: a new file, never through a link
+                    f.write(data)
                 return self.send(200, {"path": str(d / name)})
+            raw = self.body(MAX_JSON)
+            if raw is None:
+                return self.send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request too large"})
             try:
-                data = json.loads(self.body() or b"{}")
+                data = json.loads(raw or b"{}")
             except ValueError:
+                return self.send(400, {"error": "bad json"})
+            if not isinstance(data, dict):
                 return self.send(400, {"error": "bad json"})
             if u.path == "/api/command":
                 return self.send(200, app.command(data))
@@ -483,10 +586,13 @@ def make_handler(app):
                     job.stop()
                 return self.send(200, {"ok": bool(job)})
             if u.path == "/api/open":
-                p = Path(data.get("path", ""))
-                if not p.exists() or not shutil.which("xdg-open"):
+                # a folder or an image only: xdg-open on a script or a .desktop file
+                # could run it
+                p = servable(str(data.get("path", "")), folders=True, exts=OPENABLE)
+                opener = shutil.which("xdg-open")
+                if p is None or not opener:
                     return self.send(200, {"ok": False})
-                subprocess.Popen(["xdg-open", str(p)], stdout=subprocess.DEVNULL,
+                subprocess.Popen([opener, str(p)], stdout=subprocess.DEVNULL,
                                  stderr=subprocess.DEVNULL, start_new_session=True)
                 return self.send(200, {"ok": True})
             return self.send(404, {"error": "not found"})
@@ -495,6 +601,11 @@ def make_handler(app):
 
 
 def serve(port=0, browser=True):
+    if os.geteuid() == 0:
+        # as root it would serve root's files to the page: a step that needs root
+        # asks for sudo itself
+        raise SystemExit("Run the GUI as your user, not with sudo: the steps that need "
+                         "root ask for the password themselves")
     app = App()
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
     httpd.daemon_threads = True

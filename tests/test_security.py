@@ -2,13 +2,18 @@
 out of the source, atomic writes, pruned backups, commands without a shell
 (docs/architecture.md, Security)."""
 import contextlib
+import http.client
 import io
 import json
 import os
 import stat
 import sys
 import tempfile
+import threading
 import unittest
+import urllib.error
+import urllib.request
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -16,6 +21,9 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 sys.dont_write_bytecode = True
 
+from PIL import Image  # noqa: E402
+
+from catppuccinizer import gui  # noqa: E402
 from catppuccinizer.cli import main  # noqa: E402
 from catppuccinizer.core import system as core_system  # noqa: E402
 from catppuccinizer.core.naming import check_name  # noqa: E402
@@ -311,6 +319,169 @@ class Limine(Tmp):
         for ref in ("boot():/../etc/shadow", "boot():/a/../../x.png"):
             with self.assertRaises(SystemExit):
                 limine.resolve_on_esp(ref, esp)
+
+
+class GuiRequests(unittest.TestCase):
+    """The local server: who may call it, which files it serves or opens, what a
+    run may contain, uploads."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="catppuccinizer-test-"))
+        os.environ["CATPPUCCINIZER_CACHE"] = str(cls.tmp / "cache")
+        cls.app = gui.App()
+        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), gui.make_handler(cls.app))
+        cls.app.port = cls.httpd.server_address[1]
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+        Image.new("RGB", (8, 8), (30, 30, 46)).save(cls.tmp / "ok.png")
+        (cls.tmp / "notes.txt").write_text("private")
+        (cls.tmp / "run.sh").write_text("#!/bin/sh\n")
+        (cls.tmp / "passwd.png").symlink_to("/etc/passwd")       # an image by its name only
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+        os.environ.pop("CATPPUCCINIZER_CACHE", None)
+
+    def request(self, path, body=None, token=True, headers=None, raw=None):
+        """(status, parsed JSON or bytes)."""
+        data = raw if raw is not None else None if body is None else json.dumps(body).encode()
+        req = urllib.request.Request(f"http://127.0.0.1:{self.app.port}{path}", data=data)
+        if token:
+            req.add_header("X-Token", self.app.token)
+        for k, v in (headers or {}).items():
+            req.add_header(k, v)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                status, content, ctype = r.status, r.read(), r.headers.get("Content-Type", "")
+        except urllib.error.HTTPError as e:
+            with e:
+                status, content, ctype = e.code, e.read(), e.headers.get("Content-Type", "")
+        return status, json.loads(content) if ctype.startswith("application/json") else content
+
+    # ------------------------------------------------------------- access
+    def test_token_host_origin(self):
+        self.assertEqual(self.request("/api/ping")[0], 200)
+        self.assertEqual(self.request("/api/ping", token=False)[0], 403)
+        self.assertEqual(self.request("/api/ping", token=False,
+                                      headers={"X-Token": self.app.token[:-1] + "x"})[0], 403)
+        self.assertEqual(self.request(f"/api/ping?t={self.app.token}", token=False)[0], 200)
+        own = f"http://127.0.0.1:{self.app.port}"
+        for headers in ({"Host": f"evil.example:{self.app.port}"},          # DNS rebinding
+                        {"Host": "127.0.0.1"},                              # another port
+                        {"Origin": "https://evil.example"},                 # CSRF, even with
+                        {"Origin": "null"},                                 # the token
+                        {"Sec-Fetch-Site": "cross-site"},
+                        {"Sec-Fetch-Site": "same-site"}):
+            with self.subTest(headers=headers):
+                self.assertEqual(self.request("/api/ping", headers=headers)[0], 403)
+                self.assertEqual(self.request("/api/command", {"target": "lut"}, headers=headers)[0], 403)
+        self.assertEqual(self.request("/api/ping", headers={"Origin": own,
+                                                            "Sec-Fetch-Site": "same-origin"})[0], 200)
+
+    def test_listens_on_localhost_and_never_as_root(self):
+        real = gui.os.geteuid
+        gui.os.geteuid = lambda: 0
+        try:
+            with self.assertRaises(SystemExit) as e:
+                gui.serve(browser=False)
+        finally:
+            gui.os.geteuid = real
+        self.assertIn("not with sudo", str(e.exception))
+        self.assertIn('ThreadingHTTPServer(("127.0.0.1", port)', Path(gui.__file__).read_text())
+
+    # -------------------------------------------------------------- files
+    def test_files_served(self):
+        q = lambda p: urllib.request.quote(str(p))      # noqa: E731
+        status, content = self.request(f"/api/file?path={q(self.tmp / 'ok.png')}")
+        self.assertEqual((status, content[:4]), (200, b"\x89PNG"))
+        self.assertEqual(self.request(f"/api/thumb?s=32&path={q(self.tmp / 'ok.png')}")[0], 200)
+        self.assertEqual(self.request(f"/api/thumb?s=x&path={q(self.tmp / 'ok.png')}")[0], 200)
+        refused = ["/etc/passwd", self.tmp / "notes.txt", self.tmp / "passwd.png",
+                   "/proc/self/environ", "/proc/self/root/etc/passwd", "ok.png",
+                   self.tmp / "../" / self.tmp.name / "notes.txt", self.tmp / "missing.png"]
+        if os.geteuid() != 0:
+            (self.tmp / "locked.png").write_bytes((self.tmp / "ok.png").read_bytes())
+            (self.tmp / "locked.png").chmod(0)
+            refused.append(self.tmp / "locked.png")
+        for path in refused:
+            with self.subTest(path=path):
+                self.assertEqual(self.request(f"/api/file?path={q(path)}")[0], 404)
+                self.assertEqual(self.request(f"/api/thumb?path={q(path)}")[0], 404)
+
+    def test_svg_runs_no_script(self):
+        svg = self.tmp / "x.svg"
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+        req = urllib.request.Request(f"http://127.0.0.1:{self.app.port}/api/file?path="
+                                     f"{urllib.request.quote(str(svg))}", headers={"X-Token": self.app.token})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            self.assertIn("sandbox", r.headers["Content-Security-Policy"])
+            self.assertIn("default-src 'none'", r.headers["Content-Security-Policy"])
+
+    def test_open_refuses_what_could_run(self):
+        for path in (self.tmp / "run.sh", self.tmp / "passwd.png", "/etc/passwd", "relative",
+                     "/proc/self"):
+            with self.subTest(path=path):
+                self.assertEqual(self.request("/api/open", {"path": str(path)}), (200, {"ok": False}))
+
+    # ------------------------------------------------------------ uploads
+    def upload(self, name, data=b"\x89PNG fake", length=None):
+        c = http.client.HTTPConnection("127.0.0.1", self.app.port, timeout=30)
+        c.putrequest("POST", "/api/upload")
+        for k, v in (("X-Token", self.app.token), ("X-Filename", name),
+                     ("Content-Length", str(len(data) if length is None else length))):
+            c.putheader(k, v)
+        c.endheaders()
+        if length is None:
+            c.send(data)
+        r = c.getresponse()
+        out = r.status, json.loads(r.read())
+        c.close()
+        return out
+
+    def test_upload(self):
+        base = self.tmp / "cache/gui-uploads"
+        for name, expected in (("wall.png", "wall.png"), ("../../../evil.png", "evil.png"),
+                               ("..%2F..%2Fevil.png", "evil.png"), (".hidden.png", "hidden.png"),
+                               ("été 2024;rm -rf.jpg", "t_2024_rm_-rf.jpg")):
+            with self.subTest(name=name):
+                status, r = self.upload(name)
+                self.assertEqual(status, 200, r)
+                f = Path(r["path"])
+                self.assertEqual(f.parent.parent, base)
+                self.assertEqual(f.name, expected)
+                self.assertEqual(f.read_bytes(), b"\x89PNG fake")
+        self.assertEqual(stat.S_IMODE(base.stat().st_mode), 0o700)
+        for name in ("script.sh", ".bashrc", "x.png.desktop", ""):
+            with self.subTest(name=name):
+                self.assertEqual(self.upload(name)[0], 400)
+        self.assertEqual(self.upload("big.png", length=gui.MAX_UPLOAD + 1)[0], 413)
+        self.assertEqual(self.upload("neg.png", length=-1)[0], 413)
+
+    # ---------------------------------------------------------------- runs
+    def test_run_values(self):
+        bad = [{"images": ["--apply"]}, {"images": "-o/etc"}, {"images": ["a\nb"]},
+               {"images": [{"x": 1}]}, {"images": ["a.png"], "suffix": "--x"},
+               {"images": ["a.png"], "map": ["white=accent", "-f"]}, ["images"]]
+        for values in bad:
+            for route in ("/api/command", "/api/run", "/api/colours"):
+                with self.subTest(values=values, route=route):
+                    status, r = self.request(route, {"target": "image", "values": values})
+                    self.assertEqual(status, 200)
+                    self.assertTrue(r.get("error"), r)
+                    self.assertNotIn("job", r)
+        self.assertIn("unknown target", self.request("/api/run", {"target": "../x"})[1]["error"])
+        # unknown keys never reach the command line; a negative number is a value
+        status, r = self.request("/api/command", {"target": "image", "values": {
+            "images": ["a.png"], "apply": True, "shell": "rm -rf ~", "keep_lum": "-0.5"}})
+        self.assertEqual(r["argv"], ["image", "a.png", "--keep-lum", "-0.5"])
+        self.assertIn("between 0 and 1", r["error"])           # the command line's own check
+
+    def test_bodies(self):
+        self.assertEqual(self.request("/api/command", raw=b"x" * (gui.MAX_JSON + 1))[0], 413)
+        self.assertEqual(self.request("/api/command", raw=b"[1, 2]")[0], 400)
+        self.assertEqual(self.request("/api/command", raw=b"{nope")[0], 400)
+        self.assertEqual(self.request("/api/job?id=x&since=-3")[0], 404)
 
 
 if __name__ == "__main__":
