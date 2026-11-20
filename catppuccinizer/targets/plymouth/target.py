@@ -205,10 +205,6 @@ def save_config(theme, cfg):
 
 def load_config(theme):
     cfg = tomllib.loads(config_path(theme.name).read_text())
-    if "colors" in cfg:                          # legacy single-group format
-        first = next(iter(theme.groups), "progress")
-        cfg["groups"] = {first: {"background": cfg.pop("background", "#000000"),
-                                 "transparent": False, "colors": cfg.pop("colors")}}
     cfg.setdefault("bar", None)
     cfg.setdefault("bar_gap", 20)
     cfg.setdefault("bar_width", 0.5)
