@@ -19,6 +19,8 @@ class Target:
     description = None         # long help (defaults to the module docstring)
     default_out = "themes"     # output folder, relative to the current directory
     default_accent = ("all",)  # accents when -a is not given
+    accent_also = None         # what uses the accent whatever --method is (limine: "the menu
+                               # colours"); None: a LUT method leaves the accent unused
 
     def add_arguments(self, parser):
         """Add target-specific options (common ones: -f -a -m --preview -o)."""

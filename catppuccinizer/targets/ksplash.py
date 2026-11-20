@@ -23,8 +23,8 @@ from ..core import recolor
 from ..core.detect import detect_group
 from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect_text_colours,
                             is_animated, recolour_text_file, save_animation, text_files)
-from ..core.mapping import (apply_maps, map_colour_counts, print_colours, resolve_target,
-                            uses_accent)
+from ..core.mapping import (apply_maps, map_colour_counts, note_accent_ignored, print_colours,
+                            resolve_target, uses_accent)
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
 from ..core.target import Target
 
@@ -36,6 +36,7 @@ class KSplashTarget(Target):
     name = "ksplash"
     help = "recolour a KDE Plasma splash screen"
     default_accent = ("mauve",)
+    accent_also = "the QML / SVG colours mapped to accent"
 
     def add_arguments(self, p):
         p.add_argument("theme", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
@@ -172,6 +173,8 @@ def run(a):
 
     accent_used = uses_accent(vcolors) or any(
         m not in recolor.LUT_METHODS and uses_accent(g["colors"]) for m, g, _ in rasters.values())
+    if not accent_used:
+        note_accent_ignored(a)
     built = []
     for flv in a.flavor:
         for acc in (a.accent if accent_used else [None]):

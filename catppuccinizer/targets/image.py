@@ -23,7 +23,8 @@ from PIL import Image
 
 from ..core import recolor
 from ..core.formats import collect_text_colours, read_text, recolour_text, write_text
-from ..core.mapping import apply_maps, map_colour_counts, print_colours, resolve_target, uses_accent
+from ..core.mapping import (apply_maps, map_colour_counts, note_accent_ignored, print_colours,
+                            resolve_target, uses_accent)
 from ..core.palette import FLAVOR_TITLES, rgb2hex
 from ..core.target import Target
 
@@ -65,7 +66,10 @@ class ImageTarget(Target):
                 self.run_vector(path, a)
                 continue
             method, grp = recolor.plan(path, a)
-            accents = a.accent if recolor.method_uses_accent(method, grp) else [None]
+            ignored = recolor.accent_ignored_reason(method, grp)
+            if ignored:
+                note_accent_ignored(a, ignored)
+            accents = [None] if ignored else a.accent
             for flv in a.flavor:
                 for acc in accents:
                     name = "-".join(x for x in (path.stem, "catppuccin", flv, acc, a.suffix) if x)
@@ -87,6 +91,8 @@ class ImageTarget(Target):
         print_colours(colors, show_share=False)
         text = read_text(path)
         accents = a.accent if uses_accent(colors) else [None]
+        if not uses_accent(colors):
+            note_accent_ignored(a)
         for flv in a.flavor:
             for acc in accents:
                 lookup = {c["source"]: rgb2hex(resolve_target(flv, acc, c["target"]))

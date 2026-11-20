@@ -82,6 +82,16 @@ def uses_accent(colors):
     return any(c["target"] == "accent" for c in colors.values())
 
 
+NO_ACCENT = "as no colour is mapped to accent (map one with -m NAME=accent)"
+
+
+def note_accent_ignored(a, reason=NO_ACCENT, indent="  "):
+    """Tell the user that the accent they passed with -a has no effect, and why
+    (silent when -a was not given: the default accent is nobody's request)."""
+    if getattr(a, "accent_given", False):
+        print(f"{indent}note: accent ignored {reason}")
+
+
 def resolve_target(flavor, accent, target):
     """Catppuccin RGB of a target name ("accent" -> the chosen accent)."""
     return rgb(flavor, accent if target == "accent" else target)

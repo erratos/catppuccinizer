@@ -12,6 +12,7 @@ the same options (--keep-lum, --smooth, --lutgen-*).
   magick in.jpg catppuccin-mocha-hald.png -hald-clut out.jpg
 """
 from ..core import clut, recolor
+from ..core.mapping import note_accent_ignored
 from ..core.palette import FLAVOR_TITLES
 from ..core.target import Target
 
@@ -45,6 +46,7 @@ class LutTarget(Target):
             recolor.lutgen.options(a)
         if a.preview or a.map:
             print("note: --preview and -m are ignored by the lut target")
+        note_accent_ignored(a, "by the lut target (a LUT has no accent)", indent="")
 
     def run(self, a):
         a.out.mkdir(parents=True, exist_ok=True)

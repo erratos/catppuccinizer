@@ -35,6 +35,37 @@ A colour can be sent to any Catppuccin colour of the flavour:
 - `accent`: whatever is passed with `-a`. One output is produced per accent,
   so `-a all` gives 14 variants.
 
+## Which method, and does the accent count?
+
+Each target recolours in its own way, so `-a` and `-m` do not always have an
+effect:
+
+| Target | Method (default) | Why | Accent (`-a`) used | `--map` (`-m`) used |
+|---|---|---|---|---|
+| `plymouth` | always `keys` (no `--method`) | boot themes are flat art; colours come from the shipped config, or are detected once and saved | when a colour goes to `accent` (single-colour themes by default, and the shipped configs); the progress bar follows it, unless `--bar` or the config sets one | yes |
+| `image` | `auto`: `keys` or `lut` | `keys` when the detected colours rebuild the image (fit error under 6), a plain background covers at least 35 % of it and its edges are crisp; `lut` otherwise. `auto` never picks `lutgen` | `keys`: when a colour goes to `accent` (typically a single-colour design). `lut`, `lutgen`: never | `keys` only |
+| `image` (SVG) | vector, colours replaced in the file | nothing is rasterised | when a colour goes to `accent` (the most used saturated colour, by default) | yes |
+| `limine` | menu: fixed colours; wallpaper: `auto`, like `image` | | always, for the menu (branding and highlighted help); the wallpaper as for `image` | wallpaper, with `keys` |
+| `ksplash` | QML / SVG colours replaced; images `auto`, like `image`; animations `keys` | | when a QML / SVG colour or an image recoloured with `keys` goes to `accent` | everywhere, except images recoloured with a LUT |
+| `lut` | `lut` (or `lutgen`; `keys` is refused) | it writes the LUT itself | never | never |
+
+When the accent is not used, a single result is written per flavour (no
+`-<accent>` in its name). If you passed `-a` and it has no effect, the command
+says so:
+
+```
+photo.jpg: lut (fit error 44.5, background 0%, sharpness 0.87)
+  note: accent ignored by the lut method
+logo.png: keys (fit error 0.0, background 94%, sharpness 0.99)
+  ...
+  note: accent ignored as no colour is mapped to accent (map one with -m NAME=accent)
+```
+
+`--map` is reported the same way (`note: --map is ignored by the lut method`).
+To force the accent onto an image, use `--method keys` and map a colour to it
+(`-m white=accent`). The [graphical interface](gui.md) dims the accents when
+the chosen method cannot use them.
+
 ## Automatic detection
 
 The original colours are detected and given a name (`white`, `blue`,

@@ -41,10 +41,12 @@ tests/
 | `mapping.apply_maps(cfg, maps, strict)` | apply `-m NAME=TARGET` to `{"groups": {name: group}}` |
 | `mapping.map_colour_counts(counts)` | map a `{#hex: count}` list (QML, SVG, CSS…) to Catppuccin roles |
 | `mapping.resolve_target(flavor, accent, target)` | target name -> RGB |
+| `mapping.uses_accent(colors)` / `note_accent_ignored(a, reason)` | whether a colour goes to `accent`; the note printed when `-a` was given for nothing |
 | `recolor.recolor_image(path, bg, keys, targets, base)` | keys method on one image (alpha kept) |
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
 | `recolor.add_method_arguments(parser)` | `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` |
 | `recolor.LUT_METHODS` / `recolor.lut_for(method, flavor, args, n)` | the LUT methods (no source colours, no accent) and their cube |
+| `recolor.accent_ignored_reason(method, grp)` | why the accent has no effect on an image, or None |
 | `clut.apply_cube` / `resample` / `read_hald` / `write_hald` / `write_cube` | 3D LUT application and files |
 | `formats.collect_text_colours(files)` / `recolour_text_file(f, lookup)` | colours inside QML / SVG / SVGZ |
 | `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
@@ -64,6 +66,7 @@ class GrubTarget(Target):
     name = "grub"
     help = "recolour a GRUB theme"
     default_accent = ("mauve",)
+    accent_also = "the menu colours"   # optional: what uses -a even with --method lut
 
     def add_arguments(self, p):
         p.add_argument("theme", help="theme folder")

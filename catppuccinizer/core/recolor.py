@@ -17,7 +17,7 @@ from PIL import Image
 from . import lutgen
 from .clut import apply_cube as apply_lut
 from .detect import detect_group, load_rgba
-from .mapping import apply_maps, print_colours, uses_accent
+from .mapping import NO_ACCENT, apply_maps, print_colours, uses_accent
 from .palette import ACCENTS, PALETTES, hex2rgb, oklab_to_srgb, rgb, srgb_to_oklab
 
 FIT_THRESHOLD = 6.0          # mean error (0..255) on content pixels under which "keys" is chosen
@@ -240,8 +240,12 @@ def render(path, method, grp, flavor, accent, a):
     return recolor_image(path, hex2rgb(grp["background"]), keys, targets, rgb(flavor, "base"))
 
 
-def method_uses_accent(method, grp):
-    return method == "keys" and uses_accent(grp["colors"])
+def accent_ignored_reason(method, grp):
+    """Why the accent has no effect on an image recoloured with this method, or
+    None when it is used."""
+    if method in LUT_METHODS:
+        return f"by the {method} method"
+    return None if uses_accent(grp["colors"]) else NO_ACCENT
 
 
 def save_image(im, dst, method, src):

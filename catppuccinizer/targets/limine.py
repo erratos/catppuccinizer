@@ -35,6 +35,7 @@ class LimineTarget(Target):
     name = "limine"
     help = "Catppuccin colours + wallpaper for the Limine boot menu"
     default_accent = ("mauve",)
+    accent_also = "the menu colours"
 
     def add_arguments(self, p):
         add_arguments(p)

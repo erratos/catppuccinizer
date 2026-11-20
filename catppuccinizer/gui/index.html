@@ -120,6 +120,8 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .accent.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--base)); }
 .accent.def { border-style: dashed; border-color: var(--overlay0); }
 .accent.on .sw { box-shadow: 0 0 0 2px var(--base), 0 0 0 4px currentColor; }
+.accents.unused { opacity: .45; }
+.hint.ignored { color: var(--yellow); }
 .label { font-size: 12px; color: var(--subtext0); font-weight: 600; margin: 14px 0 6px; display: flex; justify-content: space-between; gap: 8px; }
 .label:first-child { margin-top: 0; }
 
@@ -178,7 +180,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
 .log { background: var(--crust); border-radius: 10px; padding: 10px 12px; font: 12px/1.5 var(--mono); height: 260px; overflow: auto;
        white-space: pre-wrap; word-break: break-word; color: var(--subtext0); margin-top: 8px; }
-.log .c { color: var(--accent); } .log .e { color: var(--red); } .log .o { color: var(--green); }
+.log .c { color: var(--accent); } .log .e { color: var(--red); } .log .o { color: var(--green); } .log .n { color: var(--yellow); }
 .log:empty::before { content: "The output of a run appears here."; color: var(--overlay0); }
 .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 10px; }
 .result { background: var(--base); border: 1px solid var(--surface0); border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; padding: 0; }
@@ -519,7 +521,7 @@ function coloursCard(t, hasSource) {
     const p = pal(uiFlavor());
     const dflt = t.default_accent.join(", ");
     out.push(h("div", { class: "label" }, h("span", {}, "Accent"), h("span", {}, acc.length ? `${all ? 14 : aset.size} selected` : `default: ${dflt}`)));
-    out.push(h("div", { class: "accents" }, S.schema.accents.map((a) => h("button", {
+    out.push(h("div", { class: "accents", id: "accents" }, S.schema.accents.map((a) => h("button", {
       class: "accent" + (aset.has(a) ? " on" : "") + (!acc.length && t.default_accent.includes(a) ? " def" : ""), style: { color: p[a] },
       title: !acc.length && t.default_accent.includes(a) ? "default" : null,
       onclick: (e) => {
@@ -530,7 +532,8 @@ function coloursCard(t, hasSource) {
       } }, h("span", { class: "sw", style: { background: p[a] } }), h("span", { style: { color: "var(--text)" } }, a)))));
     out.push(h("div", { class: "row", style: { marginTop: "6px" } },
       h("button", { class: "btn small ghost", onclick: () => setVal("accent", all ? undefined : ["all"], true) }, all ? "Default" : "All 14"),
-      h("span", { class: "hint", style: { margin: 0 } }, "Used by the colours mapped to “accent”. Click again to go back to the default.")));
+      h("span", { class: "hint", id: "accenthint", style: { margin: 0 } })));
+    updateAccentHint();
   }
 
   if (hasSource && opt("map")) out.push(mapEditor());
@@ -650,7 +653,24 @@ function pathField(o, { placeholder, accept = "dir" } = {}) {
     v ? h("button", { class: "btn ghost", title: "Clear", onclick: () => setVal(o.dest, undefined, true) }, "×") : null);
 }
 
+// Whether the accent will have an effect, as far as the options tell before the run
+// (with --method auto or keys it depends on the images: the output says it then).
+function updateAccentHint() {
+  const el = $("accenthint"), t = cur();
+  if (!el) return;
+  const m = opt("method") && (vals().method ?? opt("method").default);
+  const lut = S.schema.lut_methods.includes(m);
+  let text = "Used by the colours mapped to “accent”. Click again to go back to the default.";
+  if (lut && t.accent_also) text = `Ignored by the ${m} method for images; still used by ${t.accent_also}.`;
+  else if (lut) text = `Ignored: the ${m} method does not use the accent (one result per flavour).`;
+  else if (m === "auto" && t.accent_also) text = `Used by ${t.accent_also}, and by image colours mapped to “accent” (not by images that auto sends to the LUT).`;
+  else if (m === "auto") text = "Used by the colours mapped to “accent”. Images that auto sends to the LUT ignore it: the output says so.";
+  el.textContent = text;
+  el.classList.toggle("ignored", lut);
+  $("accents")?.classList.toggle("unused", lut && !t.accent_also);
+}
 function refreshVisibility() {
+  updateAccentHint();
   document.querySelectorAll("[data-when]").forEach((el) => {
     const w = JSON.parse(el.dataset.when);
     el.classList.toggle("hidden", !Object.entries(w).every(([k, v]) => (vals()[k] ?? opt(k)?.default) === v));
@@ -689,7 +709,7 @@ async function run(preview) {
   if (preview) values.preview = true;
   const r = await api("/api/run", { target: S.target, values, sudo: $("sudo").checked });
   if (r.error) { toast(r.error); return; }
-  S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.detected.clear(); S.group = "";
+  S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.detected.clear(); S.group = ""; S.accentIgnored = false;
   $("log").replaceChildren(); $("results").replaceChildren(); renderDetected();
   $("prog").style.width = "0"; setStatus("run", preview ? "Rendering previews…" : "Running…");
   $("stopbtn").classList.remove("hidden"); $("openout").classList.add("hidden");
@@ -709,7 +729,8 @@ async function poll() {
   S.job.done = true;
   $("stopbtn").classList.add("hidden");
   $("prog").style.width = r.code === 0 ? "100%" : $("prog").style.width;
-  setStatus(r.code === 0 ? "ok" : "fail", r.code === 0 ? `Done — ${r.outputs.length} item(s) written` : `Failed (exit code ${r.code})`);
+  setStatus(r.code === 0 ? "ok" : "fail", r.code === 0 ? `Done — ${r.outputs.length} item(s) written`
+    + (S.accentIgnored ? " · the accent was ignored (see the notes in the output)" : "") : `Failed (exit code ${r.code})`);
   S.lastOut = r.out;
   $("openout").classList.toggle("hidden", !r.outputs.length);
   renderResults(r.outputs || []);
@@ -719,7 +740,9 @@ function logLine(line) {
   let cls = "";
   if (line.startsWith("$ ")) cls = "c";
   else if (/\b(error:|Error\b|Traceback|failed|not found|unknown|cannot|denied)/i.test(line) && !/fit error/.test(line)) cls = "e";
+  else if (/\bnote:/.test(line)) cls = "n";
   else if (/->|installed|updated|done/i.test(line)) cls = "o";
+  if (/note: accent ignored/.test(line)) S.accentIgnored = true;
   // detected colours: "    name       #rrggbb -> target"
   const g = line.match(/^  (\S+) \(\d+ images?, /);
   if (g) S.group = g[1] + ".";

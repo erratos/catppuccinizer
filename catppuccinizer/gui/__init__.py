@@ -36,6 +36,7 @@ from PIL import Image
 from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.paths import cache_dir
+from ..core.recolor import LUT_METHODS
 from ..core.target import Target, discover
 
 HERE = Path(__file__).resolve().parent
@@ -125,13 +126,13 @@ def schema(targets, subparsers):
         out.append({
             "name": name, "help": t.help, "summary": first_paragraph(sp.description),
             "description": sp.description or "", "default_out": t.default_out,
-            "default_accent": list(t.default_accent),
+            "default_accent": list(t.default_accent), "accent_also": t.accent_also,
             "has_sources": type(t).sources is not Target.sources,
             "options": options_of(sp),
         })
     return {"version": __version__, "targets": out, "cwd": str(Path.cwd()),
             "home": str(Path.home()), "flavors": FLAVORS, "flavor_titles": FLAVOR_TITLES,
-            "accents": ACCENTS, "map_targets": TARGETS,
+            "accents": ACCENTS, "map_targets": TARGETS, "lut_methods": list(LUT_METHODS),
             "palettes": {f: {k: "#" + v for k, v in p.items()} for f, p in PALETTES.items()},
             "askpass": bool(askpass()), "places": places()}
 

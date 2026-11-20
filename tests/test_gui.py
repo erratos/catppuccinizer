@@ -53,6 +53,10 @@ class Gui(unittest.TestCase):
         self.assertEqual(kinds["method"]["kind"], "choice")
         self.assertEqual(kinds["keep_lum"]["range"], [0.0, 1.0])
         self.assertEqual(kinds["lutgen_algo"]["when"], {"method": "lutgen"})
+        self.assertIsNone(image["accent_also"])          # lut: the accents are dimmed
+        limine = next(t for t in s["targets"] if t["name"] == "limine")
+        self.assertTrue(limine["accent_also"])           # the menu still uses it
+        self.assertEqual(s["lut_methods"], ["lut", "lutgen"])
         plymouth = next(t for t in s["targets"] if t["name"] == "plymouth")
         self.assertTrue(plymouth["has_sources"])
         self.assertEqual({o["dest"]: o["kind"] for o in plymouth["options"]}["test"], "optional")

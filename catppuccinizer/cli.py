@@ -57,6 +57,7 @@ def parse(argv=None, parser=None):
     t = a.target
     if t is None:                     # gui
         return a
+    a.accent_given = bool(a.accent)   # -a asked for: say so when it has no effect
     a.flavor = expand(a.flavor, FLAVORS, "flavor")
     a.accent = expand(a.accent or list(t.default_accent), ACCENTS, "accent")
     a.out = a.out or Path.cwd() / t.default_out

@@ -19,7 +19,7 @@ import numpy as np
 from PIL import Image
 
 from ...core.detect import UI_GROUP, detect_group
-from ...core.mapping import apply_maps, print_colours
+from ...core.mapping import apply_maps, note_accent_ignored, print_colours
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
 from ...core.paths import config_dir
 from ...core.recolor import recolor_image, recolor_job
@@ -406,6 +406,8 @@ def run(a):
 
         uses_accent = any(c["target"] == "accent"
                           for grp in cfg["groups"].values() for c in grp["colors"].values())
+        if not uses_accent:
+            note_accent_ignored(a)
         main_colours = [c["target"] for grp in cfg["groups"].values()
                         for c in sorted(grp["colors"].values(), key=lambda c: -c.get("share", 0))
                         if c["target"] in ACCENTS]

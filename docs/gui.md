@@ -31,7 +31,10 @@ ten minutes after the page is closed. `--port N` picks the port,
    - Limine: the wallpaper is optional.
 3. **Colours**: click a flavour (Ctrl/Shift+click for several, one result
    each) and an accent. The page itself takes the colours you choose. Both are
-   kept when you switch targets.
+   kept when you switch targets. When the chosen method cannot use the accent
+   (`lut`, `lutgen`), the accents are dimmed and the hint says why; with
+   `auto` it depends on each image, so the output notes it after the run
+   (*the accent was ignored* next to *Done*).
 4. **Options**: every option of the target, with its help. Options that only
    apply to a method (the `--lutgen-*` ones) show up when that method is
    chosen.
@@ -75,4 +78,6 @@ added by an entry point) appears in the GUI without GUI code:
 - an argument group titled `"... (--method lutgen ...)"` is shown only when
   `--method` is `lutgen`;
 - an option whose help says `sudo` ticks *Run with sudo*;
-- `Target.sources()` fills the catalogue (see [Architecture](architecture.md)).
+- `Target.sources()` fills the catalogue (see [Architecture](architecture.md));
+- `Target.accent_also` names what still uses the accent when `--method` is a
+  LUT (Limine: the menu colours); without it, the accents are dimmed then.
