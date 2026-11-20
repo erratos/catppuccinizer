@@ -199,6 +199,13 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .det .sw { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(127,127,127,.4); }
 .maprow { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto; gap: 6px; align-items: center; margin-bottom: 6px; }
 .maprow .eq { color: var(--overlay1); }
+.maprow input.bad { border-color: var(--red); }
+.colourlist { margin: 14px 0 10px; }
+.colitem { margin-bottom: 10px; }
+.colhead { color: var(--subtext1); font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.colhead .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: inset 0 0 0 1px rgba(127,127,127,.4); }
+.det.set { border-color: var(--accent); }
+.det:disabled { cursor: default; opacity: .7; }
 
 /* modal */
 dialog { border: 1px solid var(--surface1); background: var(--mantle); color: var(--text); border-radius: 14px; padding: 0;
@@ -276,10 +283,6 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
       </div>
       <div class="progress" style="margin-top:8px"><i id="prog"></i></div>
       <div class="log" id="log"></div>
-      <div id="detbox" class="hidden">
-        <div class="label" style="margin-top:12px"><span>Detected colours</span><span class="hint" style="margin:0">click one to remap it</span></div>
-        <div class="detected" id="detected"></div>
-      </div>
       <div class="results" id="results"></div>
     </section>
   </div>
@@ -325,7 +328,8 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 "use strict";
 const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
-const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, detected: new Map(), cmd: null, lastOut: null };
+const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
+            colourCache: new Map(), colourSeq: 0, colourLoading: null };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -400,6 +404,7 @@ function setVal(dest, v, rerender = false) {
   if (dest === "flavor" || dest === "accent") applyTheme();
   if (rerender) render(); else refreshVisibility();
   scheduleCommand();
+  scheduleColours();
 }
 function sendVals() {
   // drop what the page does not show for this target (a shared accent for lut...)
@@ -408,14 +413,16 @@ function sendVals() {
   for (const o of t.options) if ((o.when && !shown(o)) || o.role === "step" || o.dest === "dry_run") delete v[o.dest];
   return v;
 }
-// facts from the analysis of the sources that an option's `when` can use; unknown
-// ones (not analysed yet) hide nothing. A target without colours() has nothing to remap.
-const analysis = () => (cur().has_colours ? {} : { remappable: false });
-// same rule as core.options.condition_met
-function whenMet(when) {
+// facts from the analysis of the sources (the colour list, /api/colours) that an option's
+// `when` can use; unknown ones (not analysed yet) hide nothing. A target without
+// colours() has nothing to remap.
+const analysis = () => (cur().has_colours ? colourResult()?.facts || {} : { remappable: false });
+// same rule as core.options.condition_met (useAnalysis false: only the option values)
+function whenMet(when, useAnalysis = true) {
   return Object.entries(when || {}).every(([k, allowed]) => {
     let v;
     if (k.startsWith("analysis.")) {
+      if (!useAnalysis) return true;
       v = analysis()[k.slice(9)];
       if (v === undefined || v === null) return true;
     } else v = vals()[k] ?? opt(k)?.default;
@@ -436,7 +443,7 @@ const STAGE_GROUPS = { analyse: "Analyse (writes no output)", install: "System s
 function renderTabs() {
   $("tabs").replaceChildren(...S.schema.targets.map((t) => h("button", {
     class: t.name === S.target ? "on" : "", title: t.help,
-    onclick: () => { if (t.name === S.target) return; S.target = t.name; store.set("target", t.name); S.detected.clear(); renderDetected(); renderTabs(); render(); applyTheme(); scheduleCommand(); },
+    onclick: () => { if (t.name === S.target) return; S.target = t.name; store.set("target", t.name); renderTabs(); render(); applyTheme(); scheduleCommand(); scheduleColours(); },
   }, t.name)));
 }
 
@@ -456,6 +463,7 @@ function render() {
   form.replaceChildren(...cards.filter(Boolean));
   $("previewbtn").classList.toggle("hidden", !(sources.length && opt("preview")));
   renderSteps();
+  renderColours();
   refreshVisibility();
 }
 function card(n, title, body) {
@@ -566,16 +574,96 @@ function coloursCard(t, hasSource) {
     updateAccentHint();
   }
 
+  if (hasSource && t.has_colours) out.push(h("div", { id: "colourlist", class: "colourlist" }));
   if (hasSource && opt("map") && shown(opt("map"))) out.push(mapEditor());
   return out;
+}
+
+// ---------------------------------------------------------- colour list
+// The colours -m can remap, before any run (catppuccinize ... --colours --json, through
+// /api/colours), analysed again when the source or an option that changes the analysis
+// changes; -m itself is drawn over the list here.
+const NOT_ANALYSED = new Set(["map", "preview", "out", "suffix", "dry_run", "flavor", "accent"]);  // as the server
+function analysisValues() {
+  const v = { ...vals() };
+  for (const o of cur().options) {
+    if (NOT_ANALYSED.has(o.dest) || o.role === "step" || (o.when && !whenMet(o.when, false))) delete v[o.dest];
+  }
+  return v;
+}
+const analysisKey = () => S.target + " " + JSON.stringify(analysisValues());
+const colourResult = () => S.colourCache.get(analysisKey());
+const sourceChosen = () => cur().options.some((o) => o.role === "source" && vals()[o.dest] !== undefined);
+let colourTimer = null;
+function scheduleColours(force = false) {
+  clearTimeout(colourTimer);
+  if (!cur().has_colours) return;
+  if (force || (sourceChosen() && !S.colourCache.has(analysisKey()))) colourTimer = setTimeout(analyseColours, force ? 0 : 500);
+  else renderColours();
+}
+async function analyseColours() {
+  const key = analysisKey(), seq = ++S.colourSeq, target = S.target;
+  S.colourLoading = key; renderColours();
+  let r;
+  try { r = await api("/api/colours", { target, values: analysisValues() }); }
+  catch (e) { r = { error: String(e.message || e) }; }
+  S.colourCache.set(key, r);
+  if (seq !== S.colourSeq || target !== S.target) return;
+  S.colourLoading = null;
+  // the remap editor depends on the result (nothing remappable: hidden)
+  if (opt("map") && !!document.querySelector(".mapeditor") !== shown(opt("map"))) render(); else renderColours();
+  scheduleCommand();
+}
+function mapRows() {
+  return new Map((vals().map || []).map((m) => { const i = m.indexOf("="); return [m.slice(0, i).toLowerCase(), m.slice(i + 1)]; }));
+}
+function renderColours() {
+  const box = $("colourlist");
+  if (!box) return;
+  const r = colourResult(), p = pal(uiFlavor()), rows = mapRows(), loading = S.colourLoading === analysisKey();
+  const sw = (c) => h("span", { class: "sw", style: { background: c === "accent" ? p[uiAccent()] : (p[c] || c) } });
+  const head = [h("div", { class: "label" }, h("span", {}, "Source colours"),
+    h("button", { class: "btn small", disabled: loading, title: "Analyse the source again (catppuccinize … --colours)", onclick: () => { S.colourCache.delete(analysisKey()); scheduleColours(true); } },
+      r ? "Analyse again" : "Analyse")),
+    h("p", { class: "hint", style: { marginTop: 0 } }, "The colours -m can change, found before any run. Click one to remap it.")];
+  let body;
+  if (loading) body = h("p", { class: "hint" }, "Analysing the source…");
+  else if (!r) body = h("p", { class: "hint" }, sourceChosen() ? "" : "Choose a source to see its colours (or click Analyse for the default one).");
+  else if (r.error) body = h("div", { class: "err" }, "⚠ ", r.error);
+  else {
+    body = r.items.map((it) => h("div", { class: "colitem" },
+      h("div", { class: "colhead" }, h("b", {}, baseName(it.source)), it.group ? ` / ${it.group}` : "", ` · ${it.method}`,
+        it.background ? [" · background ", sw(it.background)] : null,
+        !it.remap ? h("span", { class: "hint", style: { margin: 0 } }, ` — no remap${it.note ? `: ${it.note}` : ""}`)
+          : it.note ? h("span", { class: "hint", style: { margin: 0 } }, ` — ${it.note}`) : null),
+      it.colours.length ? h("div", { class: "detected" }, it.colours.map((c) => {
+        const over = it.remap && (rows.get(c.name.toLowerCase()) || rows.get(c.source.toLowerCase()));
+        return h("button", { class: "det" + (over ? " set" : ""), disabled: !it.remap,
+          title: it.remap ? `${c.name}: ${c.source} → ${over || c.target}. Click to remap it.` : `${c.source} → ${c.target}`,
+          onclick: () => S.addMap && S.addMap(c.name) },
+          sw(c.source), h("span", { class: "mono" }, c.name), " → ", sw(over || c.target), over || c.target,
+          c.share != null ? h("span", { class: "hint", style: { margin: 0 } }, ` ${Math.round(c.share * 100)}%`) : null);
+      })) : null));
+    if (!r.facts.remappable) body.push(h("p", { class: "hint" }, "Nothing here can be remapped with -m."));
+  }
+  box.replaceChildren(...head, ...[body].flat().filter(Boolean));
+  const dl = $("detnames");
+  if (dl) dl.replaceChildren(...knownNames().map((k) => h("option", { value: k })));
+  document.querySelectorAll(".maprow input").forEach(checkName);
+}
+const knownNames = () => (colourResult()?.items || []).filter((it) => it.remap).flatMap((it) => it.colours.map((c) => c.name));
+// a name -m will not find is marked (a #rrggbb source colour is always accepted)
+function checkName(inp) {
+  const names = knownNames(), v = inp.value.trim();
+  inp.classList.toggle("bad", !!v && names.length > 0 && !/^#[0-9a-f]{6}$/i.test(v) && !names.includes(v));
 }
 
 function mapEditor() {
   const rows = (vals().map || []).map((m) => { const i = m.indexOf("="); return i < 0 ? [m, ""] : [m.slice(0, i), m.slice(i + 1)]; });
   const p = pal(uiFlavor());
   const save = () => setVal("map", rows.filter(([a, b]) => a.trim() && b).map(([a, b]) => `${a.trim()}=${b}`));
-  const dl = h("datalist", { id: "detnames" }, [...S.detected.keys()].map((k) => h("option", { value: k })));
-  const box = h("div", {}, h("div", { class: "label" }, h("span", {}, "Colour remapping (-m)"), h("span", {}, "optional")), dl);
+  const dl = h("datalist", { id: "detnames" }, knownNames().map((k) => h("option", { value: k })));
+  const box = h("div", { class: "mapeditor" }, h("div", { class: "label" }, h("span", {}, "Colour remapping (-m)"), h("span", {}, "optional")), dl);
   const list = h("div");
   const draw = () => {
     list.replaceChildren(...rows.map((r, i) => {
@@ -585,7 +673,7 @@ function mapEditor() {
         background: r[1] ? (r[1] === "accent" ? p[uiAccent()] : p[r[1]]) : "transparent", border: "1px solid var(--surface2)" } });
       return h("div", { class: "maprow" },
         h("input", { type: "text", class: "mono", value: r[0], list: "detnames", placeholder: "name or #rrggbb", spellcheck: "false",
-          oninput: (e) => { r[0] = e.target.value; save(); } }),
+          oninput: (e) => { r[0] = e.target.value; checkName(e.target); save(); } }),
         h("span", { class: "eq" }, "="), h("div", { class: "row", style: { flexWrap: "nowrap" } }, sw, sel),
         h("button", { class: "btn small ghost", title: "Remove", onclick: () => { rows.splice(i, 1); save(); draw(); } }, "×"));
     }));
@@ -593,8 +681,13 @@ function mapEditor() {
   draw();
   box.append(list, h("div", { class: "row" },
     h("button", { class: "btn small", onclick: () => { rows.push(["", ""]); draw(); list.querySelector(".maprow:last-child input")?.focus(); } }, "+ Add a remap"),
-    h("span", { class: "hint", style: { margin: 0 } }, "Names are shown after a run (Preview is enough), e.g. ", h("code", {}, "white"), ", ", h("code", {}, "ui.white"), ", or a ", h("code", {}, "#hex"), ".")));
-  S.addMap = (name, target) => { rows.push([name, target || ""]); save(); draw(); };
+    h("span", { class: "hint", style: { margin: 0 } }, "Click a source colour above, or type its name (", h("code", {}, "white"), ", ", h("code", {}, "ui.white"), ") or a ", h("code", {}, "#rrggbb"), ".")));
+  S.addMap = (name) => {
+    let i = rows.findIndex((r) => r[0].toLowerCase() === name.toLowerCase());
+    if (i < 0) { rows.push([name, ""]); i = rows.length - 1; draw(); }
+    list.children[i]?.querySelector("select")?.focus();
+  };
+  list.querySelectorAll("input").forEach(checkName);
   return box;
 }
 
@@ -716,22 +809,17 @@ function refreshVisibility() {
 // ----------------------------------------------------------------- command
 let cmdTimer = null;
 function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCommand, 120); }
-// what a button runs: the form values, plus --preview, a command (--detect) or a step (null: Build)
+// what a button runs: the form values, plus --preview or one step (null: Build)
 function action(step) {
   const values = sendVals(), o = step && step !== "preview" ? opt(step) : null;
   if (step === "preview") values.preview = true;
-  if (o) values[step] = true;
-  if (o && o.role === "step" && S.dry[S.target]) values.dry_run = true;
+  if (o) { values[step] = true; if (S.dry[S.target]) values.dry_run = true; }
   // a dry run changes nothing but keeps the step's rights: it may have to read the system (the ESP)
   const sudo = $("sudo").checked || (!!o && o.sudo === "run");
   return { target: S.target, values, sudo };
 }
 const label = (o) => STEP_LABELS[o.dest] || nice(o).replace(/^./, (c) => c.toUpperCase());
 function renderSteps() {
-  // commands of their own (plymouth --detect) go next to Build
-  document.querySelectorAll("#mainbtns [data-action]").forEach((b) => b.remove());
-  $("mainbtns").append(...cur().options.filter((o) => o.role === "action").map((o) => h("button", { class: "btn big", "data-action": o.dest, title: o.help,
-    onclick: () => run(o.dest) }, label(o))));
   const list = steps();
   $("steps").classList.toggle("hidden", !list.length);
   $("stepopts").classList.toggle("hidden", !list.length);
@@ -753,16 +841,16 @@ async function updateCommand() {
   const busy = S.job && !S.job.done;
   $("runbtn").disabled = !!r.error || busy;
   $("previewbtn").disabled = !!r.error || busy;
-  document.querySelectorAll("#steps button, #mainbtns [data-action]").forEach((b) => { b.disabled = busy || (!!r.error && !S.hover); });
+  document.querySelectorAll("#steps button").forEach((b) => { b.disabled = busy || (!!r.error && !S.hover); });
 }
 
 // --------------------------------------------------------------------- run
 async function run(step) {
   const r = await api("/api/run", action(step));
   if (r.error) { toast(r.error); return; }
-  S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.detected.clear(); S.group = ""; S.accentIgnored = false;
-  $("log").replaceChildren(); $("results").replaceChildren(); renderDetected();
-  $("prog").style.width = "0"; setStatus("run", step === "preview" ? "Rendering previews…" : step ? `${label(opt(step))}${S.dry[S.target] && opt(step).role === "step" ? " (dry run)" : ""}…` : "Building…");
+  S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.accentIgnored = false;
+  $("log").replaceChildren(); $("results").replaceChildren();
+  $("prog").style.width = "0"; setStatus("run", step === "preview" ? "Rendering previews…" : step ? `${label(opt(step))}${S.dry[S.target] ? " (dry run)" : ""}…` : "Building…");
   $("stopbtn").classList.remove("hidden"); $("openout").classList.add("hidden");
   updateCommand(); poll();
 }
@@ -775,7 +863,6 @@ async function poll() {
   const log = $("log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
   for (const line of r.lines) log.append(logLine(line));
   if (atEnd) log.scrollTop = log.scrollHeight;
-  if (r.lines.length) renderDetected();
   if (!r.done) { setTimeout(poll, 350); return; }
   S.job.done = true;
   $("stopbtn").classList.add("hidden");
@@ -794,25 +881,9 @@ function logLine(line) {
   else if (/\bnote:/.test(line)) cls = "n";
   else if (/->|installed|updated|done/i.test(line)) cls = "o";
   if (/note: accent ignored/.test(line)) S.accentIgnored = true;
-  // detected colours: "    name       #rrggbb -> target"
-  const g = line.match(/^  (\S+) \(\d+ images?, /);
-  if (g) S.group = g[1] + ".";
-  else if (!/^\s{4}/.test(line)) S.group = "";
-  const m = line.match(/^\s{3,}(\S+)\s+(#[0-9a-f]{6}) -> (\S+)/i);
-  if (m) S.detected.set(S.group + m[1], { source: m[2], target: m[3] });
   const pr = line.match(/(\d+)\/(\d+) images/);
   if (pr) $("prog").style.width = `${Math.round(100 * pr[1] / pr[2])}%`;
   return h("div", { class: cls }, line);
-}
-function renderDetected() {
-  const box = $("detected"), p = pal(uiFlavor());
-  $("detbox").classList.toggle("hidden", !S.detected.size);
-  box.replaceChildren(...[...S.detected.entries()].slice(0, 60).map(([name, c]) => h("button", { class: "det", title: `${c.source} → ${c.target}`,
-    onclick: () => { if (S.addMap) { S.addMap(name, ""); toast(`Pick a target for ${name} in Colours`); } } },
-    h("span", { class: "sw", style: { background: c.source } }), name, " → ",
-    h("span", { class: "sw", style: { background: p[c.target === "accent" ? uiAccent() : c.target] || "transparent" } }), c.target)));
-  const dl = $("detnames");
-  if (dl) dl.replaceChildren(...[...S.detected.keys()].map((k) => h("option", { value: k })));
 }
 function renderResults(list) {
   const single = list.length === 1;
@@ -934,7 +1005,7 @@ setInterval(() => api("/api/ping").catch(() => setStatus("fail", "The catppuccin
   const names = S.schema.targets.map((t) => t.name);
   S.target = names.includes(store.get("target")) ? store.get("target") : (names.includes("image") ? "image" : names[0]);
   for (const t of names) if (typeof S.values[t] !== "object" || Array.isArray(S.values[t])) S.values[t] = {};
-  renderTabs(); applyTheme(); render(); updateCommand();
+  renderTabs(); applyTheme(); render(); updateCommand(); scheduleColours();
 })();
 </script>
 </body>

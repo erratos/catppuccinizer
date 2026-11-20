@@ -109,8 +109,9 @@ OPTIONS = [
     Option("--bar", metavar="COLOUR", kind="colour",
            help="progress bar colour: -status variants, and two-step themes' own bar"),
     Option("--no-status", switch=True, help="skip the -status variants"),
-    Option("--detect", switch=True, stage="analyse",
-           help="(re)detect colours, overwrite the theme's config, then stop"),
+    Option("--redetect", switch=True,
+           help="detect the colours again instead of using the theme's saved config "
+                "(a build saves the new one)"),
     Option("--list", switch=True, stage="analyse", gui=False,       # the GUI's catalogue
            help="list adi1090x themes and exit"),
     step("install", sudo="run",
@@ -441,7 +442,7 @@ def colours(a):
     out = []
     for arg in a.themes:
         theme = Theme(resolve_theme(arg))
-        saved = config_path(theme.name).exists() and not a.detect
+        saved = config_path(theme.name).exists() and not a.redetect
         cfg = load_config(theme) if saved else detect(theme)
         apply_maps(cfg, a.map)
         several = len(cfg["groups"]) > 1
@@ -465,15 +466,13 @@ def build(a):
         if not theme.groups:
             print(f"{theme.title}: no PNG images, nothing to recolour")
             continue
-        if a.detect or not config_path(theme.name).exists():
+        if a.redetect or not config_path(theme.name).exists():
             print(f"Detecting colours of {theme.title} ...", flush=True)
             save_config(theme, detect(theme))
             print(f"  -> {config_path(theme.name)}")
         cfg = load_config(theme)
         apply_maps(cfg, a.map)
         print_mapping(theme, cfg)
-        if a.detect:
-            continue
 
         accent_used = any(uses_accent(grp["colors"]) for grp in cfg["groups"].values())
         if not accent_used:

@@ -37,7 +37,7 @@ from PIL import Image
 from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.paths import cache_dir
-from ..core.options import condition_met
+from ..core.options import STEPS, analysis, condition_met
 from ..core.recolor import LUT_METHODS
 from ..core.target import Target, discover
 
@@ -88,6 +88,11 @@ def places():
             out.append((label, p))
     return [{"label": label, "path": str(p)} for label, p in dict(
         (str(p), (label, p)) for label, p in out).values()]
+
+
+# options that do not change what --colours finds: left out of the analysis (and of
+# its cache key in the page), so that picking a flavour does not analyse again
+NOT_ANALYSED = {"map", "preview", "out", "suffix", "dry_run", "flavor", "accent"}
 
 
 # ---------------------------------------------------------------- arguments
@@ -277,6 +282,36 @@ class App:
         self.jobs[job.id] = job
         return {**c, "job": job.id}
 
+    def colours(self, body):
+        """The colours -m can remap, before any run: `catppuccinize ... --colours --json`
+        in a subprocess (as the command line does it), without the options that do
+        not change the analysis (-m is shown over it by the page, so that a name
+        being typed is not an error)."""
+        name = body.get("target")
+        t = self.targets.get(name)
+        if t is None or not t.has_colours:
+            return {"error": f"{name}: no colours to list"}
+        values = {k: v for k, v in (body.get("values") or {}).items()
+                  if k not in NOT_ANALYSED and k not in STEPS}
+        argv = [*build_argv(name, values, self.options[name]), "--colours", "--json"]
+        a, err = check_argv(argv, self.parser)
+        if err:
+            return {"error": err}
+        try:
+            r = subprocess.run([sys.executable, "-B", "-c", BOOT, *argv], capture_output=True,
+                               text=True, timeout=600, stdin=subprocess.DEVNULL,
+                               env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+        except subprocess.TimeoutExpired:
+            return {"error": "the analysis took more than 10 minutes"}
+        if r.returncode:
+            lines = (r.stderr or r.stdout).strip().splitlines()
+            return {"error": lines[-1] if lines else f"the analysis failed ({r.returncode})"}
+        try:
+            items = json.loads(r.stdout)
+        except ValueError:
+            return {"error": "unreadable analysis output"}
+        return {"items": items, "facts": analysis(items), "command": command_line(argv)}
+
     def busy(self):
         return any(j.code is None and j.proc for j in self.jobs.values())
 
@@ -438,6 +473,8 @@ def make_handler(app):
                 return self.send(400, {"error": "bad json"})
             if u.path == "/api/command":
                 return self.send(200, app.command(data))
+            if u.path == "/api/colours":
+                return self.send(200, app.colours(data))
             if u.path == "/api/run":
                 return self.send(200, app.run(data))
             if u.path == "/api/stop":

@@ -59,11 +59,10 @@ class Declarations(unittest.TestCase):
                 self.assertEqual(any(o.dest == "dry_run" for o in t.all_options()), bool(t.steps))
         self.assertEqual(TARGETS["image"].steps, [])
 
-    def test_actions(self):
+    def test_lists_are_not_in_the_gui(self):
         ply = {o.dest: o for o in TARGETS["plymouth"].all_options()}
-        self.assertTrue(options.is_action(ply["detect"]))
-        self.assertFalse(options.is_action(ply["no_status"]))
-        self.assertFalse(ply["list"].gui)
+        self.assertFalse(ply["list"].gui)          # the catalogue
+        self.assertFalse(ply["colours"].gui)       # the page shows the colours by itself
         self.assertEqual(TARGETS["limine"].steps, ["install", "apply", "restore"])
 
     def test_when_refers_to_existing_options(self):

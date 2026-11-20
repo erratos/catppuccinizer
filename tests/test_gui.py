@@ -71,8 +71,8 @@ class Gui(unittest.TestCase):
         self.assertEqual(ply["test"]["kind"], "optional")
         self.assertEqual((ply["install"]["sudo"], ply["install"]["role"]), ("run", "step"))
         self.assertEqual(ply["dry_run"]["role"], "common")
-        self.assertEqual(ply["detect"]["role"], "action")       # a button, not a setting
         self.assertNotIn("list", ply)                           # the catalogue does it
+        self.assertNotIn("detect", ply)                         # --colours, for every target
         self.assertEqual(ply["bar"]["kind"], "colour")
         lut = next(t for t in s["targets"] if t["name"] == "lut")
         self.assertFalse(lut["has_colours"])
@@ -104,6 +104,24 @@ class Gui(unittest.TestCase):
         r = self.call("/api/command", {"target": "limine", "values": {"apply": True}, "sudo": True})
         self.assertIsNone(r["error"])
         self.assertEqual(r["command"], "sudo catppuccinize limine --apply")
+
+    def test_colours_before_a_run(self):
+        with tempfile.TemporaryDirectory() as d:
+            im = Image.new("RGB", (160, 90), (8, 14, 40))
+            ImageDraw.Draw(im).ellipse([20, 10, 140, 80], outline=(60, 220, 255), width=3)
+            im.save(Path(d) / "flat.png")
+            values = {"images": [str(Path(d) / "flat.png")], "flavor": ["latte"],
+                      "map": ["not-a-name=red"]}       # -m is left out: no error while typing
+            r = self.call("/api/colours", {"target": "image", "values": values})
+            self.assertIsNone(r.get("error"), r)
+            self.assertEqual(r["items"][0]["method"], "keys")
+            self.assertTrue(r["items"][0]["colours"])
+            self.assertEqual(r["facts"], {"remappable": True})
+            self.assertNotIn("-m", r["command"])
+            r = self.call("/api/colours", {"target": "image", "values": {**values, "method": "lut"}})
+            self.assertEqual(r["facts"], {"remappable": False})   # the editor is hidden
+        self.assertIn("error", self.call("/api/colours", {"target": "lut", "values": {}}))
+        self.assertIn("required", self.call("/api/colours", {"target": "image", "values": {}})["error"])
 
     def test_access_control(self):
         with self.assertRaises(urllib.error.HTTPError) as e:

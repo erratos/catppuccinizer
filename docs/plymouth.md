@@ -120,9 +120,10 @@ single images.
 - otherwise whites/grays go to `text` and each hue to the closest Catppuccin
   colour (red, peach, yellow, green, teal, sky, sapphire, blue, mauve, pink).
 
-`catppuccinize plymouth <theme> --detect` re-runs the detection, saves it and
-prints the mapping. `--colours` only lists it, saving nothing (a theme without
-a config is detected for the listing, not saved).
+`--colours` lists it, saving nothing (a theme without a config is detected for
+the listing, not saved). `--redetect` ignores the saved config and detects the
+colours again: with a build it saves the new config, with `--colours` it only
+lists the fresh detection.
 
 To change it, use the colour names listed by `--colours`, prefixed by the group
 when the theme has several (`ui.white`), or a `#rrggbb` source colour:
@@ -254,7 +255,7 @@ for it.
 | `-s, --suffix` | | extra suffix for the theme names |
 | `--bar` | auto | progress bar colour (`-status` variants, two-step bar) |
 | `--no-status` | | skip the `-status` variants |
-| `--detect` | | re-detect colours, overwrite the config, stop |
+| `--redetect` | | detect the colours again instead of using the saved config (a build saves it) |
 | `--preview` | | only render one before/after image per theme in `<out>/previews/` |
 | `--list` | | list upstream themes (`[config]` = has a config) |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |

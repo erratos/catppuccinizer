@@ -44,9 +44,7 @@ ten minutes after the page is closed. `--port N` picks the port,
 5. **Preview** renders the before/after images (`--preview`); **Build** writes
    the result into the output folder, without sudo and without installing
    anything (the line under the buttons says where). The output folder defaults
-   to `./<target folder>` in the folder the GUI was started from. Commands of
-   their own get a button next to them (Plymouth: **Detect** re-detects the
-   colours and saves the theme's config).
+   to `./<target folder>` in the folder the GUI was started from.
 
 The *Command* box always shows the exact `catppuccinize …` line the page runs,
 with the error the command line would give when something is missing (hover a
@@ -54,10 +52,18 @@ step button to see its own command). Copy it to script the same thing later.
 
 ### Remapping a colour
 
-After a run (a preview is enough), the colours that were detected are listed
-under the output, with what they were mapped to. Click one: it is added to
-*Colour remapping* in the Colours card, where you choose its new target.
-This is the same as `-m NAME=TARGET` ([Colours and mapping](colours.md)).
+As soon as a source is chosen, the *Colours* card lists its **source colours**,
+before any run: for each image (or Plymouth image group), the method it will
+get, then each colour -m can change, with its name, what it goes to and its
+share. It is `catppuccinize … --colours` ([Colours and mapping](colours.md#manual-mapping)),
+run again when the source or an option that changes the analysis (`--method`…)
+changes; *Analyse again* reruns it (e.g. after editing the files).
+
+Click a colour: a row is added to *Colour remapping (-m)*, where you choose its
+new target; the list then shows the new target. A name the analysis did not
+find is underlined in red (a `#rrggbb` source colour is always accepted). When
+nothing can be remapped (`--method lut`, a LUT has no source colours), the
+editor is hidden and the list says why.
 
 ### Install, apply, test, restore
 
@@ -101,10 +107,11 @@ GUI without GUI code:
   **sudo** and runs it with sudo; options of the `install` / `apply` / `test` /
   `restore` stages go to the *System steps* group, the other ones of `analyse`
   to *Analyse*;
-- an on/off option of the `analyse` stage (`plymouth --detect`) becomes a
-  button next to *Build*;
-- `gui=False` keeps an option out of the forms (`--colours` lists, it does not
-  run; `--list` repeats the catalogue);
+- `Target.colours()` fills the *Source colours* list and its `when`
+  facts (`analysis.remappable`: the remap editor is shown only when something
+  can be remapped);
+- `gui=False` keeps an option out of the forms (`--colours`: the page shows
+  that list by itself; `--list` repeats the catalogue);
 - `Target.sources()` fills the catalogue (see [Architecture](architecture.md));
 - `Target.accent_also` names what still uses the accent when `--method` is a
   LUT (Limine: the menu colours); without it, the accents are dimmed then.
