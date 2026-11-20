@@ -7,8 +7,11 @@ catppuccinizer.core. Built-in targets live in catppuccinizer/targets/<name>
     [project.entry-points."catppuccinizer.targets"]
     grub = "my_package.grub:TARGET"
 """
+import sys
 from importlib import import_module
 from importlib.metadata import entry_points
+
+from . import options as opts
 
 BUILTIN = ["plymouth", "image", "limine", "ksplash", "lut"]
 
@@ -22,8 +25,26 @@ class Target:
     accent_also = None         # what uses the accent whatever --method is (limine: "the menu
                                # colours"); None: a LUT method leaves the accent unused
 
-    def add_arguments(self, parser):
-        """Add target-specific options (common ones: -f -a -m --preview -o -s)."""
+    def options(self):
+        """The target's own options, as core.options.Option (scope "target"), plus
+        core.recolor.method_options() when it recolours images with the methods.
+        The common ones (-f -a -m --preview -o -s, --colours) are added by
+        all_options()."""
+        return []
+
+    def all_options(self):
+        """Every option of the subcommand, in order: common, the target's, --colours."""
+        return [*opts.COMMON, *self.options(), *(opts.COLOURS if self.has_colours else [])]
+
+    @property
+    def has_colours(self):
+        """Whether the target defines colours() (--colours, the GUI's remap list)."""
+        return type(self).colours is not Target.colours
+
+    @property
+    def doc(self):
+        """Long help: description, or the docstring of the target's module."""
+        return self.description or sys.modules[type(self).__module__].__doc__
 
     def check(self, args):
         """Validate options before running (raise SystemExit on error)."""

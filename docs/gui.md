@@ -37,8 +37,10 @@ ten minutes after the page is closed. `--port N` picks the port,
    `auto` it depends on each image, so the output notes it after the run
    (*the accent was ignored* next to *Done*).
 4. **Options**: every option of the target, with its help. Options that only
-   apply to a method (the `--lutgen-*` ones) show up when that method is
-   chosen.
+   apply to a method or a setting show up when it is chosen: `--keep-lum` and
+   `--smooth` with `auto` / `lut`, the `--lutgen-*` ones with `lutgen` (and
+   each algorithm's own knobs with that algorithm), `--hald-level` /
+   `--cube-size` with their format.
 5. **Preview** renders the before/after images (`--preview`); **Run** writes
    the result. The output folder defaults to `./<target folder>` in the folder
    the GUI was started from.
@@ -58,7 +60,8 @@ This is the same as `-m NAME=TARGET` ([Colours and mapping](colours.md)).
 
 Options that change the system (`plymouth --install / --test`,
 `limine --apply / --remove`, `ksplash --install`) work from the page too.
-When an option needs root (marked **sudo**), *Run with sudo* is ticked: the
+When an option needs root (marked **sudo**), *Run with sudo* is ticked (for
+`limine`; Plymouth's helper scripts ask for it themselves): the
 password is asked by a graphical prompt (`ksshaskpass`, `ssh-askpass`…, through
 `SUDO_ASKPASS`). Without one, copy the command and run it in a terminal.
 
@@ -70,15 +73,24 @@ it, and any request whose `Host` is not the local address. It only listens on
 
 ## For target authors
 
-The forms are built from the target's argparse options, so a new target (or one
-added by an entry point) appears in the GUI without GUI code:
+The forms are built from the options the target declares (`Target.options()`,
+see [Architecture](architecture.md#options)), the same ones the command line
+is built from, so a new target (or one added by an entry point) appears in the
+GUI without GUI code:
 
-- a positional argument, or an option with `metavar="IMAGE"`, goes to the
-  *Source* card; `type=Path` gets a file browser;
-- `choices` become buttons, a `metavar` like `"0..1"` a slider;
-- an argument group titled `"... (--method lutgen ...)"` is shown only when
-  `--method` is `lutgen`;
-- an option whose help says `sudo` ticks *Run with sudo*;
+- a positional argument, or an option with `source=True`, goes to the
+  *Source* card; `accept` picks what the file browser offers (`image`,
+  `images`, `dir`, `file`), and `image` / `images` sources accept dropped files;
+- `choices` become buttons, a `range` a slider, `kind="colour"` a palette
+  colour list;
+- `when` shows an option only when it matters: `--lutgen-*` with
+  `--method lutgen`, `--lutgen-radius` with `--lutgen-algo blur`, `-m` only
+  for targets that have colours to remap; options whose `when` is not met are
+  left out of the command;
+- `sudo="run"` ticks *Run with sudo*; `sudo="self"` (the target calls sudo
+  itself, like `plymouth --install`) only needs the graphical password prompt;
+  both show a **sudo** badge;
+- `gui=False` keeps an option out of the forms (`--colours` lists, it does not run);
 - `Target.sources()` fills the catalogue (see [Architecture](architecture.md));
 - `Target.accent_also` names what still uses the accent when `--method` is a
   LUT (Limine: the menu colours); without it, the accents are dimmed then.

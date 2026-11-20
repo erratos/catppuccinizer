@@ -1,8 +1,9 @@
 """Graphical interface: `catppuccinize gui`.
 
 A small web page served on 127.0.0.1 (standard library only). The forms are built
-from the same argparse subparsers as the command line, so every target, built-in
-or added by an entry point, gets its options without GUI-specific code. A run is
+from the options the targets declare (core.options), like the command line, so
+every target, built-in or added by an entry point, gets its options without
+GUI-specific code. A run is
 the equivalent `catppuccinize ...` command in a subprocess; its output is
 streamed to the page, and the files it wrote are shown as thumbnails.
 
@@ -36,6 +37,7 @@ from PIL import Image
 from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.paths import cache_dir
+from ..core.options import condition_met
 from ..core.recolor import LUT_METHODS
 from ..core.target import Target, discover
 
@@ -50,87 +52,20 @@ BOOT = (f"import sys; sys.dont_write_bytecode = True; sys.path.insert(0, {str(PK
 
 
 # -------------------------------------------------------------------- schema
-def _kind(action):
-    if isinstance(action, (argparse._StoreTrueAction, argparse._StoreFalseAction)):
-        return "bool"
-    if action.dest in ("flavor", "accent"):
-        return action.dest
-    if action.dest == "map":
-        return "map"
-    if action.nargs == "?" and action.option_strings and action.const is not None:
-        return "optional"                      # --test [SECONDS]: a switch with an optional value
-    if action.choices:
-        return "multichoice" if action.nargs in ("+", "*") else "choice"
-    if action.type in (int, float):
-        return "int" if action.type is int else "float"
-    if action.type is Path or not action.option_strings:
-        return "path"
-    return "text"
-
-
-def _range(metavar):
-    m = re.fullmatch(r"(-?[\d.]+)\.\.(-?[\d.]+)", metavar or "")
-    return [float(m.group(1)), float(m.group(2))] if m else None
-
-
-def _when(group_title):
-    """'lutgen method (--method lutgen, ...)' -> {"method": "lutgen"}: shown only then."""
-    m = re.search(r"\(--([\w-]+) ([\w-]+)", group_title or "")
-    return {m.group(1).replace("-", "_"): m.group(2)} if m else None
-
-
-def _plain(v):
-    if isinstance(v, Path):
-        return str(v)
-    if isinstance(v, (list, tuple)):
-        return [_plain(x) for x in v]
-    return v if v is None or isinstance(v, (str, int, float, bool)) else str(v)
-
-
-def options_of(sp):
-    groups = {id(a): g.title for g in sp._action_groups for a in g._group_actions}
-    out = []
-    for a in sp._actions:
-        if (isinstance(a, argparse._HelpAction) or a.dest in NOT_IN_FORMS
-                or a.help == argparse.SUPPRESS):
-            continue
-        kind = _kind(a)
-        title = groups.get(id(a))
-        is_source = not a.option_strings or (kind == "path" and a.metavar == "IMAGE")
-        out.append({
-            "dest": a.dest, "flags": a.option_strings, "kind": kind,
-            "positional": not a.option_strings, "nargs": a.nargs,
-            "multiple": a.nargs in ("+", "*"), "required": bool(a.required),
-            "choices": _plain(list(a.choices)) if a.choices else None,
-            "default": _plain(a.default), "const": _plain(a.const),
-            "metavar": a.metavar if isinstance(a.metavar, str) else None,
-            "help": (a.help or "").replace("%%", "%"), "range": _range(a.metavar),
-            "group": title if title not in ("options", "positional arguments") else None,
-            "when": _when(title),
-            "role": "source" if is_source else ("common" if a.dest in COMMON else "option"),
-            "sudo": "sudo" in (a.help or ""),
-        })
-    return out
-
-
-COMMON = {"flavor", "accent", "map", "preview", "out"}
-NOT_IN_FORMS = {"target", "colours", "json"}   # --colours lists and writes nothing: not a run
-
-
 def first_paragraph(text):
     return (text or "").strip().split("\n\n")[0].replace("\n", " ")
 
 
-def schema(targets, subparsers):
+def schema(targets):
     out = []
     for name, t in targets.items():
-        sp = subparsers[name]
         out.append({
-            "name": name, "help": t.help, "summary": first_paragraph(sp.description),
-            "description": sp.description or "", "default_out": t.default_out,
+            "name": name, "help": t.help, "summary": first_paragraph(t.doc),
+            "description": t.doc or "", "default_out": t.default_out,
             "default_accent": list(t.default_accent), "accent_also": t.accent_also,
             "has_sources": type(t).sources is not Target.sources,
-            "options": options_of(sp),
+            "has_colours": t.has_colours,
+            "options": [o.schema() for o in t.all_options() if o.gui],
         })
     return {"version": __version__, "targets": out, "cwd": str(Path.cwd()),
             "home": str(Path.home()), "flavors": FLAVORS, "flavor_titles": FLAVOR_TITLES,
@@ -157,13 +92,16 @@ def places():
 
 # ---------------------------------------------------------------- arguments
 def build_argv(target, values, options):
-    """Command-line arguments for a target from the form values {dest: value}."""
+    """Command-line arguments for a target from the form values {dest: value};
+    options whose `when` is not met (--lutgen-* without --method lutgen) are left out."""
     # sources first (catppuccinize image wall.jpg -f mocha): an option taking several
     # values (-f latte mocha) would otherwise swallow them
+    current = {o["dest"]: o["default"] for o in options}
+    current.update({k: v for k, v in values.items() if v is not None})
     argv, positionals = [], []
     for o in options:
         v = values.get(o["dest"])
-        if v is None or v == "" or v == [] or v is False:
+        if v is None or v == "" or v == [] or v is False or not condition_met(o["when"], current):
             continue
         if o["positional"]:
             positionals += [str(x) for x in (v if isinstance(v, list) else [v])]
@@ -302,8 +240,8 @@ class App:
         self.token = secrets.token_urlsafe(18)
         self.targets = discover()
         from ..cli import build_parser
-        self.parser, self.subparsers = build_parser(self.targets)
-        self.schema = schema(self.targets, self.subparsers)
+        self.parser = build_parser(self.targets)
+        self.schema = schema(self.targets)
         self.options = {t["name"]: t["options"] for t in self.schema["targets"]}
         self.jobs = {}
         self.last_seen = time.time()

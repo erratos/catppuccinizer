@@ -10,8 +10,9 @@ core never knows about targets. `tests/test_architecture.py` enforces it.
 ```
 catppuccinizer/
   cli.py              builds the command line from the discovered targets
-  gui/                `catppuccinize gui`: local web page built from the same parsers
+  gui/                `catppuccinize gui`: local web page built from the same options
   core/
+    options.py        Option: every option declared once (CLI + GUI), the common ones
     palette.py        Catppuccin palettes, colour helpers, Oklab
     detect.py         background + source colours of a group of images
     mapping.py        --map overrides, automatic mapping of plain colour lists
@@ -31,6 +32,7 @@ catppuccinizer/
 tests/
   test_regression.py  every target on small fixtures, compared with golden.json
   test_architecture.py
+  test_options.py     every declared option is complete and coherent
   test_gui.py         forms, command lines, access control of the GUI
 ```
 
@@ -46,7 +48,8 @@ tests/
 | `mapping.uses_accent(colors)` / `note_accent_ignored(a, reason)` | whether a colour goes to `accent`; the note printed when `-a` was given for nothing |
 | `recolor.recolor_image(path, bg, keys, targets, base)` | keys method on one image (alpha kept) |
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
-| `recolor.add_method_arguments(parser)` | `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` |
+| `options.Option(...)` / `options.defaults(opts, **values)` | declare an option ([below](#options)); a namespace of defaults for scripts |
+| `recolor.method_options(methods=None, help=None)` | `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` (only the given methods) |
 | `recolor.LUT_METHODS` / `recolor.lut_for(method, flavor, args, n)` | the LUT methods (no source colours, no accent) and their cube |
 | `recolor.accent_ignored_reason(method, grp)` | why the accent has no effect on an image, or None |
 | `clut.apply_cube` / `resample` / `read_hald` / `write_hald` / `write_cube` | 3D LUT application and files |
@@ -62,6 +65,7 @@ tests/
 # catppuccinizer/targets/grub.py   (or any package, see below)
 """GRUB target: recolour a GRUB theme (theme.txt + images)."""
 from ..core import recolor
+from ..core.options import Option
 from ..core.target import Target
 
 
@@ -71,9 +75,13 @@ class GrubTarget(Target):
     default_accent = ("mauve",)
     accent_also = "the menu colours"   # optional: what uses -a even with --method lut
 
-    def add_arguments(self, p):
-        p.add_argument("theme", help="theme folder")
-        recolor.add_method_arguments(p)
+    def options(self):
+        return [
+            Option("theme", accept="dir", help="theme folder"),
+            *recolor.method_options(),
+            Option("--install", switch=True, stage="install", sudo="run",
+                   help="copy the theme to /boot/grub/themes"),
+        ]
 
     def run(self, a):
         # a.flavor, a.accent, a.map, a.preview, a.out, a.suffix are already resolved;
@@ -87,7 +95,7 @@ TARGET = GrubTarget()
 Optionally, `def sources(self)` returns ready-made sources for the first
 positional argument (`[{"value", "label", "note"}]`): the GUI shows them as a
 catalogue (Plymouth: the adi1090x themes, KDE splash: the installed splash
-screens). The GUI needs nothing else: its forms come from `add_arguments`
+screens). The GUI needs nothing else: its forms come from `options()`
 (see [Graphical interface](gui.md#for-target-authors)).
 
 Optionally too, `def colours(self, a)` does only the analysis and returns the
@@ -103,6 +111,31 @@ declare an entry point and install it next to catppuccinizer:
 [project.entry-points."catppuccinizer.targets"]
 grub = "my_package.grub:TARGET"
 ```
+
+### Options
+
+`options()` returns the target's own options only; the common ones (`-f -a -m
+--preview -o -s`, and `--colours --json` when `colours()` is defined) are
+declared once in `core/options.py`, the method ones in `core/recolor.py` and
+`core/lutgen.py`. An `Option` takes the flags and the argparse fields (`type`,
+`choices`, `default`, `nargs`, `metavar`, `const`; `switch=True` for an on/off
+option), then:
+
+| Field | Meaning |
+|---|---|
+| `help` | one line (`--help`, the GUI) |
+| `explain`, `image` | a longer text, an illustration in `assets/` |
+| `scope` | `common`, `method` / `method:<name>` (core) or `target` (default) |
+| `stage` | `analyse`, `preview`, `build` (default), `install`, `apply`, `test`, `restore` |
+| `sudo` | `"run"`: the command must run as root; `"self"`: the target calls sudo itself |
+| `when` | when it matters: `{"method": ["lutgen"]}` (another option's value) or `{"analysis.remappable": [True]}` (a fact from `--colours`); `method:<name>` options get `{"method": [<name>]}` |
+| `source` | what is recoloured (positional arguments by default): the GUI's *Source* card |
+| `accept` | for a path: `image`, `images` (files or folders), `dir`, `file` |
+| `range` | `(low, high)`: checked after parsing, shown as a slider |
+| `kind` | the GUI control when it cannot be guessed (`colour`: a palette colour) |
+
+`tests/test_options.py` checks every declared option (a help, a known stage,
+`sudo` only on a system stage, `when` naming existing options).
 
 Add a case to `tests/test_regression.py` (small synthetic fixture) and run
 `python3 tests/test_regression.py --update` once the output looks right.

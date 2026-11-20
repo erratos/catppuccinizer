@@ -28,13 +28,8 @@ def output_name(flavor, source, accent=None, suffix=""):
 
 
 def suffix_type(value):
-    """argparse type of --suffix."""
+    """argparse type of --suffix (core.options.COMMON)."""
     if value and not SAFE.fullmatch(value):
         raise argparse.ArgumentTypeError("use lowercase letters, digits and '-'")
     return value
 
-
-def add_suffix_argument(parser):
-    parser.add_argument("-s", "--suffix", default="", type=suffix_type, metavar="SUFFIX",
-                        help="extra word at the end of the output names "
-                             "(lowercase letters, digits and '-')")

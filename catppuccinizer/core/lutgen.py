@@ -14,6 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from .clut import read_hald
+from .options import Option
 from .palette import PALETTES
 
 # algorithm: (lutgen flag, options it accepts besides --level/--preserve/--lum)
@@ -25,7 +26,7 @@ ALGORITHMS = {
     "nearest":  (["--nearest-neighbor"], []),
 }
 # option: (type, metavar, help)
-OPTIONS = {
+PARAMS = {
     "radius":     (float, "SIGMA", "blur: Gaussian blur radius, larger = more blending (lutgen default 8)"),
     "shape":      (float, "SHAPE", "rbf: bigger = less blending between palette colours (default 128)"),
     "nearest":    (int, "N", "rbf/shepard: nearest palette colours used, 0 = all (default 16)"),
@@ -35,36 +36,47 @@ OPTIONS = {
     "iterations": (int, "N", "sampling: noise iterations per colour, slower = smoother (default 512)"),
     "seed":       (int, "SEED", "sampling: noise seed (default 42080085)"),
 }
-
-
-def add_arguments(p):
-    g = p.add_argument_group("lutgen method (--method lutgen, needs the lutgen binary)")
-    g.add_argument("--lutgen-algo", choices=list(ALGORITHMS), default="blur",
-                   help="interpolation: blur (lutgen default), rbf (Gaussian RBF), "
-                        "shepard (inverse distance), sampling (Gaussian sampling, slow), "
-                        "nearest (no interpolation) (default: blur)")
-    g.add_argument("--lutgen-level", type=int, default=10, metavar="2..16",
-                   help="Hald CLUT level: cube of level^2 points per axis (default: 10)")
-    g.add_argument("--lutgen-preserve", action="store_true",
-                   help="keep the original lightness after interpolation")
-    g.add_argument("--lutgen-lum", type=float, metavar="FACTOR",
-                   help="lightness weight when matching: <1 prefers colourful matches, "
-                        ">1 neutral ones; usually with --lutgen-preserve (default 1)")
-    for name, (typ, metavar, help_) in OPTIONS.items():
-        g.add_argument(f"--lutgen-{name.replace('_', '-')}", type=typ, metavar=metavar, help=help_)
+GROUP = "lutgen method (--method lutgen, needs the lutgen binary)"
+BLEND = ("The blending knob of an algorithm: with blur, a small --lutgen-radius gives hard "
+         "transitions (close to nearest) and a large one washes colours out; with rbf, "
+         "--lutgen-shape works the other way round.")
+OPTIONS = [
+    Option("--lutgen-algo", choices=list(ALGORITHMS), default="blur", scope="method:lutgen",
+           group=GROUP, image="assets/options-lutgen-algo.jpg",
+           help="interpolation: blur (lutgen default), rbf (Gaussian RBF), "
+                "shepard (inverse distance), sampling (Gaussian sampling, slow), "
+                "nearest (no interpolation) (default: blur)",
+           explain="blur, rbf, shepard and sampling give similar soft results with small "
+                   "differences in how colours blend; nearest does not interpolate at all: "
+                   "every colour snaps to one palette colour (flat, posterised look)."),
+    Option("--lutgen-level", type=int, default=10, range=(2, 16), scope="method:lutgen",
+           group=GROUP, help="Hald CLUT level: cube of level^2 points per axis (default: 10)"),
+    Option("--lutgen-preserve", switch=True, scope="method:lutgen", group=GROUP,
+           image="assets/options-lutgen-lum.jpg",
+           help="keep the original lightness after interpolation"),
+    Option("--lutgen-lum", type=float, metavar="FACTOR", scope="method:lutgen", group=GROUP,
+           image="assets/options-lutgen-lum.jpg",
+           help="lightness weight when matching: <1 prefers colourful matches, "
+                ">1 neutral ones; usually with --lutgen-preserve (default 1)"),
+    *(Option(f"--lutgen-{name.replace('_', '-')}", type=typ, metavar=metavar, help=help_,
+             scope="method:lutgen", group=GROUP,
+             when={"method": ["lutgen"],
+                   "lutgen_algo": [a for a, (_, allowed) in ALGORITHMS.items() if name in allowed]},
+             **({"image": "assets/options-lutgen-blend.jpg", "explain": BLEND}
+                if name in ("radius", "shape") else {}))
+      for name, (typ, metavar, help_) in PARAMS.items()),
+]
 
 
 def options(a):
     """The `lutgen generate` arguments for the parsed options (tuple, hashable)."""
     flag, allowed = ALGORITHMS[a.lutgen_algo]
-    if not 2 <= a.lutgen_level <= 16:
-        raise SystemExit("--lutgen-level must be between 2 and 16")
     out = [*flag, "--level", str(a.lutgen_level)]
     if a.lutgen_preserve:
         out.append("--preserve")
     if a.lutgen_lum is not None:
         out += ["--lum", str(a.lutgen_lum)]
-    for name in OPTIONS:
+    for name in PARAMS:
         value = getattr(a, f"lutgen_{name}")
         if value is None:
             continue

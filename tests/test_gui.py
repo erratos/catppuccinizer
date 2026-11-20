@@ -1,4 +1,4 @@
-"""GUI: forms built from the argparse subparsers, command lines, access control, a run."""
+"""GUI: forms built from the declared options, command lines, access control, a run."""
 import json
 import sys
 import tempfile
@@ -52,14 +52,28 @@ class Gui(unittest.TestCase):
         self.assertEqual(kinds["images"]["role"], "source")
         self.assertEqual(kinds["method"]["kind"], "choice")
         self.assertEqual(kinds["keep_lum"]["range"], [0.0, 1.0])
-        self.assertEqual(kinds["lutgen_algo"]["when"], {"method": "lutgen"})
+        self.assertEqual(kinds["lutgen_algo"]["when"], {"method": ["lutgen"]})
+        self.assertEqual(kinds["lutgen_radius"]["when"], {"method": ["lutgen"], "lutgen_algo": ["blur"]})
+        self.assertEqual(kinds["map"]["when"], {"analysis.remappable": [True]})
+        self.assertNotIn("colours", kinds)               # lists, does not run: not in the form
+        self.assertTrue(image["has_colours"])
         self.assertIsNone(image["accent_also"])          # lut: the accents are dimmed
         limine = next(t for t in s["targets"] if t["name"] == "limine")
         self.assertTrue(limine["accent_also"])           # the menu still uses it
+        lim = {o["dest"]: o for o in limine["options"]}
+        self.assertEqual((lim["apply"]["sudo"], lim["apply"]["stage"]), ("run", "apply"))
+        self.assertEqual(lim["wallpaper"]["role"], "source")
+        self.assertEqual(lim["esp"]["accept"], "dir")
         self.assertEqual(s["lut_methods"], ["lut", "lutgen"])
         plymouth = next(t for t in s["targets"] if t["name"] == "plymouth")
         self.assertTrue(plymouth["has_sources"])
-        self.assertEqual({o["dest"]: o["kind"] for o in plymouth["options"]}["test"], "optional")
+        ply = {o["dest"]: o for o in plymouth["options"]}
+        self.assertEqual(ply["test"]["kind"], "optional")
+        self.assertEqual(ply["install"]["sudo"], "self")     # the helper script asks for sudo
+        self.assertEqual(ply["bar"]["kind"], "colour")
+        lut = next(t for t in s["targets"] if t["name"] == "lut")
+        self.assertFalse(lut["has_colours"])
+        self.assertEqual({o["dest"]: o for o in lut["options"]}["method"]["choices"], ["lut", "lutgen"])
         self.assertNotIn("boot_delay", [o["dest"] for o in plymouth["options"]])
 
     def test_command_line(self):
@@ -69,6 +83,11 @@ class Gui(unittest.TestCase):
         # sources first, defaults left out, several flavours not swallowing the source
         self.assertEqual(argv, ["image", "a.png", "-f", "latte", "mocha", "--preview",
                                 "--keep-lum", "0.7"])
+        # an option whose `when` is not met is left out (--lutgen-radius without lutgen)
+        argv = build_argv("image", {"images": ["a.png"], "lutgen_radius": 4}, opts)
+        self.assertEqual(argv, ["image", "a.png"])
+        argv = build_argv("image", {"images": ["a.png"], "method": "lutgen", "lutgen_radius": 4}, opts)
+        self.assertEqual(argv, ["image", "a.png", "--method", "lutgen", "--lutgen-radius", "4"])
         argv = build_argv("plymouth", {"test": True}, self.app.options["plymouth"])
         self.assertEqual(argv, ["plymouth", "--test"])
         argv = build_argv("plymouth", {"test": 5}, self.app.options["plymouth"])
@@ -78,7 +97,7 @@ class Gui(unittest.TestCase):
         r = self.call("/api/command", {"target": "image", "values": {}})
         self.assertIn("required", r["error"])
         r = self.call("/api/command", {"target": "lut", "values": {"method": "keys"}})
-        self.assertEqual(r["error"], "lut: --method must be lut or lutgen")
+        self.assertIn("invalid choice: 'keys'", r["error"])
         r = self.call("/api/command", {"target": "limine", "values": {"apply": True}, "sudo": True})
         self.assertIsNone(r["error"])
         self.assertEqual(r["command"], "sudo catppuccinize limine --apply")

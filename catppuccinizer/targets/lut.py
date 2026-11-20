@@ -14,6 +14,7 @@ the same options (--keep-lum, --smooth, --lutgen-*).
 from ..core import clut, recolor
 from ..core.mapping import note_accent_ignored
 from ..core.naming import output_name
+from ..core.options import Option
 from ..core.palette import FLAVOR_TITLES
 from ..core.target import Target
 
@@ -24,24 +25,22 @@ class LutTarget(Target):
     default_out = "luts"
     default_accent = ()
 
-    def add_arguments(self, p):
-        p.add_argument("--format", nargs="+", choices=["hald", "cube"], default=["hald", "cube"],
-                       help="file format(s) (default: both)")
-        p.add_argument("--hald-level", type=int, default=8, metavar="2..16",
-                       help="Hald CLUT level: level^3 pixels square, level^2 points per axis "
-                            "(default: 8, 512x512)")
-        p.add_argument("--cube-size", type=int, default=33, metavar="N",
-                       help=".cube points per axis (default: 33)")
-        recolor.add_method_arguments(p)
-        p.set_defaults(method="lut")
+    def options(self):
+        return [
+            Option("--format", nargs="+", choices=["hald", "cube"], default=["hald", "cube"],
+                   help="file format(s) (default: both)"),
+            Option("--hald-level", type=int, default=8, range=(2, 16),
+                   when={"format": ["hald"]},
+                   help="Hald CLUT level: level^3 pixels square, level^2 points per axis "
+                        "(default: 8, 512x512)"),
+            Option("--cube-size", type=int, default=33, range=(2, 256), metavar="N",
+                   when={"format": ["cube"]},
+                   help=".cube points per axis (default: 33)"),
+            *recolor.method_options(recolor.LUT_METHODS, help="lut = the built-in table, "
+                                    "lutgen = a table made by lutgen (default: lut)"),
+        ]
 
     def check(self, a):
-        if a.method not in recolor.LUT_METHODS:
-            raise SystemExit("lut: --method must be lut or lutgen")
-        if not 2 <= a.hald_level <= 16:
-            raise SystemExit("--hald-level must be between 2 and 16")
-        if not 2 <= a.cube_size <= 256:
-            raise SystemExit("--cube-size must be between 2 and 256")
         recolor.check_method_arguments(a)
         if a.preview or a.map:
             print("note: --preview and -m are ignored by the lut target")

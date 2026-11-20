@@ -23,6 +23,7 @@ from ...core.mapping import (apply_maps, background_of, colour_report, note_acce
                              print_colours, uses_accent)
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
 from ...core.naming import output_name, slug
+from ...core.options import Option
 from ...core.paths import config_dir
 from ...core.recolor import recolor_image, recolor_job
 from ...core.target import Target
@@ -40,8 +41,8 @@ class PlymouthTarget(Target):
     name = "plymouth"
     help = "recolour Plymouth themes (folders or adi1090x names)"
 
-    def add_arguments(self, p):
-        add_arguments(p)
+    def options(self):
+        return OPTIONS
 
     def check(self, a):
         check_args(a)
@@ -60,18 +61,20 @@ class PlymouthTarget(Target):
                 for name, path in sorted(themes.items(), key=lambda kv: kv[1])]
 
 
-def add_arguments(p):
-    p.add_argument("themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME",
-                   help="theme folder, or adi1090x theme name (default: hexa_retro infinite_seal)")
-    p.add_argument("--bar", metavar="COLOUR", help="progress bar colour")
-    p.add_argument("--no-status", action="store_true", help="skip the -status variants")
-    p.add_argument("--detect", action="store_true",
-                   help="(re)detect colours, overwrite the theme's config, then stop")
-    p.add_argument("--list", action="store_true", help="list adi1090x themes and exit")
-    p.add_argument("--install", action="store_true",
-                   help="install the result (its -status variant if any) and rebuild the initramfs")
-    p.add_argument("--test", nargs="?", const=10, type=int, metavar="SECONDS",
-                   help="show the result without rebooting (default: 10 s)")
+OPTIONS = [
+    Option("themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME", accept="dir",
+           help="theme folder, or adi1090x theme name (default: hexa_retro infinite_seal)"),
+    Option("--bar", metavar="COLOUR", kind="colour", help="progress bar colour"),
+    Option("--no-status", switch=True, help="skip the -status variants"),
+    Option("--detect", switch=True, stage="analyse",
+           help="(re)detect colours, overwrite the theme's config, then stop"),
+    Option("--list", switch=True, stage="analyse", help="list adi1090x themes and exit"),
+    # the helper scripts call sudo themselves
+    Option("--install", switch=True, stage="install", sudo="self",
+           help="install the result (its -status variant if any) and rebuild the initramfs"),
+    Option("--test", nargs="?", const=10, type=int, metavar="SECONDS", stage="test", sudo="self",
+           help="show the result without rebooting (default: 10 s)"),
+]
 
 
 def check_args(a):

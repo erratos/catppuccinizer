@@ -3,7 +3,8 @@
 - catppuccinizer.core never imports a target;
 - a target only imports catppuccinizer.core (and its own sub-package), never
   another target;
-- every built-in target exposes a TARGET object with a unique name.
+- every built-in target exposes a TARGET object with a unique name;
+- nothing reads argparse internals (options are declared in core.options).
 """
 import ast
 import sys
@@ -54,6 +55,12 @@ class Architecture(unittest.TestCase):
                 other = target_of(m)
                 if other is not None:
                     self.assertEqual(other, own, f"{f.relative_to(PKG)} imports target {m}")
+
+    def test_no_argparse_internals(self):
+        for f in PKG.rglob("*.py"):
+            text = f.read_text()
+            for private in ("._actions", "._action_groups", "._group_actions", "argparse._"):
+                self.assertNotIn(private, text, f"{f.relative_to(PKG)} uses {private}")
 
     def test_builtin_targets(self):
         from catppuccinizer.core.target import BUILTIN, Target, discover

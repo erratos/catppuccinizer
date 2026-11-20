@@ -18,6 +18,7 @@ from pathlib import Path
 from ..core import recolor
 from ..core.mapping import colour_report
 from ..core.naming import output_name
+from ..core.options import Option
 from ..core.palette import FLAVOR_TITLES, PALETTES
 from ..core.paths import give_back
 from ..core.target import Target
@@ -39,8 +40,8 @@ class LimineTarget(Target):
     default_accent = ("mauve",)
     accent_also = "the menu colours"
 
-    def add_arguments(self, p):
-        add_arguments(p)
+    def options(self):
+        return OPTIONS
 
     def check(self, a):
         check_args(a)
@@ -52,20 +53,23 @@ class LimineTarget(Target):
         return colours(a)
 
 
-def add_arguments(p):
-    p.add_argument("--wallpaper", type=Path, metavar="IMAGE",
-                   help="image to recolour and use as the Limine wallpaper")
-    p.add_argument("--recolor-wallpaper", action="store_true",
-                   help="recolour the wallpaper(s) already set in limine.conf")
-    recolor.add_method_arguments(p)
-    p.add_argument("--style", choices=["stretched", "centered", "tiled"],
-                   help="wallpaper_style (default: the current one, or stretched)")
-    p.add_argument("--apply", action="store_true",
-                   help="write the theme into limine.conf (run with sudo; a backup is made)")
-    p.add_argument("--remove", action="store_true", help="remove the theme from limine.conf")
-    p.add_argument("--conf", type=Path, help="limine.conf to edit (default: searched on the ESP)")
-    p.add_argument("--esp", type=Path,
-                   help="ESP mount point (default: ESP_PATH of /etc/default/limine, or /boot)")
+OPTIONS = [
+    Option("--wallpaper", type=Path, metavar="IMAGE", accept="image", source=True,
+           help="image to recolour and use as the Limine wallpaper"),
+    Option("--recolor-wallpaper", switch=True,
+           help="recolour the wallpaper(s) already set in limine.conf"),
+    *recolor.method_options(),
+    Option("--style", choices=["stretched", "centered", "tiled"],
+           help="wallpaper_style (default: the current one, or stretched)"),
+    Option("--apply", switch=True, stage="apply", sudo="run",
+           help="write the theme into limine.conf (run with sudo; a backup is made)"),
+    Option("--remove", switch=True, stage="restore", sudo="run",
+           help="remove the theme from limine.conf"),
+    Option("--conf", type=Path, accept="file", stage="apply",
+           help="limine.conf to edit (default: searched on the ESP)"),
+    Option("--esp", type=Path, accept="dir", stage="apply",
+           help="ESP mount point (default: ESP_PATH of /etc/default/limine, or /boot)"),
+]
 
 
 def check_args(a):

@@ -26,6 +26,7 @@ from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect
 from ..core.mapping import (apply_maps, background_of, colour_report, map_colour_counts,
                             note_accent_ignored, print_colours, resolve_target, uses_accent)
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
+from ..core.options import Option
 from ..core.target import Target
 
 SEARCH = [Path.home() / ".local/share/plasma/look-and-feel", Path("/usr/share/plasma/look-and-feel")]
@@ -38,14 +39,18 @@ class KSplashTarget(Target):
     default_accent = ("mauve",)
     accent_also = "the QML / SVG colours mapped to accent"
 
-    def add_arguments(self, p):
-        p.add_argument("theme", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
-                       help="look-and-feel id or folder (default: org.kde.breeze.desktop)")
-        recolor.add_method_arguments(p)
-        p.add_argument("--list", action="store_true", help="list installed splash screens and exit")
-        p.add_argument("--install", action="store_true",
-                       help=f"copy to {USER_DIR} and select it as the splash screen")
-        p.add_argument("--test", action="store_true", help="show the result with ksplashqml --test")
+    def options(self):
+        return [
+            Option("theme", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
+                   accept="dir", help="look-and-feel id or folder (default: org.kde.breeze.desktop)"),
+            *recolor.method_options(),
+            Option("--list", switch=True, stage="analyse",
+                   help="list installed splash screens and exit"),
+            Option("--install", switch=True, stage="install",
+                   help=f"copy to {USER_DIR} and select it as the splash screen"),
+            Option("--test", switch=True, stage="test",
+                   help="show the result with ksplashqml --test"),
+        ]
 
     def check(self, a):
         if (a.install or a.test) and (len(a.flavor) > 1 or len(a.accent) > 1):

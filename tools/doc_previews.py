@@ -9,7 +9,6 @@ of colour can be seen at a glance.
     python3 tools/doc_previews.py            # all grids (lutgen ones need lutgen)
     python3 tools/doc_previews.py lut keep-lum
 """
-import argparse
 import colorsys
 import subprocess
 import sys
@@ -23,6 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from catppuccinizer.core import recolor  # noqa: E402
+from catppuccinizer.core.options import defaults  # noqa: E402
 
 ASSETS = ROOT / "assets"
 WIDTH = 1000                 # total grid width
@@ -64,13 +64,7 @@ def scene():
 
 
 def options(**kw):
-    p = argparse.ArgumentParser()
-    recolor.add_method_arguments(p)
-    a = p.parse_args([])
-    a.map = []
-    for k, v in kw.items():
-        setattr(a, k, v)
-    return a
+    return defaults(recolor.method_options(), map=[], **kw)
 
 
 def flat():

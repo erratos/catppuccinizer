@@ -396,14 +396,26 @@ function sendVals() {
   // drop what the page does not show for this target (a shared accent for lut...)
   const v = { ...vals() }, t = cur();
   if (!t.default_accent.length) delete v.accent;
-  if (!t.options.some((o) => o.role === "source")) delete v.map;
   for (const o of t.options) if (o.when && !shown(o)) delete v[o.dest];
   return v;
 }
-function shown(o) {
-  if (!o.when) return true;
-  return Object.entries(o.when).every(([k, v]) => (vals()[k] ?? opt(k)?.default) === v);
+// facts from the analysis of the sources that an option's `when` can use; unknown
+// ones (not analysed yet) hide nothing. A target without colours() has nothing to remap.
+const analysis = () => (cur().has_colours ? {} : { remappable: false });
+// same rule as core.options.condition_met
+function whenMet(when) {
+  return Object.entries(when || {}).every(([k, allowed]) => {
+    let v;
+    if (k.startsWith("analysis.")) {
+      v = analysis()[k.slice(9)];
+      if (v === undefined || v === null) return true;
+    } else v = vals()[k] ?? opt(k)?.default;
+    return Array.isArray(v) ? v.some((x) => allowed.includes(x)) : allowed.includes(v);
+  });
 }
+const shown = (o) => whenMet(o.when);
+// common options with their own place in the page; the others go to the Options card
+const COMMON_WIDGETS = new Set(["flavor", "accent", "map", "preview", "out"]);
 
 // ------------------------------------------------------------------ render
 function renderTabs() {
@@ -421,7 +433,7 @@ function render() {
   const sources = t.options.filter((o) => o.role === "source");
   if (sources.length) cards.push(card(++n, "Source", sources.map(sourceField)));
   cards.push(card(++n, "Colours", coloursCard(t, sources.length > 0)));
-  const options = t.options.filter((o) => o.role === "option");
+  const options = t.options.filter((o) => o.role === "option" || (o.role === "common" && !COMMON_WIDGETS.has(o.dest)));
   if (options.length) cards.push(card(++n, "Options", optionsCard(options)));
   cards.push(card(++n, "Output folder", [pathField(opt("out"), { placeholder: `${tidy(S.schema.cwd)}/${t.default_out}`, accept: "dir" }),
     h("p", { class: "hint" }, "Nothing is installed on the system unless you turn on an install / apply option.")]));
@@ -434,17 +446,18 @@ function card(n, title, body) {
 }
 
 // ------------------------------------------------------------------ source
-function sourceAccept(o) {
-  if (o.metavar === "IMAGE") return o.multiple ? "any" : "image";
-  return "dir";
+// what the file browser offers for a path: "image" (one image), "dir", or "any"
+function browseAccept(o, fallback = "any") {
+  return { image: "image", images: "any", dir: "dir", file: "any" }[o.accept] || fallback;
 }
+const takesImages = (o) => o.accept === "image" || o.accept === "images";
 function sourceField(o) {
   const t = cur(), wrap = h("div", { class: "source" });
   const V = () => { const v = vals()[o.dest]; return v === undefined ? [] : [v].flat(); };
   const draw = () => {
     const list = V();
     const items = h("div", { class: "items" }, list.map((p, i) => {
-      const img = isImage(p) || o.metavar === "IMAGE";
+      const img = isImage(p) || takesImages(o);
       const im = h("div", { class: "im" }, img ? "" : (p.includes("/") ? "📁" : "🎨"));
       if (p.includes("/")) im.style.backgroundImage = `url("${thumb(p, 320)}")`;
       return h("div", { class: "item", title: p }, im, h("div", { class: "cap" }, h("bdi", {}, tidy(p))),
@@ -455,7 +468,7 @@ function sourceField(o) {
       if (o.multiple) setVal(o.dest, [...new Set([...V(), ...paths])], true);
       else setVal(o.dest, paths[0], true);
     };
-    const accept = sourceAccept(o);
+    const accept = browseAccept(o, "dir");
     const manual = h("input", { type: "text", class: "grow mono", placeholder: o.multiple ? "Type a path or a name, then Enter" : "Path or name", spellcheck: "false",
       onkeydown: (e) => { if (e.key === "Enter" && e.target.value.trim()) { add([e.target.value.trim()]); } } });
     const buttons = h("div", { class: "row" },
@@ -467,7 +480,7 @@ function sourceField(o) {
     const kids = [h("div", { class: "label" }, h("span", {}, nice(o)), o.multiple ? h("span", {}, list.length ? `${list.length} selected` : "") : null),
       list.length ? items : null, buttons,
       h("p", { class: "hint" }, o.help, !list.length && def && def !== "None" ? [" — empty: ", h("code", {}, def)] : null)];
-    if (o.metavar === "IMAGE") {
+    if (takesImages(o)) {
       const drop = h("div", { class: "drop" }, "Drop images here");
       drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
       drop.addEventListener("dragleave", () => drop.classList.remove("over"));
@@ -536,7 +549,7 @@ function coloursCard(t, hasSource) {
     updateAccentHint();
   }
 
-  if (hasSource && opt("map")) out.push(mapEditor());
+  if (hasSource && opt("map") && shown(opt("map"))) out.push(mapEditor());
   return out;
 }
 
@@ -575,8 +588,7 @@ function optionsCard(options) {
   for (const o of options.filter((o) => o.group)) (groups[o.group] ||= []).push(o);
   const out = [h("div", { class: "opts" }, plain.map(optionField))];
   for (const [title, list] of Object.entries(groups)) {
-    const when = list[0].when;
-    const d = h("details", { class: "group", "data-when": when ? JSON.stringify(when) : null, open: true },
+    const d = h("details", { class: "group", open: true },
       h("summary", {}, title), h("div", { class: "opts" }, list.map(optionField)));
     out.push(d);
   }
@@ -585,10 +597,10 @@ function optionsCard(options) {
 
 function optionField(o) {
   const V = vals(), v = V[o.dest];
-  const box = h("div", { class: "opt" + (v !== undefined ? " set" : ""), "data-dest": o.dest });
+  const box = h("div", { class: "opt" + (v !== undefined ? " set" : ""), "data-dest": o.dest, "data-when": o.when ? JSON.stringify(o.when) : null });
   const head = h("div", { class: "head" }, h("div", {}, h("div", { class: "name" }, nice(o)), h("div", { class: "flag" }, o.flags.join(", "))));
   const extra = [];
-  if (o.sudo) head.append(h("span", { class: "badge", title: "Needs administrator rights" }, "sudo"));
+  if (o.sudo) head.append(h("span", { class: "badge", title: o.sudo === "run" ? "Needs administrator rights: run with sudo" : "Asks for the administrator password itself" }, "sudo"));
   let control;
   const def = o.default;
   if (o.kind === "bool") {
@@ -627,9 +639,9 @@ function optionField(o) {
     if (on) control = h("div", { class: "num" }, h("span", { class: "hint", style: { margin: 0 } }, o.metavar?.toLowerCase() || "value"),
       h("input", { type: "number", value: v === true ? "" : v, placeholder: o.const, oninput: (e) => setVal(o.dest, e.target.value === "" ? true : Number(e.target.value)) }));
   } else if (o.kind === "path") {
-    control = pathField(o, { accept: /folder|checkout|mount point/.test(o.help) ? "dir" : "any" });
+    control = pathField(o, { accept: browseAccept(o) });
     box.classList.add("wide");
-  } else if (o.metavar === "COLOUR") {
+  } else if (o.kind === "colour") {
     const p = pal(uiFlavor());
     control = h("div", { class: "row" }, h("select", { onchange: (e) => setVal(o.dest, e.target.value || undefined, true) },
       h("option", { value: "" }, "(automatic)"), Object.keys(p).map((c) => h("option", { value: c, selected: v === c }, c))),
@@ -671,18 +683,18 @@ function updateAccentHint() {
 }
 function refreshVisibility() {
   updateAccentHint();
-  document.querySelectorAll("[data-when]").forEach((el) => {
-    const w = JSON.parse(el.dataset.when);
-    el.classList.toggle("hidden", !Object.entries(w).every(([k, v]) => (vals()[k] ?? opt(k)?.default) === v));
-  });
-  // sudo: on by default when an option says it needs it, until the user changes it
-  const t = cur(), needs = t.options.some((o) => o.sudo && vals()[o.dest]);
+  document.querySelectorAll("[data-when]").forEach((el) => el.classList.toggle("hidden", !whenMet(JSON.parse(el.dataset.when))));
+  // a group of options with none shown (the --lutgen-* ones without --method lutgen)
+  document.querySelectorAll("details.group").forEach((d) => d.classList.toggle("hidden", ![...d.querySelectorAll(".opt")].some((e) => !e.classList.contains("hidden"))));
+  // sudo: on by default when an option says the command needs it, until the user changes it
+  const t = cur(), on = (o) => vals()[o.dest] !== undefined && shown(o);
+  const needs = t.options.some((o) => o.sudo === "run" && on(o));
   const chosen = S.sudo[S.target];
   $("sudo").checked = chosen === undefined ? needs : chosen;
   $("sudobox").classList.toggle("hidden", !needs && !$("sudo").checked);
   const w = $("sudowarn");
   const sudoOn = $("sudo").checked;
-  const helperNeeded = sudoOn || t.options.some((o) => ["install", "test"].includes(o.dest) && vals()[o.dest] && S.target === "plymouth");
+  const helperNeeded = sudoOn || t.options.some((o) => o.sudo === "self" && on(o));
   w.classList.toggle("hidden", !(helperNeeded && !S.schema.askpass));
   w.textContent = "No graphical sudo prompt (ksshaskpass, ssh-askpass) was found: copy the command and run it in a terminal.";
 }

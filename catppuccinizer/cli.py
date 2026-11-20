@@ -7,29 +7,15 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .core.naming import add_suffix_argument
-from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
+from .core import options
 from .core.mapping import format_colour_report
-from .core.target import Target, discover
-
-
-def common_parser():
-    common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("-f", "--flavor", nargs="+", default=["mocha"], metavar="FLAVOR",
-                        help="one or more flavors, or 'all' (default: mocha)")
-    common.add_argument("-a", "--accent", nargs="+", metavar="ACCENT",
-                        help="accent(s) for colours mapped to 'accent', or 'all'")
-    common.add_argument("-m", "--map", nargs="+", action="extend", default=[], metavar="NAME=TARGET",
-                        help="override the colour mapping: white=mauve, ui.white=text, '#ffad03=peach'")
-    common.add_argument("--preview", action="store_true",
-                        help="only render before/after images into <out>/previews/")
-    common.add_argument("-o", "--out", type=Path, help="output folder")
-    add_suffix_argument(common)
-    return common
+from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
+from .core.target import discover
 
 
 def build_parser(targets=None):
-    """(parser, {target name: its subparser}); the GUI builds its forms from the subparsers."""
+    """The parser of `catppuccinize`: one subcommand per target, built from its
+    options (core.options), plus `gui`."""
     targets = discover() if targets is None else targets
     p = argparse.ArgumentParser(prog="catppuccinize",
                                 description="Recolour boot themes, wallpapers and more with Catppuccin.")
@@ -37,20 +23,11 @@ def build_parser(targets=None):
     sub = p.add_subparsers(dest="target_name", required=True, metavar="TARGET")
     epilog = (f"flavors: {', '.join(FLAVORS)}\naccents: {', '.join(ACCENTS)}\n"
               f"targets: {', '.join(TARGETS)}")
-    common = common_parser()
-    subparsers = {}
     for name, t in targets.items():
-        doc = t.description or sys.modules[type(t).__module__].__doc__
-        sp = sub.add_parser(name, parents=[common], help=t.help, description=doc, epilog=epilog,
+        sp = sub.add_parser(name, help=t.help, description=t.doc, epilog=epilog,
                             formatter_class=argparse.RawDescriptionHelpFormatter)
-        t.add_arguments(sp)
-        if type(t).colours is not Target.colours:
-            sp.add_argument("--colours", action="store_true",
-                            help="only list the colours -m can remap (name, source colour, "
-                                 "current target, share) and exit; nothing is written")
-            sp.add_argument("--json", action="store_true", help="with --colours: print JSON")
+        options.add_to(sp, t.all_options())
         sp.set_defaults(target=t)
-        subparsers[name] = sp
     if "gui" not in targets:
         g = sub.add_parser("gui", help="open the graphical interface in your browser",
                            description="Choose a target, its source and options in a web page "
@@ -58,12 +35,12 @@ def build_parser(targets=None):
         g.add_argument("--port", type=int, default=0, help="port (default: a free one)")
         g.add_argument("--no-browser", action="store_true", help="only print the address")
         g.set_defaults(target=None)
-    return p, subparsers
+    return p
 
 
 def parse(argv=None, parser=None):
     """Parsed and resolved arguments (flavours, accents, output folder), checked by the target."""
-    p = parser or build_parser()[0]
+    p = parser or build_parser()
     a = p.parse_args(argv)
     t = a.target
     if t is None:                     # gui
@@ -74,6 +51,7 @@ def parse(argv=None, parser=None):
     a.out = a.out or Path.cwd() / t.default_out
     if getattr(a, "json", False) and not a.colours:
         raise SystemExit("--json only goes with --colours")
+    options.check(a, t.all_options())
     t.check(a)
     return a
 

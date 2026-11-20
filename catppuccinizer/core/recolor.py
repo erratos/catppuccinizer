@@ -18,6 +18,7 @@ from . import lutgen, mapping
 from .clut import apply_cube as apply_lut
 from .detect import detect_group, load_rgba
 from .mapping import NO_ACCENT, apply_maps, print_colours, uses_accent
+from .options import Option
 from .palette import ACCENTS, PALETTES, hex2rgb, oklab_to_srgb, rgb, srgb_to_oklab
 
 FIT_THRESHOLD = 6.0          # mean error (0..255) on content pixels under which "keys" is chosen
@@ -30,21 +31,46 @@ LUT_METHODS = ("lut", "lutgen")   # whole-image colour tables: no source colours
 OPTIMIZE_MAX_PIXELS = 2_000_000   # larger PNGs are saved without optimize (much faster)
 
 
-def add_method_arguments(p):
-    p.add_argument("--method", choices=["auto", "keys", *LUT_METHODS], default="auto",
-                   help="keys = flat art, lut = photos, lutgen = photos with a LUT made by "
-                        "lutgen (default: auto, which never picks lutgen)")
-    p.add_argument("--keep-lum", type=float, default=0.5, metavar="0..1",
-                   help="lut: 0 = palette lightness, 1 = original lightness (default: 0.5)")
-    p.add_argument("--smooth", type=float, default=0.08, metavar="R",
-                   help="lut: blend radius in Oklab; smaller = purer palette colours (default: 0.08)")
-    lutgen.add_arguments(p)
+def method_options(methods=None, help=None):
+    """The options of the recolouring methods (--method, --keep-lum, --smooth,
+    --lutgen-*), for a target that recolours images with them. methods: the ones
+    it accepts, the first is the default (lut target: LUT_METHODS), with the help
+    of --method that goes with them."""
+    method = METHOD if methods is None else METHOD.replace(
+        choices=list(methods), default=methods[0], help=help or METHOD.help)
+    methods = method.choices
+    return [method, *(LUT_OPTIONS if "lut" in methods else []),
+            *(lutgen.OPTIONS if "lutgen" in methods else [])]
+
+
+METHOD = Option("--method", choices=["auto", "keys", *LUT_METHODS], default="auto", scope="method",
+                image="assets/options-method.jpg",
+                help="keys = flat art, lut = photos, lutgen = photos with a LUT made by "
+                     "lutgen (default: auto, which never picks lutgen)",
+                explain="keys finds the few source colours of flat art (line art, logos, neon on "
+                        "a plain background) and replaces them exactly; -m and the accent work "
+                        "with it. lut pulls every colour towards the palette through a colour "
+                        "look-up table, for photos, paintings and gradients. auto picks keys when "
+                        "the detected colours rebuild the image almost exactly, a plain "
+                        "background covers a good part of it and its edges are crisp.")
+LUT_OPTIONS = [
+    Option("--keep-lum", type=float, default=0.5, range=(0, 1), scope="method:lut",
+           when={"method": ["auto", "lut"]}, image="assets/options-keep-lum.jpg",
+           help="lut: 0 = palette lightness, 1 = original lightness (default: 0.5)",
+           explain="At 0 every colour takes the lightness of the palette's neutrals (crust to "
+                   "text): low contrast, very Catppuccin. At 1 the original lightness is kept: "
+                   "deep blacks and bright highlights, more contrast."),
+    Option("--smooth", type=float, default=0.08, metavar="R", scope="method:lut",
+           when={"method": ["auto", "lut"]}, image="assets/options-smooth.jpg",
+           help="lut: blend radius in Oklab; smaller = purer palette colours (default: 0.08)",
+           explain="How far a colour looks for accents. Small values snap each hue to its "
+                   "closest accent (distinct bands); large values blend many accents together, "
+                   "towards a pastel, almost uniform tint."),
+]
 
 
 def check_method_arguments(a):
-    """Fail early on option values the methods cannot use."""
-    if not 0 <= a.keep_lum <= 1:
-        raise SystemExit("--keep-lum must be between 0 and 1")
+    """Fail early on option values the methods cannot use (ranges: core.options.check)."""
     if a.smooth <= 0:
         raise SystemExit("--smooth must be greater than 0")
     if a.method == "lutgen":

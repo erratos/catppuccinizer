@@ -26,6 +26,7 @@ from ..core.formats import collect_text_colours, read_text, recolour_text, write
 from ..core.mapping import (apply_maps, colour_report, map_colour_counts, note_accent_ignored,
                             print_colours, resolve_target, uses_accent)
 from ..core.naming import output_name
+from ..core.options import Option
 from ..core.palette import FLAVOR_TITLES, rgb2hex
 from ..core.target import Target
 
@@ -51,9 +52,10 @@ class ImageTarget(Target):
     default_out = "images"
     default_accent = ("mauve",)
 
-    def add_arguments(self, p):
-        p.add_argument("images", nargs="+", metavar="IMAGE", help="image file(s) or folder(s)")
-        recolor.add_method_arguments(p)
+    def options(self):
+        return [Option("images", nargs="+", metavar="IMAGE", accept="images",
+                       help="image file(s) or folder(s)"),
+                *recolor.method_options()]
 
     def colours(self, a):
         files = collect(a.images)
