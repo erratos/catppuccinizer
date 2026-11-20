@@ -213,6 +213,13 @@ def representative(folder):
     return big
 
 
+def version(path):
+    try:
+        return int(path.stat().st_mtime_ns // 1_000_000) if path else 0
+    except OSError:
+        return 0
+
+
 def outputs(out, since, limit=80):
     """Files and folders written into the output folder by a run."""
     found = []
@@ -230,7 +237,10 @@ def outputs(out, since, limit=80):
             thumb = f if f.suffix.lower() in IMAGE_EXTS else (representative(f) if f.is_dir() else None)
             found.append({"path": str(f), "name": f.name, "dir": f.is_dir(),
                           "preview": base.name == "previews" and base != out,
-                          "thumb": str(thumb) if thumb else None})
+                          "thumb": str(thumb) if thumb else None,
+                          # in the thumbnail's address: a file written again gets a new one,
+                          # so the browser does not show its cached copy of the old image
+                          "version": version(thumb)})
     return found[:limit]
 
 

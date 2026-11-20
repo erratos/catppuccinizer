@@ -42,8 +42,11 @@ ten minutes after the page is closed. `--port N` picks the port,
    each algorithm's own knobs with that algorithm), `--hald-level` /
    `--cube-size` with their format.
 5. **Preview** renders the before/after images (`--preview`); **Build** writes
-   the result. The output folder defaults to `./<target folder>` in the folder
-   the GUI was started from.
+   the result into the output folder, without sudo and without installing
+   anything (the line under the buttons says where). The output folder defaults
+   to `./<target folder>` in the folder the GUI was started from. Commands of
+   their own get a button next to them (Plymouth: **Detect** re-detects the
+   colours and saves the theme's config).
 
 The *Command* box always shows the exact `catppuccinize …` line the page runs,
 with the error the command line would give when something is missing (hover a
@@ -96,9 +99,12 @@ GUI without GUI code:
   left out of the command;
 - a step option (`options.step()`) becomes a button, `sudo="run"` marks it
   **sudo** and runs it with sudo; options of the `install` / `apply` / `test` /
-  `restore` stages go to the *System steps* group, those of `analyse` to
-  *Analyse*;
-- `gui=False` keeps an option out of the forms (`--colours` lists, it does not run);
+  `restore` stages go to the *System steps* group, the other ones of `analyse`
+  to *Analyse*;
+- an on/off option of the `analyse` stage (`plymouth --detect`) becomes a
+  button next to *Build*;
+- `gui=False` keeps an option out of the forms (`--colours` lists, it does not
+  run; `--list` repeats the catalogue);
 - `Target.sources()` fills the catalogue (see [Architecture](architecture.md));
 - `Target.accent_also` names what still uses the accent when `--method` is a
   LUT (Limine: the menu colours); without it, the accents are dimmed then.

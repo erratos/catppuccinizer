@@ -23,7 +23,9 @@ what a front-end needs to show it:
   first by the GUI; accept: what a path is ("image", "images" = image files or
   folders, "dir", "file");
 - range: (low, high), checked after parsing ("--keep-lum must be between 0 and 1");
-- gui: False keeps it out of the GUI forms (--colours lists, it does not run).
+- gui: False keeps it out of the GUI forms (--colours lists, it does not run;
+  --list repeats the GUI's catalogue). An on/off option of the analyse stage is
+  a command of its own: a button next to Build (is_action()).
 """
 import argparse
 from pathlib import Path
@@ -140,6 +142,7 @@ class Option:
             "group": self.group, "when": self.when, "scope": self.scope, "stage": self.stage,
             "sudo": self.sudo, "accept": self.accept,
             "role": ("source" if self.source else "step" if is_step(self)
+                     else "action" if is_action(self)
                      else "common" if self.scope == "common" else "option"),
         }
 
@@ -219,6 +222,12 @@ def step(name, help, sudo=None, **kw):
 
 def is_step(o):
     return o.dest in STEPS and o.stage == o.dest
+
+
+def is_action(o):
+    """An on/off option of the analyse stage (plymouth --detect): a command of its own,
+    a button in the GUI rather than a setting."""
+    return o.stage == "analyse" and o.switch
 
 
 # ---------------------------------------------------------- common options

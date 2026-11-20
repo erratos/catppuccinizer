@@ -49,7 +49,7 @@ class KSplashTarget(Target):
             Option("theme", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
                    accept="dir", help="look-and-feel id or folder (default: org.kde.breeze.desktop)"),
             *recolor.method_options(),
-            Option("--list", switch=True, stage="analyse",
+            Option("--list", switch=True, stage="analyse", gui=False,   # the GUI's catalogue
                    help="list installed splash screens and exit"),
             step("install", help=f"copy the result to {USER_DIR}"),
             step("apply", help="install, then select it as the splash screen"),

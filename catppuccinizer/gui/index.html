@@ -170,6 +170,8 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
 .actions .sp { flex: 1; }
 .btn .badge { margin-left: 6px; vertical-align: 1px; }
+.actions.first { margin-top: 0; }
+.hint.dest { margin: 10px 0 8px; overflow-wrap: anywhere; }
 .check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; color: var(--subtext1); font-size: 13px; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--subtext0); margin: 12px 0 6px; }
@@ -250,18 +252,20 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
   <div class="col side">
     <section class="card">
       <h2>Command</h2>
-      <div class="cmd" id="cmd"><span id="cmdtext"></span><button class="btn ghost small copy" id="copy" title="Copy the command">Copy</button></div>
-      <div class="err hidden" id="err"></div>
-      <div class="warn hidden" id="sudowarn"></div>
-      <div class="actions">
+      <!-- the buttons come first: what changes length below (command, errors) cannot move them -->
+      <div class="actions first" id="mainbtns">
         <button class="btn big" id="previewbtn" title="Only render before/after images (--preview)">Preview</button>
-        <button class="btn primary big" id="runbtn" title="Write the result into the output folder">Build</button>
+        <button class="btn primary big" id="runbtn" title="Write the result into the output folder, without sudo and without installing anything">Build</button>
       </div>
       <div class="actions hidden" id="steps"></div>
       <div class="actions hidden" id="stepopts">
         <label class="check" id="drybox" title="Build as usual, then only list what the system steps would change (--dry-run); a step marked sudo still asks for the password, to read the system"><input type="checkbox" id="dryrun"> Dry run</label>
         <label class="check" id="sudobox" title="Run every command with sudo (a password prompt opens); the steps marked sudo always do"><input type="checkbox" id="sudo"> Always with sudo</label>
       </div>
+      <p class="hint dest" id="dest"></p>
+      <div class="cmd" id="cmd"><span id="cmdtext"></span><button class="btn ghost small copy" id="copy" title="Copy the command">Copy</button></div>
+      <div class="err hidden" id="err"></div>
+      <div class="warn hidden" id="sudowarn"></div>
     </section>
     <section class="card">
       <h2>Output</h2>
@@ -344,8 +348,9 @@ async function api(path, body) {
   if (!r.ok && r.status === 403) throw new Error("This page needs the address printed by catppuccinize gui (with its token).");
   return r.json();
 }
-const thumb = (p, s = 256) => `/api/thumb?s=${s}&path=${encodeURIComponent(p)}&t=${encodeURIComponent(TOKEN)}`;
-const fileURL = (p) => `/api/file?path=${encodeURIComponent(p)}&t=${encodeURIComponent(TOKEN)}`;
+// v: the file's version (modification time) for results, so a new run shows the new image
+const thumb = (p, s = 256, v = 0) => `/api/thumb?s=${s}&path=${encodeURIComponent(p)}&v=${v}&t=${encodeURIComponent(TOKEN)}`;
+const fileURL = (p, v = 0) => `/api/file?path=${encodeURIComponent(p)}&v=${v}&t=${encodeURIComponent(TOKEN)}`;
 const baseName = (p) => String(p).replace(/\/+$/, "").split("/").pop() || p;
 const tidy = (p) => S.schema && String(p).startsWith(S.schema.home + "/") ? "~" + String(p).slice(S.schema.home.length) : String(p);
 const isImage = (p) => /\.(png|jpe?g|webp|bmp|gif|qoi|svgz?)$/i.test(p);
@@ -711,22 +716,28 @@ function refreshVisibility() {
 // ----------------------------------------------------------------- command
 let cmdTimer = null;
 function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCommand, 120); }
-// what a button runs: the form values, plus --preview or one step (null: Build)
+// what a button runs: the form values, plus --preview, a command (--detect) or a step (null: Build)
 function action(step) {
   const values = sendVals(), o = step && step !== "preview" ? opt(step) : null;
   if (step === "preview") values.preview = true;
-  if (o) { values[step] = true; if (S.dry[S.target]) values.dry_run = true; }
+  if (o) values[step] = true;
+  if (o && o.role === "step" && S.dry[S.target]) values.dry_run = true;
   // a dry run changes nothing but keeps the step's rights: it may have to read the system (the ESP)
   const sudo = $("sudo").checked || (!!o && o.sudo === "run");
   return { target: S.target, values, sudo };
 }
+const label = (o) => STEP_LABELS[o.dest] || nice(o).replace(/^./, (c) => c.toUpperCase());
 function renderSteps() {
+  // commands of their own (plymouth --detect) go next to Build
+  document.querySelectorAll("#mainbtns [data-action]").forEach((b) => b.remove());
+  $("mainbtns").append(...cur().options.filter((o) => o.role === "action").map((o) => h("button", { class: "btn big", "data-action": o.dest, title: o.help,
+    onclick: () => run(o.dest) }, label(o))));
   const list = steps();
   $("steps").classList.toggle("hidden", !list.length);
   $("stepopts").classList.toggle("hidden", !list.length);
   $("steps").replaceChildren(...list.map((o) => h("button", { class: "btn" + (o.dest === "restore" ? " danger" : ""), "data-step": o.dest, title: o.help,
     onclick: () => run(o.dest), onmouseenter: () => { S.hover = o.dest; updateCommand(); }, onmouseleave: () => { S.hover = null; updateCommand(); } },
-    STEP_LABELS[o.dest] || o.dest, o.sudo === "run" ? h("span", { class: "badge" }, "sudo") : null)));
+    label(o), o.sudo === "run" ? h("span", { class: "badge" }, "sudo") : null)));
 }
 async function updateCommand() {
   const r = await api("/api/command", action(S.hover));
@@ -734,12 +745,15 @@ async function updateCommand() {
   const c = $("cmdtext");
   const parts = (r.command || "").split(" ");
   c.replaceChildren(...parts.map((p, i) => i === 0 || (i === 1 && parts[0] === "sudo") || (p === "catppuccinize") ? h("b", {}, p + " ") : (/^-/.test(p) ? h("span", { style: { color: "var(--blue)" } }, p + " ") : p + " ")));
+  $("dest").textContent = !r.out ? "" : S.hover === "restore" ? "Restore only undoes Install / Apply: it builds nothing."
+    : S.hover ? `${label(opt(S.hover))} builds into ${tidy(r.out)} first.`
+    : `Build writes into ${tidy(r.out)}: no sudo, nothing installed.`;
   $("err").classList.toggle("hidden", !r.error);
   $("err").replaceChildren("⚠ ", r.error || "");
   const busy = S.job && !S.job.done;
   $("runbtn").disabled = !!r.error || busy;
   $("previewbtn").disabled = !!r.error || busy;
-  document.querySelectorAll("#steps button").forEach((b) => { b.disabled = busy || (!!r.error && !S.hover); });
+  document.querySelectorAll("#steps button, #mainbtns [data-action]").forEach((b) => { b.disabled = busy || (!!r.error && !S.hover); });
 }
 
 // --------------------------------------------------------------------- run
@@ -748,7 +762,7 @@ async function run(step) {
   if (r.error) { toast(r.error); return; }
   S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.detected.clear(); S.group = ""; S.accentIgnored = false;
   $("log").replaceChildren(); $("results").replaceChildren(); renderDetected();
-  $("prog").style.width = "0"; setStatus("run", step === "preview" ? "Rendering previews…" : step ? `${STEP_LABELS[step] || step}${S.dry[S.target] && step !== "preview" ? " (dry run)" : ""}…` : "Building…");
+  $("prog").style.width = "0"; setStatus("run", step === "preview" ? "Rendering previews…" : step ? `${label(opt(step))}${S.dry[S.target] && opt(step).role === "step" ? " (dry run)" : ""}…` : "Building…");
   $("stopbtn").classList.remove("hidden"); $("openout").classList.add("hidden");
   updateCommand(); poll();
 }
@@ -804,7 +818,7 @@ function renderResults(list) {
   const single = list.length === 1;
   $("results").replaceChildren(...list.map((o) => {
     const im = h("div", { class: "im" }, o.thumb ? "" : (o.dir ? "📁" : "📄"));
-    if (o.thumb) im.style.backgroundImage = `url("${thumb(o.thumb, single || o.preview ? 900 : 320)}")`;
+    if (o.thumb) im.style.backgroundImage = `url("${thumb(o.thumb, single || o.preview ? 900 : 320, o.version)}")`;
     return h("button", { class: "result" + (single || o.preview && list.length < 3 ? " wide" : ""), title: o.path,
       onclick: () => (o.thumb ? lightbox(o) : api("/api/open", { path: o.path })) },
       im, h("div", { class: "cap" }, (o.dir ? "📁 " : "") + o.name));
@@ -812,7 +826,7 @@ function renderResults(list) {
 }
 function lightbox(o) {
   $("lbtitle").textContent = tidy(o.path);
-  $("lbimg").src = o.thumb.match(/\.(png|jpe?g|webp|gif|svg)$/i) && !o.dir ? fileURL(o.thumb) : thumb(o.thumb, 1600);
+  $("lbimg").src = o.thumb.match(/\.(png|jpe?g|webp|gif|svg)$/i) && !o.dir ? fileURL(o.thumb, o.version) : thumb(o.thumb, 1600, o.version);
   $("lbopen").onclick = () => api("/api/open", { path: o.path });
   $("lightbox").showModal();
 }

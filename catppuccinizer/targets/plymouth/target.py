@@ -106,11 +106,13 @@ class PlymouthTarget(Target):
 OPTIONS = [
     Option("themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME", accept="dir",
            help="theme folder, or adi1090x theme name (default: hexa_retro infinite_seal)"),
-    Option("--bar", metavar="COLOUR", kind="colour", help="progress bar colour"),
+    Option("--bar", metavar="COLOUR", kind="colour",
+           help="progress bar colour: -status variants, and two-step themes' own bar"),
     Option("--no-status", switch=True, help="skip the -status variants"),
     Option("--detect", switch=True, stage="analyse",
            help="(re)detect colours, overwrite the theme's config, then stop"),
-    Option("--list", switch=True, stage="analyse", help="list adi1090x themes and exit"),
+    Option("--list", switch=True, stage="analyse", gui=False,       # the GUI's catalogue
+           help="list adi1090x themes and exit"),
     step("install", sudo="run",
          help=f"copy the result (its -status variant if any) to {INSTALL_DIR} (sudo)"),
     step("apply", sudo="run",

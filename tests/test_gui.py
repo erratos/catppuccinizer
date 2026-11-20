@@ -71,6 +71,8 @@ class Gui(unittest.TestCase):
         self.assertEqual(ply["test"]["kind"], "optional")
         self.assertEqual((ply["install"]["sudo"], ply["install"]["role"]), ("run", "step"))
         self.assertEqual(ply["dry_run"]["role"], "common")
+        self.assertEqual(ply["detect"]["role"], "action")       # a button, not a setting
+        self.assertNotIn("list", ply)                           # the catalogue does it
         self.assertEqual(ply["bar"]["kind"], "colour")
         lut = next(t for t in s["targets"] if t["name"] == "lut")
         self.assertFalse(lut["has_colours"])
@@ -128,6 +130,7 @@ class Gui(unittest.TestCase):
             self.assertEqual(state["code"], 0, "\n".join(state["lines"]))
             names = [o["name"] for o in state["outputs"]]
             self.assertEqual(len(names), 1)
+            self.assertGreater(state["outputs"][0]["version"], 0)   # new file, new thumbnail URL
             self.assertTrue(names[0].startswith("catppuccin-mocha-flat"), names)
             self.assertTrue(state["outputs"][0]["preview"])
 

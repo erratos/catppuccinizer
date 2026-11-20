@@ -58,6 +58,12 @@ class Declarations(unittest.TestCase):
                 self.assertEqual(declared, t.steps)           # one option per method, in order
                 self.assertEqual(any(o.dest == "dry_run" for o in t.all_options()), bool(t.steps))
         self.assertEqual(TARGETS["image"].steps, [])
+
+    def test_actions(self):
+        ply = {o.dest: o for o in TARGETS["plymouth"].all_options()}
+        self.assertTrue(options.is_action(ply["detect"]))
+        self.assertFalse(options.is_action(ply["no_status"]))
+        self.assertFalse(ply["list"].gui)
         self.assertEqual(TARGETS["limine"].steps, ["install", "apply", "restore"])
 
     def test_when_refers_to_existing_options(self):
