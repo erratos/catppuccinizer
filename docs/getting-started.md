@@ -76,8 +76,8 @@ sudo catppuccinize plymouth rings_2 -a mauve --apply
 `--apply` copies the theme into `/usr/share/plymouth/themes/` (that is
 `--install`), makes it the default and rebuilds the initramfs: you will see it
 at the next boot. `sudo catppuccinize plymouth --restore` brings your previous
-theme back, and `--dry-run` (no sudo needed) lists what any of them would
-change without doing it.
+theme back, and `--dry-run` lists what any of them would change without
+doing it (keep `sudo`: the steps may need to read system files).
 
 If `sudo` says *command not found* (pipx installs into `~/.local/bin`, which
 sudo does not search), use `sudo "$(command -v catppuccinize)" …`.

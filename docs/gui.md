@@ -65,7 +65,8 @@ Each button builds, then runs its step; *Restore* only undoes. Their settings
 (`--esp`, `--conf`…) are in the *System steps* group of the options.
 
 - **Dry run**: the step only lists the files it would copy, change or remove
-  and the commands it would run; nothing is changed and no password is asked.
+  and the commands it would run; nothing is changed. A step marked **sudo**
+  still asks for the password: it may have to read the system (the ESP).
 - A button marked **sudo** runs the command with sudo: the password is asked by
   a graphical prompt (`ksshaskpass`, `ssh-askpass`…, through `SUDO_ASKPASS`).
   Without one, copy its command (hover the button) and run it in a terminal.

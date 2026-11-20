@@ -8,7 +8,7 @@ boot menu, optionally with a recoloured wallpaper.
 ```bash
 catppuccinize limine -f mocha -a mauve                        # snippet only
 catppuccinize limine -a mauve --wallpaper wall.jpg --preview  # + recoloured wallpaper
-catppuccinize limine -a mauve --apply --dry-run               # what --apply would change
+sudo catppuccinize limine -a mauve --apply --dry-run          # what --apply would change
 sudo catppuccinize limine -a mauve --apply                    # keeps your current wallpaper
 sudo catppuccinize limine -a mauve --recolor-wallpaper --apply  # recolours it
 sudo catppuccinize limine -a mauve --wallpaper wall.jpg --apply # replaces it
@@ -17,7 +17,8 @@ sudo catppuccinize limine --restore
 
 Building writes into the output folder only; `--install`, `--apply` and
 `--restore` change the ESP (root needed, a single flavour and accent). Add
-`--dry-run` to only list what they would copy and write.
+`--dry-run` to only list what they would copy and write (with sudo too when the
+ESP is only readable by root: it reads `limine.conf`, it changes nothing).
 
 ## Preview
 

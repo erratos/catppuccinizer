@@ -242,7 +242,7 @@ COMMON = [
 DRY_RUN = Option("--dry-run", switch=True, scope="common", stage="install",
                  help="with --install, --apply, --test or --restore: build as usual, then "
                       "only list the files the steps would copy, change or remove and the "
-                      "commands they would run")
+                      "commands they would run (reading the system may still need sudo)")
 
 # added to the targets that define colours() (core.target.Target.colours)
 COLOURS = [

@@ -150,8 +150,9 @@ targets that have steps.
 | `restore` | `apply` and `install` undone | as `apply` |
 
 A step changes the system only through the `System` object it gets: each change
-is printed, and with `--dry-run` only listed. Reading is free (the current
-theme, `limine.conf`). What `restore` needs (the theme in use before `apply`)
+is printed, and with `--dry-run` only listed. Reading the system (the current
+theme, `limine.conf`) is done directly, also in a dry run, which therefore
+keeps the step's rights. What `restore` needs (the theme in use before `apply`)
 goes into `paths.state_file()` with `system.save_state()`. When a step needs
 root, the whole command runs with sudo (`sudo="run"`): configs and downloads
 still come from the invoking user's home, and what build wrote is handed back

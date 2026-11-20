@@ -143,7 +143,7 @@ def default_esp():
 
 def find_conf(esp):
     if esp.is_dir() and not os.access(esp, os.R_OK | os.X_OK):
-        raise SystemExit(f"Cannot read {esp}: run with sudo.")
+        raise SystemExit(f"Cannot read {esp}: run with sudo (--dry-run too: it changes nothing, but it reads limine.conf)")
     for rel in ("limine.conf", "EFI/limine/limine.conf", "EFI/BOOT/limine.conf",
                 "boot/limine/limine.conf", "limine/limine.conf"):
         if (esp / rel).is_file():
@@ -197,7 +197,7 @@ def read(conf):
     try:
         return conf.read_text()
     except PermissionError:
-        raise SystemExit(f"Cannot read {conf}: run with sudo.")
+        raise SystemExit(f"Cannot read {conf}: run with sudo (--dry-run too: it changes nothing, but it reads limine.conf)")
 
 
 def enrollment_note():

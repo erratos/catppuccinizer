@@ -259,7 +259,7 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
       </div>
       <div class="actions hidden" id="steps"></div>
       <div class="actions hidden" id="stepopts">
-        <label class="check" id="drybox" title="Build as usual, then only list what the system steps would change (--dry-run)"><input type="checkbox" id="dryrun"> Dry run</label>
+        <label class="check" id="drybox" title="Build as usual, then only list what the system steps would change (--dry-run); a step marked sudo still asks for the password, to read the system"><input type="checkbox" id="dryrun"> Dry run</label>
         <label class="check" id="sudobox" title="Run every command with sudo (a password prompt opens); the steps marked sudo always do"><input type="checkbox" id="sudo"> Always with sudo</label>
       </div>
     </section>
@@ -699,7 +699,7 @@ function refreshVisibility() {
   document.querySelectorAll("[data-when]").forEach((el) => el.classList.toggle("hidden", !whenMet(JSON.parse(el.dataset.when))));
   // a group of options with none shown (the --lutgen-* ones without --method lutgen)
   document.querySelectorAll("details.group").forEach((d) => d.classList.toggle("hidden", ![...d.querySelectorAll(".opt")].some((e) => !e.classList.contains("hidden"))));
-  // sudo: the steps marked sudo always run with it (not in a dry run); "Always with sudo" for the rest
+  // sudo: the steps marked sudo always run with it (dry run too); "Always with sudo" for the rest
   $("sudo").checked = !!S.sudo[S.target];
   $("dryrun").checked = !!S.dry[S.target];
   const w = $("sudowarn");
@@ -716,7 +716,8 @@ function action(step) {
   const values = sendVals(), o = step && step !== "preview" ? opt(step) : null;
   if (step === "preview") values.preview = true;
   if (o) { values[step] = true; if (S.dry[S.target]) values.dry_run = true; }
-  const sudo = $("sudo").checked || (!!o && o.sudo === "run" && !S.dry[S.target]);
+  // a dry run changes nothing but keeps the step's rights: it may have to read the system (the ESP)
+  const sudo = $("sudo").checked || (!!o && o.sudo === "run");
   return { target: S.target, values, sudo };
 }
 function renderSteps() {
