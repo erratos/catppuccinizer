@@ -173,7 +173,7 @@ def run_all():
     try:
         cli("plymouth", FIXTURES / "hexa_mini", "-f", "mocha", "macchiato", "-a", "mauve",
             "-o", tmp / "plymouth")
-        cli("plymouth", FIXTURES / "glow_mini", "-f", "latte", "-a", "teal",
+        cli("plymouth", FIXTURES / "glow_mini", "-f", "latte", "-a", "teal", "mauve",
             "-m", "throbber.white=accent", "-o", tmp / "plymouth")
         out["plymouth"] = tree(tmp / "plymouth", tmp)
         out["configs"] = tree(tmp / "configs", tmp)
@@ -208,6 +208,10 @@ def run_all():
         steps["keep"] = (esp / "limine.conf").read_text()
         cli("limine", "-a", "lavender", "--recolor-wallpaper", "--apply", "--esp", esp,
             "-o", tmp / "limine")
+        # several accents, a LUT wallpaper: rendered once, the same file in each folder
+        cli("limine", "-a", "lavender", "peach", "--wallpaper", tmp / "img/photo.jpg",
+            "-o", tmp / "limine-accents")
+        out["limine_accents"] = tree(tmp / "limine-accents", tmp)
         steps["recolor"] = (esp / "limine.conf").read_text()
         steps["recolor_files"] = tree(esp, tmp)
         cli("limine", "--remove", "--esp", esp)
@@ -217,7 +221,7 @@ def run_all():
         out["limine_out"] = tree(tmp / "limine", tmp)
 
         make_splash(tmp / "splash-src")
-        cli("ksplash", tmp / "splash-src", "-a", "peach", "-o", tmp / "ksplash")
+        cli("ksplash", tmp / "splash-src", "-a", "peach", "mauve", "-o", tmp / "ksplash")
         cli("ksplash", tmp / "splash-src", "-m", "green=lavender", "-s", "lav", "-o", tmp / "ksplash")
         out["ksplash"] = tree(tmp / "ksplash", tmp)
         pv = next((tmp / "ksplash").glob("*-lav/contents/previews/splash.png"))

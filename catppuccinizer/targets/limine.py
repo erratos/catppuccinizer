@@ -68,6 +68,8 @@ def check_args(a):
         raise SystemExit("--apply needs a single flavour and a single accent")
     if a.wallpaper and a.recolor_wallpaper:
         raise SystemExit("use either --wallpaper or --recolor-wallpaper")
+    if a.wallpaper and not a.wallpaper.is_file():
+        raise SystemExit(f"Not found: {a.wallpaper}")
 
 
 def theme_lines(flavor, accent, wallpapers=(), style=None, over_wallpaper=False):
@@ -212,19 +214,34 @@ def run(a):
             if not s.is_file():
                 raise SystemExit(f"Wallpaper not found on the ESP: {s} (use --esp or --wallpaper)")
 
+    plans = [recolor.plan(src, a) for src in sources]          # analysed once per image
+    done = {}       # (image, flavour, accent or None) -> files already written for it
     for flv in a.flavor:
         for acc in a.accent:
             name = f"limine-catppuccin-{flv}-{acc}"
             dst = a.out / name
             dst.mkdir(parents=True, exist_ok=True)
             wall_files = []
-            for k, src in enumerate(sources):
-                method, grp = recolor.plan(src, a)
-                im = recolor.render(src, method, grp, flv, acc, a)
-                stem = f"wallpaper-{flv}-{acc}" + (f"-{k + 1}" if len(sources) > 1 else "")
+            for k, (src, (method, grp)) in enumerate(zip(sources, plans)):
+                # a wallpaper that ignores the accent is the same for every accent:
+                # rendered once per flavour, named without the accent, copied
+                wacc = None if recolor.accent_ignored_reason(method, grp) else acc
+                stem = "-".join(x for x in ("wallpaper", flv, wacc) if x) + (
+                    f"-{k + 1}" if len(sources) > 1 else "")
+                key = (k, flv, wacc)
+                if key in done:
+                    for f in done[key]:
+                        if f.parent != dst:
+                            shutil.copyfile(f, dst / f.name)
+                    wall_files.append(dst / done[key][0].name)
+                    continue
+                im = recolor.render(src, method, grp, flv, wacc, a)
+                files = [recolor.save_image(im.convert("RGB"), dst / stem, method, src)]
                 if a.preview:
-                    recolor.side_by_side(src, im, dst / f"preview-{stem}.png")
-                wall_files.append(recolor.save_image(im.convert("RGB"), dst / stem, method, src))
+                    files.append(dst / f"preview-{stem}.png")
+                    recolor.side_by_side(src, im, files[-1])
+                done[key] = files
+                wall_files.append(files[0])
             wall_refs = [f"boot():/{WALL_DIR}/{f.name}" for f in wall_files]
             lines = theme_lines(flv, acc, wall_refs, style,
                                 over_wallpaper=bool(current) and not wall_files)

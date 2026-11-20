@@ -18,11 +18,14 @@ sudo catppuccinize limine --remove
 
 A `limine-theme.conf` snippet (and the wallpaper) is written to
 `themes/limine-catppuccin-<flavor>-<accent>/`, to paste into `limine.conf`
-yourself:
+yourself. The wallpaper is named `wallpaper-<flavor>[-<accent>]`: the accent
+only appears when the wallpaper uses it (flat art with a colour mapped to
+`accent`); otherwise it is rendered once per flavour and the same file is put
+in every accent's folder.
 
 ```
 # >>> catppuccinizer: Catppuccin Mocha (mauve)
-wallpaper: boot():/catppuccin/wallpaper-mocha-mauve.png
+wallpaper: boot():/catppuccin/wallpaper-mocha.png
 wallpaper_style: stretched
 backdrop: 1e1e2e
 term_palette: 45475a;f38ba8;a6e3a1;f9e2af;89b4fa;f5c2e7;94e2d5;bac2de

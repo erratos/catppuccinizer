@@ -27,6 +27,13 @@
   "catppuccin-mocha-test-splash-mauve-lav/contents/splash/images/rain.webp": "62b105c57ea7ee4e",
   "catppuccin-mocha-test-splash-mauve-lav/contents/splash/images/spin.gif": "f03d64b4f3d100d0",
   "catppuccin-mocha-test-splash-mauve-lav/metadata.json": "50da58d191d8b34f",
+  "catppuccin-mocha-test-splash-mauve/contents/previews/splash.png": "e5892ce37d4d25ef",
+  "catppuccin-mocha-test-splash-mauve/contents/splash/Splash.qml": "32ae720c190699f1",
+  "catppuccin-mocha-test-splash-mauve/contents/splash/images/bg.png": "21b6927039a7136d",
+  "catppuccin-mocha-test-splash-mauve/contents/splash/images/logo.svg": "0edc018f293540d1",
+  "catppuccin-mocha-test-splash-mauve/contents/splash/images/rain.webp": "62b105c57ea7ee4e",
+  "catppuccin-mocha-test-splash-mauve/contents/splash/images/spin.gif": "f03d64b4f3d100d0",
+  "catppuccin-mocha-test-splash-mauve/metadata.json": "608dd28e86e8b434",
   "catppuccin-mocha-test-splash-peach/contents/previews/splash.png": "e86f9d44fb610d4a",
   "catppuccin-mocha-test-splash-peach/contents/splash/Splash.qml": "d60cfe6c3d459568",
   "catppuccin-mocha-test-splash-peach/contents/splash/images/bg.png": "21b6927039a7136d",
@@ -38,17 +45,23 @@
  "ksplash_preview_lavender": true,
  "limine": {
   "keep": "ab9420334b75a598",
-  "recolor": "cee9f207d827e2cb",
+  "recolor": "487be2b7245da656",
   "recolor_files": {
-   "catppuccin/wallpaper-mocha-lavender.png": "bd66ee1b1040e291",
+   "catppuccin/wallpaper-mocha.png": "bd66ee1b1040e291",
    "limine-splash.png": "44b2c26d9ac77580",
-   "limine.conf": "cee9f207d827e2cb"
+   "limine.conf": "487be2b7245da656"
   },
   "removed_is_original": true
  },
+ "limine_accents": {
+  "limine-catppuccin-mocha-lavender/limine-theme.conf": "328fc4240668781f",
+  "limine-catppuccin-mocha-lavender/wallpaper-mocha.jpg": "8d7dc4a313006aa8",
+  "limine-catppuccin-mocha-peach/limine-theme.conf": "42b33f8dde4cca22",
+  "limine-catppuccin-mocha-peach/wallpaper-mocha.jpg": "8d7dc4a313006aa8"
+ },
  "limine_out": {
-  "limine-catppuccin-mocha-lavender/limine-theme.conf": "30258f8696d46051",
-  "limine-catppuccin-mocha-lavender/wallpaper-mocha-lavender.png": "bd66ee1b1040e291"
+  "limine-catppuccin-mocha-lavender/limine-theme.conf": "b5415fa0ed08d7c2",
+  "limine-catppuccin-mocha-lavender/wallpaper-mocha.png": "bd66ee1b1040e291"
  },
  "lut": {
   "catppuccin-frappe-soft.cube": "fa4b56d79d7db2bc",
@@ -67,6 +80,17 @@
   "photo-catppuccin-mocha-shepard.jpg": "8a3517e3062d1c24"
  },
  "plymouth": {
+  "catppuccin-latte-glow-mini-mauve/box.png": "e73b9a65bbe81f8d",
+  "catppuccin-latte-glow-mini-mauve/bullet.png": "bdd886421a262178",
+  "catppuccin-latte-glow-mini-mauve/catppuccin-latte-glow-mini-mauve.plymouth": "83d70555104a150e",
+  "catppuccin-latte-glow-mini-mauve/entry.png": "728ba5ede51cf513",
+  "catppuccin-latte-glow-mini-mauve/lock.png": "01efa777cf5021e3",
+  "catppuccin-latte-glow-mini-mauve/progress-00.png": "be9728fdf09e29f2",
+  "catppuccin-latte-glow-mini-mauve/progress-01.png": "c76d760b590e2bad",
+  "catppuccin-latte-glow-mini-mauve/progress-02.png": "76bad645d7db8dbb",
+  "catppuccin-latte-glow-mini-mauve/throbber-00.png": "e686230d7b61f419",
+  "catppuccin-latte-glow-mini-mauve/throbber-01.png": "487522cb5d1375d1",
+  "catppuccin-latte-glow-mini-mauve/throbber-02.png": "eaf6ffa122619982",
   "catppuccin-latte-glow-mini-teal/box.png": "e73b9a65bbe81f8d",
   "catppuccin-latte-glow-mini-teal/bullet.png": "bdd886421a262178",
   "catppuccin-latte-glow-mini-teal/catppuccin-latte-glow-mini-teal.plymouth": "8583f7ca4a634d12",

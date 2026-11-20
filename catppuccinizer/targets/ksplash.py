@@ -176,6 +176,7 @@ def run(a):
     if not accent_used:
         note_accent_ignored(a)
     built = []
+    done = {}      # (image, flavour, accent or None) -> recoloured file, copied for other accents
     for flv in a.flavor:
         for acc in (a.accent if accent_used else [None]):
             pid = "-".join(x for x in (f"catppuccin-{flv}-{slug}", acc, a.suffix) if x)
@@ -204,6 +205,13 @@ def run(a):
             for src, (method, grp, extra) in rasters.items():
                 rel = src.relative_to(splash) if src.is_relative_to(splash) else None
                 out = dst / "contents/splash" / rel if rel else dst / "contents/previews/splash.png"
+                # an image that ignores the accent is the same in every accent's package
+                key = (src, flv, None if method in recolor.LUT_METHODS
+                       or not uses_accent(grp["colors"]) else acc)
+                if key in done:
+                    shutil.copyfile(done[key], out)
+                    continue
+                done[key] = out
                 if method == "anim":
                     n, durations, loop = extra
                     keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])

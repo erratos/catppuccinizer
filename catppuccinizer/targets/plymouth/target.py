@@ -19,7 +19,7 @@ import numpy as np
 from PIL import Image
 
 from ...core.detect import UI_GROUP, detect_group
-from ...core.mapping import apply_maps, note_accent_ignored, print_colours
+from ...core.mapping import apply_maps, note_accent_ignored, print_colours, uses_accent
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
 from ...core.paths import config_dir
 from ...core.recolor import recolor_image, recolor_job
@@ -388,7 +388,7 @@ def run(a):
     if a.boot_delay:
         raise SystemExit(script("boot-delay.sh", a.boot_delay))
 
-    jobs, status = [], []
+    jobs, status, copies = [], [], []
     for arg in a.themes:
         theme = Theme(resolve_theme(arg, a.src))
         if not theme.groups:
@@ -404,19 +404,19 @@ def run(a):
         if a.detect:
             continue
 
-        uses_accent = any(c["target"] == "accent"
-                          for grp in cfg["groups"].values() for c in grp["colors"].values())
-        if not uses_accent:
+        accent_used = any(uses_accent(grp["colors"]) for grp in cfg["groups"].values())
+        if not accent_used:
             note_accent_ignored(a)
         main_colours = [c["target"] for grp in cfg["groups"].values()
                         for c in sorted(grp["colors"].values(), key=lambda c: -c.get("share", 0))
                         if c["target"] in ACCENTS]
         with_status = not a.no_status and theme.adi_template
+        done = {}      # (flavour, group, accent or None) -> folder whose images can be copied
         if not a.no_status and not theme.adi_template and not a.preview:
             print("  (no -status variant: only for adi1090x-style script themes)")
         for flv in a.flavor:
             base = rgb(flv, "base")
-            for acc in (a.accent if uses_accent else [None]):
+            for acc in (a.accent if accent_used else [None]):
                 out_name = "-".join(x for x in (f"catppuccin-{flv}-{theme.slug}", acc, a.suffix) if x)
                 # bar colour: option > config > accent > most common colour target
                 bar = a.bar or cfg["bar"] or acc or (main_colours[0] if main_colours else "blue")
@@ -437,6 +437,14 @@ def run(a):
                     continue
                 write_theme(theme, out_name, flv, acc, bar, a.out / out_name)
                 for g, (src_bg, keys, targets) in plan.items():
+                    # a group without "accent" is the same for every accent: recoloured
+                    # once, then copied into the other accents' themes
+                    gkey = (flv, g, acc if uses_accent(cfg["groups"][g]["colors"]) else None)
+                    if gkey in done:
+                        copies += [(done[gkey] / p.name, a.out / out_name / p.name)
+                                   for p in theme.groups[g]]
+                        continue
+                    done[gkey] = a.out / out_name
                     jobs += [(p, a.out / out_name / p.name, src_bg, keys, targets, base)
                              for p in theme.groups[g]]
                 status.append(((a.out / out_name, flv, bar, cfg["bar_width"], cfg["bar_gap"]),
@@ -449,6 +457,8 @@ def run(a):
         for i, _ in enumerate(pool.imap_unordered(recolor_job, jobs, chunksize=8), 1):
             if i % 500 == 0 or i == len(jobs):
                 print(f"{i}/{len(jobs)} images", flush=True)
+    for src, dst in copies:
+        shutil.copyfile(src, dst)
     for args, with_st in status:
         if with_st:
             write_status_variant(*args)
