@@ -20,6 +20,7 @@ catppuccinizer/
     lutgen.py         --lutgen-* options, runs the external lutgen binary
     formats.py        colours written as text (QML, SVG/SVGZ), animations (GIF, WebP)
     paths.py          user config / cache folders, sudo-aware ownership
+    naming.py         output names (catppuccin-<flavor>-<source>[-<accent>][-<suffix>])
     target.py         Target base class + discovery
   targets/
     plymouth/         Plymouth themes (+ adi1090x fetcher, shipped configs, scripts)
@@ -52,6 +53,7 @@ tests/
 | `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
 | `recolor.recolor_frames(frames, ...)` | keys method over a stream of frames, in parallel |
 | `paths.config_dir(target)` / `cache_dir()` / `give_back(path)` | where to store things, sudo ownership |
+| `naming.output_name(flavor, source, accent, suffix)` / `slug(text)` | the name of every output: `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]` |
 
 ## Writing a target
 
@@ -73,7 +75,8 @@ class GrubTarget(Target):
         recolor.add_method_arguments(p)
 
     def run(self, a):
-        # a.flavor, a.accent, a.map, a.preview, a.out are already resolved
+        # a.flavor, a.accent, a.map, a.preview, a.out, a.suffix are already resolved;
+        # name outputs with naming.output_name(flavor, source, accent, a.suffix)
         ...
 
 

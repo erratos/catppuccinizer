@@ -108,7 +108,7 @@ class Gui(unittest.TestCase):
             self.assertEqual(state["code"], 0, "\n".join(state["lines"]))
             names = [o["name"] for o in state["outputs"]]
             self.assertEqual(len(names), 1)
-            self.assertTrue(names[0].startswith("flat-catppuccin-mocha"), names)
+            self.assertTrue(names[0].startswith("catppuccin-mocha-flat"), names)
             self.assertTrue(state["outputs"][0]["preview"])
 
 

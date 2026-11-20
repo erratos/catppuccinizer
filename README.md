@@ -32,6 +32,9 @@ catppuccinize plymouth rings_2 -a mauve --test           # boot splash, shown wi
 before/after image instead of the result. Nothing is installed on your system
 unless you pass `--install` or `--apply`.
 
+Every command names its outputs `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]`
+([output names](docs/colours.md#output-names)).
+
 Prefer clicking? `catppuccinize gui` opens a [graphical interface](docs/gui.md)
 in your browser: choose the source and the options, preview, run.
 

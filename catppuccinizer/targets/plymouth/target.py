@@ -21,6 +21,7 @@ from PIL import Image
 from ...core.detect import UI_GROUP, detect_group
 from ...core.mapping import apply_maps, note_accent_ignored, print_colours, uses_accent
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
+from ...core.naming import output_name, slug
 from ...core.paths import config_dir
 from ...core.recolor import recolor_image, recolor_job
 from ...core.target import Target
@@ -58,7 +59,6 @@ class PlymouthTarget(Target):
 def add_arguments(p):
     p.add_argument("themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME",
                    help="theme folder, or adi1090x theme name (default: hexa_retro infinite_seal)")
-    p.add_argument("-s", "--suffix", default="", help="extra suffix for the theme names")
     p.add_argument("--bar", metavar="COLOUR", help="progress bar colour")
     p.add_argument("--no-status", action="store_true", help="skip the -status variants")
     p.add_argument("--detect", action="store_true",
@@ -75,8 +75,6 @@ def check_args(a):
         raise SystemExit("--install / --test need a single theme, flavour and accent")
     if a.bar and a.bar not in PALETTES["mocha"]:
         raise SystemExit(f"--bar: unknown colour '{a.bar}'")
-    if a.suffix and not re.fullmatch(r"[a-z0-9-]+", a.suffix):
-        raise SystemExit("--suffix: use lowercase letters, digits and '-'")
 
 
 # --------------------------------------------------------------- theme model
@@ -103,7 +101,7 @@ class Theme:
         if " " not in self.title and "_" in self.title:      # hexa_retro -> Hexa Retro
             self.title = self.title.replace("_", " ").title()
         self.name = folder.name
-        self.slug = re.sub(r"[^a-z0-9]+", "-", folder.name.lower()).strip("-")
+        self.slug = slug(folder.name)
 
         self.script = None
         if self.module == "script":
@@ -414,7 +412,7 @@ def run(a):
         for flv in a.flavor:
             base = rgb(flv, "base")
             for acc in (a.accent if accent_used else [None]):
-                out_name = "-".join(x for x in (f"catppuccin-{flv}-{theme.slug}", acc, a.suffix) if x)
+                out_name = output_name(flv, theme.slug, acc, a.suffix)
                 # bar colour: option > config > accent > most common colour target
                 bar = a.bar or cfg["bar"] or acc or (main_colours[0] if main_colours else "blue")
                 bar = acc if bar == "accent" else bar

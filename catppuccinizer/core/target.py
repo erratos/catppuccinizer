@@ -23,7 +23,7 @@ class Target:
                                # colours"); None: a LUT method leaves the accent unused
 
     def add_arguments(self, parser):
-        """Add target-specific options (common ones: -f -a -m --preview -o)."""
+        """Add target-specific options (common ones: -f -a -m --preview -o -s)."""
 
     def check(self, args):
         """Validate options before running (raise SystemExit on error)."""

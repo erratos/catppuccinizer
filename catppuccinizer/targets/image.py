@@ -25,6 +25,7 @@ from ..core import recolor
 from ..core.formats import collect_text_colours, read_text, recolour_text, write_text
 from ..core.mapping import (apply_maps, map_colour_counts, note_accent_ignored, print_colours,
                             resolve_target, uses_accent)
+from ..core.naming import output_name
 from ..core.palette import FLAVOR_TITLES, rgb2hex
 from ..core.target import Target
 
@@ -53,7 +54,6 @@ class ImageTarget(Target):
     def add_arguments(self, p):
         p.add_argument("images", nargs="+", metavar="IMAGE", help="image file(s) or folder(s)")
         recolor.add_method_arguments(p)
-        p.add_argument("-s", "--suffix", default="", help="extra suffix for the file names")
 
     def run(self, a):
         files = collect(a.images)
@@ -72,7 +72,7 @@ class ImageTarget(Target):
             accents = [None] if ignored else a.accent
             for flv in a.flavor:
                 for acc in accents:
-                    name = "-".join(x for x in (path.stem, "catppuccin", flv, acc, a.suffix) if x)
+                    name = output_name(flv, path.stem, acc, a.suffix)
                     im = recolor.render(path, method, grp, flv, acc, a)
                     if a.preview:
                         (a.out / "previews").mkdir(exist_ok=True)
@@ -97,7 +97,7 @@ class ImageTarget(Target):
             for acc in accents:
                 lookup = {c["source"]: rgb2hex(resolve_target(flv, acc, c["target"]))
                           for c in colors.values()}
-                name = "-".join(x for x in (path.stem, "catppuccin", flv, acc, a.suffix) if x)
+                name = output_name(flv, path.stem, acc, a.suffix)
                 new = recolour_text(text, False, lookup)
                 if a.preview:
                     (a.out / "previews").mkdir(exist_ok=True)

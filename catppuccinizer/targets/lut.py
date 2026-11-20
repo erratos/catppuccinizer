@@ -8,11 +8,12 @@ and videos with other tools.
 The table is the one `catppuccinize image --method lut|lutgen` applies, with
 the same options (--keep-lum, --smooth, --lutgen-*).
 
-  ffmpeg -i in.mp4 -vf lut3d=catppuccin-mocha.cube out.mp4
-  magick in.jpg catppuccin-mocha-hald.png -hald-clut out.jpg
+  ffmpeg -i in.mp4 -vf lut3d=catppuccin-mocha-lut.cube out.mp4
+  magick in.jpg catppuccin-mocha-lut-hald.png -hald-clut out.jpg
 """
 from ..core import clut, recolor
 from ..core.mapping import note_accent_ignored
+from ..core.naming import output_name
 from ..core.palette import FLAVOR_TITLES
 from ..core.target import Target
 
@@ -31,7 +32,6 @@ class LutTarget(Target):
                             "(default: 8, 512x512)")
         p.add_argument("--cube-size", type=int, default=33, metavar="N",
                        help=".cube points per axis (default: 33)")
-        p.add_argument("-s", "--suffix", default="", help="extra suffix for the file names")
         recolor.add_method_arguments(p)
         p.set_defaults(method="lut")
 
@@ -50,17 +50,15 @@ class LutTarget(Target):
     def run(self, a):
         a.out.mkdir(parents=True, exist_ok=True)
         for flv in a.flavor:
-            stem = "-".join(x for x in ("catppuccin", flv, a.method if a.method != "lut" else "",
-                                        a.suffix) if x)
             title = f"Catppuccin {FLAVOR_TITLES[flv]}"
             if "hald" in a.format:
                 n = a.hald_level ** 2
-                dst = a.out / f"{stem}-hald.png"
+                dst = a.out / f"{output_name(flv, a.method + '-hald', suffix=a.suffix)}.png"
                 clut.write_hald(clut.resample(recolor.lut_for(a.method, flv, a, n), n), dst)
                 print(f"  -> {dst}  ({title}, Hald level {a.hald_level})")
             if "cube" in a.format:
                 n = a.cube_size
-                dst = a.out / f"{stem}.cube"
+                dst = a.out / f"{output_name(flv, a.method, suffix=a.suffix)}.cube"
                 clut.write_cube(clut.resample(recolor.lut_for(a.method, flv, a, n), n), dst, title)
                 print(f"  -> {dst}  ({title}, {n}^3)")
 

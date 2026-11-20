@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .core.naming import add_suffix_argument
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
 from .core.target import discover
 
@@ -20,6 +21,7 @@ def common_parser():
     common.add_argument("--preview", action="store_true",
                         help="only render before/after images into <out>/previews/")
     common.add_argument("-o", "--out", type=Path, help="output folder")
+    add_suffix_argument(common)
     return common
 
 

@@ -13,6 +13,22 @@ What the options shared by every target mean, and how colours are chosen.
 | `-m, --map` | `NAME=TARGET …`: change where a source colour goes; repeated `-m` add up |
 | `--preview` | only render before/after images in `<out>/previews/`, nothing else |
 | `-o, --out` | output folder (`themes/`, `images/` or `luts/` by default) |
+| `-s, --suffix` | extra word at the end of the output names (lowercase letters, digits, `-`) |
+
+## Output names
+
+Every command names what it writes the same way:
+
+```
+catppuccin-<flavor>-<source>[-<accent>][-<suffix>]
+```
+
+`<source>` is what was recoloured (image file name, theme, splash screen,
+`limine`, `lut`…) in lowercase letters, digits and `-` (`My Wall.jpg` →
+`my-wall`). The accent only appears when the output uses it, so a photo
+recoloured with the `lut` method gives one file per flavour. Examples:
+`catppuccin-mocha-wall.jpg`, `catppuccin-mocha-rings-2-mauve/`,
+`catppuccin-mocha-limine-peach/`, `catppuccin-mocha-lut.cube`.
 
 ## Flavours
 

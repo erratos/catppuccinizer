@@ -39,7 +39,7 @@ Catppuccin hue; `-m` remaps any of them by name or `#rrggbb`.
 
 ## Result
 
-A new look-and-feel package (`themes/catppuccin-<flavor>-<name>-<accent>[-<suffix>]/`)
+A new look-and-feel package (`themes/catppuccin-<flavor>-<name>[-<accent>][-<suffix>]/`)
 containing only the splash screen. As a derived work, its `metadata.json` keeps
 the original authors, licence and website (catppuccinizer is added as an
 author), and the original licence file is copied when there is one.

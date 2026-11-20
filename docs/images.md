@@ -12,8 +12,8 @@ catppuccinize image logo.svg -m blue=lavender    # SVG stays SVG
 catppuccinize image photo.jpg --method lutgen --lutgen-algo rbf   # LUT made by lutgen
 ```
 
-Output: `images/<name>-catppuccin-<flavor>[-<accent>].png` (JPEG/WebP photos
-keep their format).
+Output: `images/catppuccin-<flavor>-<name>[-<accent>][-<suffix>].png` (JPEG/WebP
+photos keep their format; see [output names](colours.md#output-names)).
 
 ## Reading the comparison images
 
@@ -91,7 +91,7 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `-a` | `mauve` | accent for colours mapped to `accent` (keys) |
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
 | `--preview` | | only render before/after images in `<out>/previews/` |
-| `-s, --suffix` | | extra suffix for the file names |
+| `-s, --suffix` | | extra word at the end of the file names |
 | `-o, --out` | `images/` | output folder |
 | `--lutgen-*` | | see [lutgen method](#lutgen-method) |
 

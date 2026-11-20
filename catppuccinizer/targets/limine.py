@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..core import recolor
+from ..core.naming import output_name
 from ..core.palette import FLAVOR_TITLES, PALETTES
 from ..core.paths import give_back
 from ..core.target import Target
@@ -174,7 +175,7 @@ def apply(conf, esp, lines, wallpaper_files=()):
         conf.write_text(insert_theme(text, lines, bool(wallpaper_files)) if lines
                         else strip_theme(text))
         if not lines:                            # --remove: drop our wallpapers too
-            for f in (esp / WALL_DIR).glob("wallpaper-*"):
+            for f in (esp / WALL_DIR).glob("catppuccin-*-wallpaper*"):
                 f.unlink()
             if (esp / WALL_DIR).is_dir() and not any((esp / WALL_DIR).iterdir()):
                 (esp / WALL_DIR).rmdir()
@@ -218,7 +219,7 @@ def run(a):
     done = {}       # (image, flavour, accent or None) -> files already written for it
     for flv in a.flavor:
         for acc in a.accent:
-            name = f"limine-catppuccin-{flv}-{acc}"
+            name = output_name(flv, "limine", acc, a.suffix)
             dst = a.out / name
             dst.mkdir(parents=True, exist_ok=True)
             wall_files = []
@@ -226,8 +227,8 @@ def run(a):
                 # a wallpaper that ignores the accent is the same for every accent:
                 # rendered once per flavour, named without the accent, copied
                 wacc = None if recolor.accent_ignored_reason(method, grp) else acc
-                stem = "-".join(x for x in ("wallpaper", flv, wacc) if x) + (
-                    f"-{k + 1}" if len(sources) > 1 else "")
+                stem = output_name(flv, "wallpaper" + (f"-{k + 1}" if len(sources) > 1 else ""),
+                                   wacc, a.suffix)
                 key = (k, flv, wacc)
                 if key in done:
                     for f in done[key]:
@@ -238,8 +239,8 @@ def run(a):
                 im = recolor.render(src, method, grp, flv, wacc, a)
                 files = [recolor.save_image(im.convert("RGB"), dst / stem, method, src)]
                 if a.preview:
-                    files.append(dst / f"preview-{stem}.png")
-                    recolor.side_by_side(src, im, files[-1])
+                    (a.out / "previews").mkdir(parents=True, exist_ok=True)
+                    recolor.side_by_side(src, im, a.out / "previews" / f"{stem}.png")
                 done[key] = files
                 wall_files.append(files[0])
             wall_refs = [f"boot():/{WALL_DIR}/{f.name}" for f in wall_files]

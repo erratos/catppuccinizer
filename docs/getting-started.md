@@ -43,7 +43,7 @@ That is all you need for most commands.
 catppuccinize image ~/Pictures/wall.jpg
 ```
 
-The result lands in `./images/wall-catppuccin-mocha.jpg`. The tool decides
+The result lands in `./images/catppuccin-mocha-wall.jpg`. The tool decides
 on its own whether your image is flat art or a photo, and treats it
 accordingly.
 

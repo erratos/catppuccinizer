@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..core import recolor
+from ..core import naming, recolor
 from ..core.detect import detect_group
 from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect_text_colours,
                             is_animated, recolour_text_file, save_animation, text_files)
@@ -42,7 +42,6 @@ class KSplashTarget(Target):
         p.add_argument("theme", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
                        help="look-and-feel id or folder (default: org.kde.breeze.desktop)")
         recolor.add_method_arguments(p)
-        p.add_argument("-s", "--suffix", default="", help="extra suffix for the package id")
         p.add_argument("--list", action="store_true", help="list installed splash screens and exit")
         p.add_argument("--install", action="store_true",
                        help=f"copy to {USER_DIR} and select it as the splash screen")
@@ -132,7 +131,7 @@ def run(a):
     pkg = resolve(a.theme)
     splash = pkg / "contents/splash"
     title = package_name(pkg)
-    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or "splash"
+    slug = naming.slug(title, "splash")
     print(f"{title} ({pkg})")
 
     vector = {"groups": {"vector": {"colors": map_colour_counts(
@@ -179,7 +178,7 @@ def run(a):
     done = {}      # (image, flavour, accent or None) -> recoloured file, copied for other accents
     for flv in a.flavor:
         for acc in (a.accent if accent_used else [None]):
-            pid = "-".join(x for x in (f"catppuccin-{flv}-{slug}", acc, a.suffix) if x)
+            pid = naming.output_name(flv, slug, acc, a.suffix)
             name = (f"{title} - Catppuccin {FLAVOR_TITLES[flv]}" + (f" {acc.title()}" if acc else "")
                     + (f" ({a.suffix})" if a.suffix else ""))
             dst = a.out / pid
