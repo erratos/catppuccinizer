@@ -42,6 +42,7 @@ tests/
 | `mapping.apply_maps(cfg, maps, strict)` | apply `-m NAME=TARGET` to `{"groups": {name: group}}` |
 | `mapping.map_colour_counts(counts)` | map a `{#hex: count}` list (QML, SVG, CSS…) to Catppuccin roles |
 | `mapping.resolve_target(flavor, accent, target)` | target name -> RGB |
+| `mapping.colour_report(source, method, colors, ...)` / `recolor.colour_report(path, method, grp)` | one entry of `--colours` (names as `-m` accepts them, source, target, share) |
 | `mapping.uses_accent(colors)` / `note_accent_ignored(a, reason)` | whether a colour goes to `accent`; the note printed when `-a` was given for nothing |
 | `recolor.recolor_image(path, bg, keys, targets, base)` | keys method on one image (alpha kept) |
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
@@ -88,6 +89,12 @@ positional argument (`[{"value", "label", "note"}]`): the GUI shows them as a
 catalogue (Plymouth: the adi1090x themes, KDE splash: the installed splash
 screens). The GUI needs nothing else: its forms come from `add_arguments`
 (see [Graphical interface](gui.md#for-target-authors)).
+
+Optionally too, `def colours(self, a)` does only the analysis and returns the
+colours `-m` can remap, as `mapping.colour_report(...)` entries (or
+`recolor.colour_report(path, *recolor.plan(path, a, verbose=False))` for an
+image). It must write nothing. When a target defines it, `--colours` and
+`--json` are added to its options and the command line prints the list.
 
 Then add `"grub"` to `BUILTIN` in `core/target.py`, or, from another package,
 declare an entry point and install it next to catppuccinizer:

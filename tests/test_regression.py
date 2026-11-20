@@ -154,6 +154,15 @@ def cli(*argv):
         main([str(a) for a in argv])
 
 
+def colours(tmp, *argv):
+    """--colours --json output, temporary paths replaced by <tmp>."""
+    from catppuccinizer.cli import main
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+        main([str(a) for a in argv] + ["--colours", "--json"])
+    return json.loads(out.getvalue().replace(str(tmp), "<tmp>"))
+
+
 # --------------------------------------------------------------------- cases
 def has_lutgen():
     from catppuccinizer.core import lutgen
@@ -224,6 +233,13 @@ def run_all():
         cli("ksplash", tmp / "splash-src", "-a", "peach", "mauve", "-o", tmp / "ksplash")
         cli("ksplash", tmp / "splash-src", "-m", "green=lavender", "-s", "lav", "-o", tmp / "ksplash")
         out["ksplash"] = tree(tmp / "ksplash", tmp)
+        out["colours"] = {
+            "image": colours(tmp, "image", tmp / "img"),
+            "image_mapped": colours(tmp, "image", tmp / "img/flat.png", "-m", "pink=peach"),
+            "plymouth": colours(tmp, "plymouth", FIXTURES / "glow_mini", "-m", "throbber.white=accent"),
+            "ksplash": colours(tmp, "ksplash", tmp / "splash-src", "-m", "green=lavender"),
+            "limine": colours(tmp, "limine", "--wallpaper", tmp / "img/speck.png"),
+        }
         pv = next((tmp / "ksplash").glob("*-lav/contents/previews/splash.png"))
         r, g, b = np.asarray(Image.open(pv).convert("RGB"), np.int32)[18, 19]   # centre of the bar
         out["ksplash_preview_lavender"] = bool(b > g > r)    # lavender, not a LUT green
@@ -252,6 +268,9 @@ class Regression(unittest.TestCase):
 
     def test_lut(self):
         self.check("lut")
+
+    def test_colours(self):
+        self.check("colours")
 
     @unittest.skipUnless(HAS_LUTGEN, "lutgen is not installed")
     def test_lutgen(self):

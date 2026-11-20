@@ -70,6 +70,7 @@ enrollment is enabled, run `sudo limine-enroll-config` afterwards.
 | `--recolor-wallpaper` | recolour the wallpaper(s) already set in `limine.conf` |
 | `--style` | `stretched`, `centered` or `tiled` |
 | `--preview` | also render before/after images of the wallpaper in `<out>/previews/` |
+| `--colours` | only list the wallpaper colours `-m` can remap (the menu has none); `--json` for JSON |
 | `-s, --suffix` | extra word at the end of the folder and wallpaper names |
 | `--apply` | write the theme into `limine.conf` (with sudo) |
 | `--remove` | remove the theme from `limine.conf` |

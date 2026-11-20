@@ -91,7 +91,8 @@ def options_of(sp):
     groups = {id(a): g.title for g in sp._action_groups for a in g._group_actions}
     out = []
     for a in sp._actions:
-        if isinstance(a, argparse._HelpAction) or a.dest == "target" or a.help == argparse.SUPPRESS:
+        if (isinstance(a, argparse._HelpAction) or a.dest in NOT_IN_FORMS
+                or a.help == argparse.SUPPRESS):
             continue
         kind = _kind(a)
         title = groups.get(id(a))
@@ -113,6 +114,7 @@ def options_of(sp):
 
 
 COMMON = {"flavor", "accent", "map", "preview", "out"}
+NOT_IN_FORMS = {"target", "colours", "json"}   # --colours lists and writes nothing: not a run
 
 
 def first_paragraph(text):

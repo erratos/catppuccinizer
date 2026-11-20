@@ -23,8 +23,8 @@ from ..core import naming, recolor
 from ..core.detect import detect_group
 from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect_text_colours,
                             is_animated, recolour_text_file, save_animation, text_files)
-from ..core.mapping import (apply_maps, map_colour_counts, note_accent_ignored, print_colours,
-                            resolve_target, uses_accent)
+from ..core.mapping import (apply_maps, background_of, colour_report, map_colour_counts,
+                            note_accent_ignored, print_colours, resolve_target, uses_accent)
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
 from ..core.target import Target
 
@@ -53,6 +53,9 @@ class KSplashTarget(Target):
 
     def run(self, a):
         run(a)
+
+    def colours(self, a):
+        return colours(a)
 
     def sources(self):
         return [{"value": pid, "label": package_name(d), "note": str(d.parent)}
@@ -123,17 +126,10 @@ def preview_group(preview, rasters):
 
 
 # ---------------------------------------------------------------------- main
-def run(a):
-    if a.list:
-        return list_packages()
-    if a.preview:
-        print("note: --preview is not available for splash screens, use --test to see the result")
-    pkg = resolve(a.theme)
+def analyse(a, pkg, tmp):
+    """Colours of a splash package after -m: (QML / SVG colours, {image: (method or
+    "anim", group, extra)}). Animations are sampled into tmp."""
     splash = pkg / "contents/splash"
-    title = package_name(pkg)
-    slug = naming.slug(title, "splash")
-    print(f"{title} ({pkg})")
-
     vector = {"groups": {"vector": {"colors": map_colour_counts(
         collect_text_colours(text_files(splash)))}}}
     apply_maps(vector, a.map, strict=False)
@@ -142,7 +138,6 @@ def run(a):
         print("  QML / SVG colours")
         print_colours(vcolors)
 
-    tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
     rasters = {}                                   # path -> ("anim"|method, grp, extra)
     previews = pkg / "contents/previews/splash.png"
     for f in [*sorted(splash.rglob("*")), *([previews] if previews.exists() else [])]:
@@ -169,6 +164,43 @@ def run(a):
             continue
         if rasters[f][1] is not None and rasters[f][0] not in recolor.LUT_METHODS:
             print_colours(rasters[f][1]["colors"], show_share=False)
+    return vcolors, rasters
+
+
+def colours(a):
+    """--colours: the QML / SVG colours, then each image and animation."""
+    pkg = resolve(a.theme)
+    tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
+    try:
+        vcolors, rasters = analyse(a, pkg, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    out = [colour_report("QML / SVG", "text", vcolors)] if vcolors else []
+    for f, (method, grp, extra) in rasters.items():
+        name = f.relative_to(pkg)
+        if method == "anim":
+            out.append(colour_report(name, "keys", grp["colors"], background=background_of(grp),
+                                     note=f"animation, {extra[0]} frames"))
+        else:
+            note = "colours of the animation" if f == pkg / "contents/previews/splash.png" else None
+            out.append(recolor.colour_report(name, method, grp, note=note))
+    return out
+
+
+def run(a):
+    if a.list:
+        return list_packages()
+    if a.preview:
+        print("note: --preview is not available for splash screens, use --test to see the result")
+    pkg = resolve(a.theme)
+    splash = pkg / "contents/splash"
+    title = package_name(pkg)
+    slug = naming.slug(title, "splash")
+    print(f"{title} ({pkg})")
+
+    tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
+    vcolors, rasters = analyse(a, pkg, tmp)
+    previews = pkg / "contents/previews/splash.png"
 
     accent_used = uses_accent(vcolors) or any(
         m not in recolor.LUT_METHODS and uses_accent(g["colors"]) for m, g, _ in rasters.values())

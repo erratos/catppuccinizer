@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..core import recolor
+from ..core.mapping import colour_report
 from ..core.naming import output_name
 from ..core.palette import FLAVOR_TITLES, PALETTES
 from ..core.paths import give_back
@@ -46,6 +47,9 @@ class LimineTarget(Target):
 
     def run(self, a):
         run(a)
+
+    def colours(self, a):
+        return colours(a)
 
 
 def add_arguments(p):
@@ -188,15 +192,11 @@ def apply(conf, esp, lines, wallpaper_files=()):
         print("  config enrollment is on: run 'sudo limine-enroll-config' now")
 
 
-def run(a):
-    esp = a.esp or default_esp()
-    if a.remove:
-        conf = a.conf or find_conf(esp)
-        print(f"Removing the Catppuccin theme from {conf}")
-        return apply(conf, esp, None)
-
-    current, style = [], a.style
-    if a.apply or a.recolor_wallpaper:
+def wallpapers(a, esp, read_conf):
+    """(limine.conf, its current wallpapers, their style, the images to recolour);
+    limine.conf is only read when read_conf."""
+    conf, current, style = None, [], a.style
+    if read_conf:
         conf = a.conf or find_conf(esp)
         try:
             text = strip_theme(conf.read_text())
@@ -211,10 +211,27 @@ def run(a):
         if not current:
             raise SystemExit("limine.conf has no wallpaper to recolour (use --wallpaper IMAGE)")
         sources = [resolve_on_esp(w, esp) for w in current]
-        for s in sources:
-            if not s.is_file():
-                raise SystemExit(f"Wallpaper not found on the ESP: {s} (use --esp or --wallpaper)")
+        for src in sources:
+            if not src.is_file():
+                raise SystemExit(f"Wallpaper not found on the ESP: {src} (use --esp or --wallpaper)")
+    return conf, current, style, sources
 
+
+def colours(a):
+    """--colours: the menu (fixed roles, nothing to remap) and each wallpaper."""
+    sources = wallpapers(a, a.esp or default_esp(), a.recolor_wallpaper)[3]
+    return [colour_report("menu", "fixed", note="Catppuccin roles, the accent comes from -a"),
+            *(recolor.colour_report(src, *recolor.plan(src, a, verbose=False)) for src in sources)]
+
+
+def run(a):
+    esp = a.esp or default_esp()
+    if a.remove:
+        conf = a.conf or find_conf(esp)
+        print(f"Removing the Catppuccin theme from {conf}")
+        return apply(conf, esp, None)
+
+    conf, current, style, sources = wallpapers(a, esp, a.apply or a.recolor_wallpaper)
     plans = [recolor.plan(src, a) for src in sources]          # analysed once per image
     done = {}       # (image, flavour, accent or None) -> files already written for it
     for flv in a.flavor:

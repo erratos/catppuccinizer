@@ -23,8 +23,8 @@ from PIL import Image
 
 from ..core import recolor
 from ..core.formats import collect_text_colours, read_text, recolour_text, write_text
-from ..core.mapping import (apply_maps, map_colour_counts, note_accent_ignored, print_colours,
-                            resolve_target, uses_accent)
+from ..core.mapping import (apply_maps, colour_report, map_colour_counts, note_accent_ignored,
+                            print_colours, resolve_target, uses_accent)
 from ..core.naming import output_name
 from ..core.palette import FLAVOR_TITLES, rgb2hex
 from ..core.target import Target
@@ -55,6 +55,17 @@ class ImageTarget(Target):
         p.add_argument("images", nargs="+", metavar="IMAGE", help="image file(s) or folder(s)")
         recolor.add_method_arguments(p)
 
+    def colours(self, a):
+        files = collect(a.images)
+        a.strict_map = len(files) == 1
+        out = []
+        for path in files:
+            if path.suffix.lower() in VECTOR:
+                out.append(colour_report(path, "vector", vector_colours(path, a)))
+            else:
+                out.append(recolor.colour_report(path, *recolor.plan(path, a, verbose=False)))
+        return out
+
     def run(self, a):
         files = collect(a.images)
         if not files:
@@ -83,10 +94,7 @@ class ImageTarget(Target):
                     print(f"  -> {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + acc if acc else ''})")
 
     def run_vector(self, path, a):
-        colors = map_colour_counts(collect_text_colours([path]))
-        cfg = {"groups": {"svg": {"colors": colors}}}
-        apply_maps(cfg, a.map, strict=a.strict_map)
-        colors = cfg["groups"]["svg"]["colors"]
+        colors = vector_colours(path, a)
         print(f"{path}: vector ({len(colors)} colours)")
         print_colours(colors, show_share=False)
         text = read_text(path)
@@ -109,6 +117,13 @@ class ImageTarget(Target):
                     dst = a.out / f"{name}{path.suffix}"
                     write_text(dst, new)
                 print(f"  -> {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + acc if acc else ''})")
+
+
+def vector_colours(path, a):
+    """Colours written in an SVG, mapped to Catppuccin roles, after -m."""
+    cfg = {"groups": {"svg": {"colors": map_colour_counts(collect_text_colours([path]))}}}
+    apply_maps(cfg, a.map, strict=a.strict_map)
+    return cfg["groups"]["svg"]["colors"]
 
 
 def svg_preview(src, new_text, dst):

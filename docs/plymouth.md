@@ -118,10 +118,12 @@ single images.
 - otherwise whites/grays go to `text` and each hue to the closest Catppuccin
   colour (red, peach, yellow, green, teal, sky, sapphire, blue, mauve, pink).
 
-`catppuccinize plymouth <theme> --detect` re-runs the detection and prints the mapping.
+`catppuccinize plymouth <theme> --detect` re-runs the detection, saves it and
+prints the mapping. `--colours` only lists it, saving nothing (a theme without
+a config is detected for the listing, not saved).
 
-To change it, use the colour names printed by the detection, optionally
-prefixed by the group (`ui.white`), or a `#rrggbb` source colour:
+To change it, use the colour names listed by `--colours`, prefixed by the group
+when the theme has several (`ui.white`), or a `#rrggbb` source colour:
 
 ```bash
 catppuccinize plymouth hexa_retro -m yellow=red white=lavender -s alt   # -s: name suffix
@@ -218,6 +220,7 @@ for it.
 | `--detect` | | re-detect colours, overwrite the config, stop |
 | `--preview` | | only render one before/after image per theme in `<out>/previews/` |
 | `--list` | | list upstream themes (`[config]` = has a config) |
+| `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |
 | `-o, --out` | `themes/` | output folder |
 | `--test [S]` | `10` | show the result for S seconds without rebooting (always quits Plymouth, restores your default theme) |
 | `--install` | | install the result (its `-status` variant if any) and rebuild the initramfs |

@@ -97,6 +97,49 @@ def resolve_target(flavor, accent, target):
     return rgb(flavor, accent if target == "accent" else target)
 
 
+# ------------------------------------------------- --colours (list, write nothing)
+def colour_report(source, method, colors=None, group=None, background=None, note=None,
+                  prefix=False):
+    """One entry of `--colours`: the colours of a source (or of one of its image
+    groups) that -m can remap, under the names -m accepts. colors=None: nothing
+    to remap (note says why). prefix: names are "group.name" (several groups)."""
+    total = sum(c.get("count", 0) for c in (colors or {}).values())
+    entries = []
+    for n, c in (colors or {}).items():
+        share = c.get("share")
+        if share is None and total:
+            share = round(c.get("count", 0) / total, 3)
+        entries.append({"name": f"{group}.{n}" if prefix and group else n,
+                        "source": c["source"], "target": c["target"], "share": share})
+    return {"source": str(source), "group": group, "method": method,
+            "remap": colors is not None, "background": background, "note": note,
+            "colours": entries}
+
+
+def background_of(grp):
+    """'transparent' or the '#rrggbb' background of a detected group."""
+    return "transparent" if grp.get("transparent") else grp.get("background")
+
+
+def format_colour_report(items):
+    """Text of `--colours`."""
+    lines = []
+    for it in items:
+        head = it["source"] + (f" / {it['group']}" if it["group"] else "") + f": {it['method']}"
+        if it["background"]:
+            head += f", background {it['background']}"
+        if not it["remap"]:
+            head += f" (no remap: {it['note']})" if it["note"] else " (no remap)"
+        elif it["note"]:
+            head += f" ({it['note']})"
+        lines.append(head)
+        width = max((len(c["name"]) for c in it["colours"]), default=0)
+        for c in it["colours"]:
+            share = f"  ({c['share'] * 100:.0f}%)" if c["share"] is not None else ""
+            lines.append(f"    {c['name']:{width}s}  {c['source']} -> {c['target']}{share}")
+    return "\n".join(lines)
+
+
 def print_colours(colors, indent="    ", show_share=True):
     for n, c in colors.items():
         extra = ""

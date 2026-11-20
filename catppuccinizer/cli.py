@@ -1,5 +1,7 @@
 """Command line: catppuccinize TARGET [options]. Targets are discovered (see core.target)."""
 import argparse
+import contextlib
+import json
 import os
 import sys
 from pathlib import Path
@@ -7,7 +9,8 @@ from pathlib import Path
 from . import __version__
 from .core.naming import add_suffix_argument
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
-from .core.target import discover
+from .core.mapping import format_colour_report
+from .core.target import Target, discover
 
 
 def common_parser():
@@ -41,6 +44,11 @@ def build_parser(targets=None):
         sp = sub.add_parser(name, parents=[common], help=t.help, description=doc, epilog=epilog,
                             formatter_class=argparse.RawDescriptionHelpFormatter)
         t.add_arguments(sp)
+        if type(t).colours is not Target.colours:
+            sp.add_argument("--colours", action="store_true",
+                            help="only list the colours -m can remap (name, source colour, "
+                                 "current target, share) and exit; nothing is written")
+            sp.add_argument("--json", action="store_true", help="with --colours: print JSON")
         sp.set_defaults(target=t)
         subparsers[name] = sp
     if "gui" not in targets:
@@ -64,6 +72,8 @@ def parse(argv=None, parser=None):
     a.flavor = expand(a.flavor, FLAVORS, "flavor")
     a.accent = expand(a.accent or list(t.default_accent), ACCENTS, "accent")
     a.out = a.out or Path.cwd() / t.default_out
+    if getattr(a, "json", False) and not a.colours:
+        raise SystemExit("--json only goes with --colours")
     t.check(a)
     return a
 
@@ -75,6 +85,11 @@ def main(argv=None):
         if a.target is None:
             from .gui import serve
             return serve(port=a.port, browser=not a.no_browser)
+        if getattr(a, "colours", False):
+            with contextlib.redirect_stdout(sys.stderr):    # notes, fetching: not the list
+                items = a.target.colours(a)
+            print(json.dumps(items, indent=2) if a.json else format_colour_report(items))
+            return
         a.target.run(a)
     except KeyboardInterrupt:
         raise SystemExit("\ninterrupted")

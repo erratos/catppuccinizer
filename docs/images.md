@@ -91,6 +91,7 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `-a` | `mauve` | accent for colours mapped to `accent` (keys) |
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
 | `--preview` | | only render before/after images in `<out>/previews/` |
+| `--colours` | | only list the colours `-m` can remap, and the method each image would get ([details](colours.md#manual-mapping)); `--json` for JSON |
 | `-s, --suffix` | | extra word at the end of the file names |
 | `-o, --out` | `images/` | output folder |
 | `--lutgen-*` | | see [lutgen method](#lutgen-method) |

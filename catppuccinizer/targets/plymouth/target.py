@@ -19,7 +19,8 @@ import numpy as np
 from PIL import Image
 
 from ...core.detect import UI_GROUP, detect_group
-from ...core.mapping import apply_maps, note_accent_ignored, print_colours, uses_accent
+from ...core.mapping import (apply_maps, background_of, colour_report, note_accent_ignored,
+                             print_colours, uses_accent)
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
 from ...core.naming import output_name, slug
 from ...core.paths import config_dir
@@ -47,6 +48,9 @@ class PlymouthTarget(Target):
 
     def run(self, a):
         run(a)
+
+    def colours(self, a):
+        return colours(a)
 
     def sources(self):
         themes = upstream_themes()
@@ -377,6 +381,25 @@ def list_themes():
 def script(name, *args):
     """Run one of the helper shell scripts (they call sudo themselves)."""
     return subprocess.run(["bash", str(SCRIPTS / name), *map(str, args)], check=False).returncode
+
+
+def colours(a):
+    """--colours: each image group of each theme, under the names -m accepts
+    ("group.name" when a theme has several groups). A theme without a config is
+    detected but its config is not saved."""
+    out = []
+    for arg in a.themes:
+        theme = Theme(resolve_theme(arg))
+        saved = config_path(theme.name).exists() and not a.detect
+        cfg = load_config(theme) if saved else detect(theme)
+        apply_maps(cfg, a.map)
+        several = len(cfg["groups"]) > 1
+        for g, grp in cfg["groups"].items():
+            n = len(theme.groups.get(g, []))
+            note = f"{n} image{'s' if n != 1 else ''}" + ("" if saved else ", freshly detected")
+            out.append(colour_report(theme.name, "keys", grp["colors"], group=g,
+                                     background=background_of(grp), note=note, prefix=several))
+    return out
 
 
 def run(a):

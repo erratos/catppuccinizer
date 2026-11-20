@@ -101,7 +101,31 @@ preserved.
 
 ## Manual mapping
 
-`-m` takes the names printed by the detection, or a `#rrggbb` source colour:
+To see the names first, `--colours` lists the colours `-m` can remap and
+exits, without writing anything (no output folder, no saved config):
+
+```bash
+catppuccinize plymouth /usr/share/plymouth/themes/glow --colours
+```
+
+```
+glow / progress: keys, background transparent (33 images)
+    progress.white  #ffffff -> accent  (100%)
+glow / throbber: keys, background transparent (20 images)
+    throbber.white   #ffffff -> text  (87%)
+    throbber.yellow  #f9a905 -> yellow  (13%)
+glow / ui: keys, background transparent (4 images)
+    ui.white  #ffffff -> text  (100%)
+```
+
+Each line is a name `-m` accepts (with its group when there are several),
+the source colour, its current target (after the `-m` already given) and its
+share. A source that cannot be remapped says why (`photo.jpg: lut (no remap:
+the lut method uses no source colours)`); with `--method auto`, the method
+shown is the one a run would use. `--json` prints the same list as JSON.
+`lut` has no source colours, so it has no `--colours`.
+
+`-m` takes those names, or a `#rrggbb` source colour:
 
 ```bash
 catppuccinize plymouth rings_2 -m pink=mauve green=peach blue=lavender

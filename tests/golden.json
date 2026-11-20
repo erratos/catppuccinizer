@@ -1,4 +1,332 @@
 {
+ "colours": {
+  "image": [
+   {
+    "background": null,
+    "colours": [],
+    "group": null,
+    "method": "lut",
+    "note": "the lut method uses no source colours",
+    "remap": false,
+    "source": "<tmp>/img/blobs.png"
+   },
+   {
+    "background": "#080e28",
+    "colours": [
+     {
+      "name": "blue",
+      "share": 0.646,
+      "source": "#3cdcff",
+      "target": "sky"
+     },
+     {
+      "name": "pink",
+      "share": 0.354,
+      "source": "#ff468c",
+      "target": "red"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": null,
+    "remap": true,
+    "source": "<tmp>/img/flat.png"
+   },
+   {
+    "background": "transparent",
+    "colours": [
+     {
+      "name": "white",
+      "share": 0.791,
+      "source": "#ffffff",
+      "target": "text"
+     },
+     {
+      "name": "blue",
+      "share": 0.209,
+      "source": "#1793d1",
+      "target": "sapphire"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": null,
+    "remap": true,
+    "source": "<tmp>/img/logo.png"
+   },
+   {
+    "background": null,
+    "colours": [
+     {
+      "name": "blue",
+      "share": 0.4,
+      "source": "#00ccff",
+      "target": "accent"
+     },
+     {
+      "name": "cyan",
+      "share": 0.2,
+      "source": "#00aa88",
+      "target": "teal"
+     },
+     {
+      "name": "white",
+      "share": 0.2,
+      "source": "#ffffff",
+      "target": "text"
+     },
+     {
+      "name": "pink",
+      "share": 0.2,
+      "source": "#e0306a",
+      "target": "red"
+     }
+    ],
+    "group": null,
+    "method": "vector",
+    "note": null,
+    "remap": true,
+    "source": "<tmp>/img/mark.svg"
+   },
+   {
+    "background": null,
+    "colours": [],
+    "group": null,
+    "method": "lut",
+    "note": "the lut method uses no source colours",
+    "remap": false,
+    "source": "<tmp>/img/photo.jpg"
+   },
+   {
+    "background": "#000000",
+    "colours": [
+     {
+      "name": "white",
+      "share": 1.0,
+      "source": "#e8e8e8",
+      "target": "accent"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": null,
+    "remap": true,
+    "source": "<tmp>/img/speck.png"
+   }
+  ],
+  "image_mapped": [
+   {
+    "background": "#080e28",
+    "colours": [
+     {
+      "name": "blue",
+      "share": 0.646,
+      "source": "#3cdcff",
+      "target": "sky"
+     },
+     {
+      "name": "pink",
+      "share": 0.354,
+      "source": "#ff468c",
+      "target": "peach"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": null,
+    "remap": true,
+    "source": "<tmp>/img/flat.png"
+   }
+  ],
+  "ksplash": [
+   {
+    "background": null,
+    "colours": [
+     {
+      "name": "blue",
+      "share": 0.333,
+      "source": "#3daee9",
+      "target": "accent"
+     },
+     {
+      "name": "white",
+      "share": 0.111,
+      "source": "#eff0f1",
+      "target": "text"
+     },
+     {
+      "name": "black",
+      "share": 0.111,
+      "source": "#000000",
+      "target": "base"
+     },
+     {
+      "name": "gray",
+      "share": 0.111,
+      "source": "#333340",
+      "target": "surface1"
+     },
+     {
+      "name": "gray-2",
+      "share": 0.111,
+      "source": "#31363b",
+      "target": "surface1"
+     },
+     {
+      "name": "red",
+      "share": 0.111,
+      "source": "#da4453",
+      "target": "red"
+     },
+     {
+      "name": "white-2",
+      "share": 0.111,
+      "source": "#ffffff",
+      "target": "text"
+     }
+    ],
+    "group": null,
+    "method": "text",
+    "note": null,
+    "remap": true,
+    "source": "QML / SVG"
+   },
+   {
+    "background": null,
+    "colours": [],
+    "group": null,
+    "method": "lut",
+    "note": "the lut method uses no source colours",
+    "remap": false,
+    "source": "contents/splash/images/bg.png"
+   },
+   {
+    "background": "#000000",
+    "colours": [
+     {
+      "name": "green",
+      "share": 1.0,
+      "source": "#78f064",
+      "target": "lavender"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": "animation, 4 frames",
+    "remap": true,
+    "source": "contents/splash/images/rain.webp"
+   },
+   {
+    "background": "transparent",
+    "colours": [
+     {
+      "name": "white",
+      "share": 1.0,
+      "source": "#ffffff",
+      "target": "accent"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": "animation, 3 frames",
+    "remap": true,
+    "source": "contents/splash/images/spin.gif"
+   },
+   {
+    "background": "#000000",
+    "colours": [
+     {
+      "name": "green",
+      "share": 1.0,
+      "source": "#78f064",
+      "target": "lavender"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": "colours of the animation",
+    "remap": true,
+    "source": "contents/previews/splash.png"
+   }
+  ],
+  "limine": [
+   {
+    "background": null,
+    "colours": [],
+    "group": null,
+    "method": "fixed",
+    "note": "Catppuccin roles, the accent comes from -a",
+    "remap": false,
+    "source": "menu"
+   },
+   {
+    "background": "#000000",
+    "colours": [
+     {
+      "name": "white",
+      "share": 1.0,
+      "source": "#e8e8e8",
+      "target": "accent"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": null,
+    "remap": true,
+    "source": "<tmp>/img/speck.png"
+   }
+  ],
+  "plymouth": [
+   {
+    "background": "transparent",
+    "colours": [
+     {
+      "name": "progress.white",
+      "share": 1.0,
+      "source": "#ffffff",
+      "target": "accent"
+     }
+    ],
+    "group": "progress",
+    "method": "keys",
+    "note": "3 images",
+    "remap": true,
+    "source": "glow_mini"
+   },
+   {
+    "background": "transparent",
+    "colours": [
+     {
+      "name": "throbber.white",
+      "share": 1.0,
+      "source": "#ffffff",
+      "target": "accent"
+     }
+    ],
+    "group": "throbber",
+    "method": "keys",
+    "note": "3 images",
+    "remap": true,
+    "source": "glow_mini"
+   },
+   {
+    "background": "transparent",
+    "colours": [
+     {
+      "name": "ui.white",
+      "share": 1.0,
+      "source": "#ffffff",
+      "target": "text"
+     }
+    ],
+    "group": "ui",
+    "method": "keys",
+    "note": "4 images",
+    "remap": true,
+    "source": "glow_mini"
+   }
+  ]
+ },
  "configs": {
   "plymouth/glow_mini.toml": "87f082138dfdbc29",
   "plymouth/hexa_mini.toml": "6f102e0e53d4157b"

@@ -33,6 +33,12 @@ class Target:
         (the GUI's catalogue): [{"value", "label", "note"}], or None for none."""
         return None
 
+    def colours(self, args):
+        """`--colours`: the source colours -m can remap, analysed but nothing
+        written, as a list of core.mapping.colour_report() entries. Targets
+        without source colours (lut) leave it out: the option is not offered."""
+        raise NotImplementedError
+
     def run(self, args):
         raise NotImplementedError
 

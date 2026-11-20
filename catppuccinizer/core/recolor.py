@@ -14,7 +14,7 @@ from functools import lru_cache
 import numpy as np
 from PIL import Image
 
-from . import lutgen
+from . import lutgen, mapping
 from .clut import apply_cube as apply_lut
 from .detect import detect_group, load_rgba
 from .mapping import NO_ACCENT, apply_maps, print_colours, uses_accent
@@ -248,6 +248,15 @@ def render(path, method, grp, flavor, accent, a):
     targets = np.array([rgb(flavor, accent if c["target"] == "accent" else c["target"])
                         for c in grp["colors"].values()])
     return recolor_image(path, hex2rgb(grp["background"]), keys, targets, rgb(flavor, "base"))
+
+
+def colour_report(path, method, grp, note=None):
+    """--colours entry of an image after plan(): its colours, or why -m does
+    not apply (LUT methods use no source colours)."""
+    if method in LUT_METHODS:
+        return mapping.colour_report(path, method, note=f"the {method} method uses no source colours")
+    return mapping.colour_report(path, method, grp["colors"], background=mapping.background_of(grp),
+                                 note=note)
 
 
 def accent_ignored_reason(method, grp):
