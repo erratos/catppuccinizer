@@ -102,3 +102,44 @@ Add a case to `tests/test_regression.py` (small synthetic fixture) and run
 Run `python3 -m unittest discover -s tests`. If a golden output changes on
 purpose (better LUT, new detection rule…), look at the result, then update
 `tests/golden.json` with `--update` in the same commit.
+
+User mistakes end with a one-line message, never a traceback: a target raises
+`SystemExit("...")`, and `cli.main` turns file errors (`OSError`: missing,
+unreadable or unwritable files) into `error: ...`. Set `CATPPUCCINIZER_DEBUG=1`
+to get the traceback back.
+
+## Performances
+
+Work that does not depend on the accent is done once: each image is analysed
+once, and an image whose colours do not go to `accent` (LUT methods, or `keys`
+without an `accent` colour) is rendered once per flavour, then copied into the
+other accents' outputs (Limine, KDE splash, Plymouth image groups). The LUT
+cube is cached per flavour and options (`lru_cache` on `build_lut` and
+`lutgen.build`).
+
+Measured with `python3 -m cProfile -s cumtime` (one machine, 32 threads, for
+orders of magnitude):
+
+| Case | Time |
+|---|---|
+| `image`, 3840×2160 photo (`lut`) | 3.2 s: analysis 1.2 s (detection 1.0 s), `apply_cube` 1.8 s |
+| `image`, 3840×2160 PNG | 3.4 s (was 5.1 s with `optimize=True` on the PNG) |
+| `limine`, same photo, 4 accents | 3.3 s (was 12.2 s: analysed and rendered once per accent) |
+| `plymouth rings_2` (270 images, 800×600), 2 accents | 3.8 s in parallel; 21.5 s of CPU per accent |
+| `lut -f all` (Hald + .cube) | 1.6 s, 0.85 s of it in `build_lut` |
+| fixtures (any target) | under 1 s |
+
+The three slowest points, in order:
+
+1. **`keys` recolouring** (`recolor_image`): per pixel, the best source colour
+   is found over an `(N, K, 3)` array, then opaque results are quantized to 256
+   colours (MEDIANCUT, ~20 % of the time). It dominates Plymouth themes
+   (hundreds of frames) and animated splash screens.
+2. **`clut.apply_cube`**: trilinear interpolation in numpy, ~0.2 s per
+   megapixel; it dominates `lut` / `lutgen` on large wallpapers.
+3. **Analysis of a large image** (`detect_group`, `fit_error`, `sharpness`):
+   about 1 s and 500 MB for a 4K picture, as `detect_group` works on the full
+   resolution in float32.
+
+These are the candidates for a real-time preview (work on a reduced image) or
+a compiled implementation.

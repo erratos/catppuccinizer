@@ -27,6 +27,7 @@ NEUTRALS = ["crust", "mantle", "base", "surface0", "surface1", "surface2", "over
 MIN_BG_SHARE = 0.35          # ... and the plain background must cover at least this share
 MIN_SHARPNESS = 0.08         # ... and edges must be crisp (blurred blobs/gradients -> lut)
 LUT_METHODS = ("lut", "lutgen")   # whole-image colour tables: no source colours, no accent
+OPTIMIZE_MAX_PIXELS = 2_000_000   # larger PNGs are saved without optimize (much faster)
 
 
 def add_method_arguments(p):
@@ -38,6 +39,16 @@ def add_method_arguments(p):
     p.add_argument("--smooth", type=float, default=0.08, metavar="R",
                    help="lut: blend radius in Oklab; smaller = purer palette colours (default: 0.08)")
     lutgen.add_arguments(p)
+
+
+def check_method_arguments(a):
+    """Fail early on option values the methods cannot use."""
+    if not 0 <= a.keep_lum <= 1:
+        raise SystemExit("--keep-lum must be between 0 and 1")
+    if a.smooth <= 0:
+        raise SystemExit("--smooth must be greater than 0")
+    if a.method == "lutgen":
+        lutgen.options(a)
 
 
 # ---------------------------------------------------------------------- keys
@@ -207,14 +218,13 @@ def recolor_lut(path, cube):
 # --------------------------------------------------------------------- API
 def plan(path, a, verbose=True):
     """Return (method, group config or None) for one image."""
+    check_method_arguments(a)
     grp, err, bg_share, sharp = None, None, None, None
     if a.method in ("auto", "keys"):
         grp, err, bg_share, sharp = analyse(path)
     flat = (err is not None and err < FIT_THRESHOLD and bg_share >= MIN_BG_SHARE
             and sharp >= MIN_SHARPNESS)
     method = a.method if a.method != "auto" else ("keys" if flat else "lut")
-    if method == "lutgen":
-        lutgen.options(a)                    # bad option combination: fail before any work
     if method == "keys":
         cfg = {"groups": {"image": grp}}
         apply_maps(cfg, a.map, strict=getattr(a, "strict_map", True))
@@ -255,7 +265,8 @@ def save_image(im, dst, method, src):
         im.save(dst, quality=95)
     else:
         dst = dst.with_suffix(".png")
-        im.save(dst, optimize=True)
+        # optimize: ~5x slower on a 4K picture for files under 1 % smaller
+        im.save(dst, optimize=im.width * im.height <= OPTIMIZE_MAX_PIXELS)
     return dst
 
 

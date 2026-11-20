@@ -42,8 +42,7 @@ class LutTarget(Target):
             raise SystemExit("--hald-level must be between 2 and 16")
         if not 2 <= a.cube_size <= 256:
             raise SystemExit("--cube-size must be between 2 and 256")
-        if a.method == "lutgen":
-            recolor.lutgen.options(a)
+        recolor.check_method_arguments(a)
         if a.preview or a.map:
             print("note: --preview and -m are ignored by the lut target")
         note_accent_ignored(a, "by the lut target (a LUT has no accent)", indent="")

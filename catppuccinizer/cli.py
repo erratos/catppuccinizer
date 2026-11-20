@@ -1,5 +1,6 @@
 """Command line: catppuccinize TARGET [options]. Targets are discovered (see core.target)."""
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -67,8 +68,18 @@ def parse(argv=None, parser=None):
 
 def main(argv=None):
     sys.dont_write_bytecode = True       # no root-owned __pycache__ after a sudo run
-    a = parse(argv)
-    if a.target is None:
-        from .gui import serve
-        return serve(port=a.port, browser=not a.no_browser)
-    a.target.run(a)
+    try:
+        a = parse(argv)
+        if a.target is None:
+            from .gui import serve
+            return serve(port=a.port, browser=not a.no_browser)
+        a.target.run(a)
+    except KeyboardInterrupt:
+        raise SystemExit("\ninterrupted")
+    except OSError as e:
+        # missing, unreadable or unwritable files are the user's to fix: a message,
+        # not a traceback (CATPPUCCINIZER_DEBUG=1 shows it)
+        if os.environ.get("CATPPUCCINIZER_DEBUG"):
+            raise
+        raise SystemExit(f"error: {e.strerror}: {e.filename}" if e.filename and e.strerror
+                         else f"error: {e}")

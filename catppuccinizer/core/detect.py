@@ -13,9 +13,12 @@ UI_GROUP = "ui"
 def load_rgba(path):
     """Image (path or PIL image) as float RGB plus alpha (0..255), or alpha=None
     when fully opaque."""
-    im = path if isinstance(path, Image.Image) else Image.open(path)
-    has_alpha = im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
-    im = im.convert("RGBA")
+    try:
+        im = path if isinstance(path, Image.Image) else Image.open(path)
+        has_alpha = im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
+        im = im.convert("RGBA")
+    except (ValueError, SyntaxError) as e:      # a broken header: PIL is not consistent
+        raise OSError(f"cannot read image file '{path}' ({e})") from e
     arr = np.asarray(im, dtype=np.float32)
     alpha = arr[..., 3]
     if not has_alpha or alpha.min() >= 255:
