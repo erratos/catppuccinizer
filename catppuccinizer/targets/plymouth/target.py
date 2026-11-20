@@ -24,7 +24,7 @@ from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_arg
 from ...core.paths import config_dir
 from ...core.recolor import recolor_image, recolor_job
 from ...core.target import Target
-from .upstream import resolve_theme, upstream_themes
+from .upstream import local_src, resolve_theme, upstream_themes
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIGS = HERE / "configs"
@@ -50,7 +50,8 @@ class PlymouthTarget(Target):
     def sources(self):
         themes = upstream_themes()
         return [{"value": name, "label": name,
-                 "note": path.split("/")[0] + ("  · tuned" if config_path(name).exists() else "")}
+                 "note": "  · ".join(x for x in (path.rpartition("/")[0],
+                                                "tuned" if config_path(name).exists() else "") if x)}
                 for name, path in sorted(themes.items(), key=lambda kv: kv[1])]
 
 
@@ -63,8 +64,6 @@ def add_arguments(p):
     p.add_argument("--detect", action="store_true",
                    help="(re)detect colours, overwrite the theme's config, then stop")
     p.add_argument("--list", action="store_true", help="list adi1090x themes and exit")
-    p.add_argument("--src", type=Path,
-                   help="local adi1090x/plymouth-themes checkout (default: fetched into the cache)")
     p.add_argument("--install", action="store_true",
                    help="install the result (its -status variant if any) and rebuild the initramfs")
     p.add_argument("--test", nargs="?", const=10, type=int, metavar="SECONDS",
@@ -370,6 +369,8 @@ def preview_sheet(theme, plan, base, out):
 
 def list_themes():
     themes = upstream_themes()
+    if local_src():
+        print(f"(from {local_src()})")
     for name, path in sorted(themes.items(), key=lambda kv: kv[1]):
         mark = "  [config]" if config_path(name).exists() else ""
         print(f"{path}{mark}")
@@ -386,7 +387,7 @@ def run(a):
 
     jobs, status, copies = [], [], []
     for arg in a.themes:
-        theme = Theme(resolve_theme(arg, a.src))
+        theme = Theme(resolve_theme(arg))
         if not theme.groups:
             print(f"{theme.title}: no PNG images, nothing to recolour")
             continue

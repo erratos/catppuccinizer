@@ -24,8 +24,9 @@ ten minutes after the page is closed. `--port N` picks the port,
    - images: *Browse files…* (several at once, or a whole folder), drop them on
      the page, or type a path;
    - Plymouth: *Choose from catalogue…* lists the 80 adi1090x themes (fetched
-     with git the first time; *tuned* ones have a hand-made colour config), or
-     browse to any theme folder;
+     with git the first time, or those of your
+     [local copy](plymouth.md#using-a-local-copy-of-the-adi1090x-themes);
+     *tuned* ones have a hand-made colour config), or browse to any theme folder;
    - KDE splash: the catalogue lists the splash screens installed on the
      system;
    - Limine: the wallpaper is optional.

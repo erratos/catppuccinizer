@@ -5,7 +5,7 @@
 Recolours any Plymouth boot splash theme folder (`script`, `two-step`,
 `fade-throbber`…), or any of the 80 animations of
 [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes), fetched
-by name (needs `git`).
+by name (needs `git`, or a [local copy](#using-a-local-copy-of-the-adi1090x-themes)).
 
 ```bash
 catppuccinize plymouth --list                        # adi1090x themes you can fetch by name
@@ -171,6 +171,23 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 
 ## Tips
 
+### Using a local copy of the adi1090x themes
+
+Themes given by name are fetched with git into
+`~/.cache/catppuccinizer/plymouth-themes/`, one at a time. To use a copy you
+already have instead (a clone of the repository, an extracted archive, or any
+folder of themes), point `CATPPUCCINIZER_PLYMOUTH_SRC` to it:
+
+```bash
+export CATPPUCCINIZER_PLYMOUTH_SRC=~/src/plymouth-themes
+catppuccinize plymouth --list            # the themes found there
+catppuccinize plymouth rings_2 -a mauve  # taken from that folder, nothing fetched
+catppuccinize gui                        # the catalogue lists the same themes
+```
+
+Every folder holding a `.plymouth` file counts, in `pack_N/` or at the top.
+To recolour a single theme folder, just give its path instead.
+
 ### Seeing the splash on a fast machine
 
 On a fast machine the splash may vanish before you see it. A systemd drop-in
@@ -202,7 +219,6 @@ for it.
 | `--preview` | | only render one before/after image per theme in `<out>/previews/` |
 | `--list` | | list upstream themes (`[config]` = has a config) |
 | `-o, --out` | `themes/` | output folder |
-| `--src` | | local `adi1090x/plymouth-themes` checkout instead of fetching |
 | `--test [S]` | `10` | show the result for S seconds without rebooting (always quits Plymouth, restores your default theme) |
 | `--install` | | install the result (its `-status` variant if any) and rebuild the initramfs |
 
