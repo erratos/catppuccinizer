@@ -117,7 +117,7 @@ class DryRun(unittest.TestCase):
         self.assertIn(f"would write {esp / 'limine.conf'}", out)
         self.assertTrue(any((self.tmp / "out").rglob("limine-theme.conf")))   # built as usual
         out = cli("limine", "--restore", "--dry-run", "--esp", esp)
-        self.assertIn(f"would write {esp / 'limine.conf'}", out)
+        self.assertIn("no catppuccinizer theme in it, left as it is", out)     # nothing applied
         self.assertEqual((esp / "limine.conf").read_text(), LIMINE_CONF)
 
     def test_plymouth(self):

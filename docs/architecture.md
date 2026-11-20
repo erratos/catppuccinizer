@@ -240,6 +240,13 @@ How:
   written byte for byte (`system.read_text` keeps line endings and undecodable
   bytes). `write_text(…, backup=True)` first copies the file next to itself as
   `<name>.<date>.bak`; the `KEEP_BACKUPS` (5) most recent are kept.
+- **`limine.conf`** is read back before it is written (`limine.check_insert`):
+  exactly one block, exactly the theme, and the rest of the file unchanged
+  byte for byte once the options it commented out are enabled again; otherwise
+  nothing is written. `restore` removes exactly that, so an untouched file
+  comes back as the backup of the first `apply`, and later changes (new kernel
+  entries) are kept. A wallpaper path of `limine.conf` that leaves the ESP
+  (`boot():/../…`) is refused.
 - **Commands** are lists, never a shell. Run as root, a command is looked up in
   the system folders only (`/usr/sbin`, `/usr/bin`…, not `$PATH`) and run by
   its absolute path. `plymouth/scripts/preview.sh` sets its own `PATH` and
@@ -249,7 +256,7 @@ How:
   file with other hard links.
 
 `tests/test_security.py` covers each point (malicious names, links out of a
-theme, atomic writes, backups, commands).
+theme, atomic writes, backups, commands, `limine.conf` byte for byte).
 
 ## Performances
 

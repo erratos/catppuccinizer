@@ -6,6 +6,10 @@ Writes a snippet (limine-theme.conf) and the wallpaper into the output folder.
 inserts the snippet into limine.conf between marker comments (a backup is made,
 conflicting global options are commented out). --restore undoes both.
 
+limine.conf is edited byte for byte: apply only adds the block and comments out
+options, restore removes exactly that, and the result is checked before it is
+written (check_insert): the rest of the file stays as it was.
+
 An existing wallpaper is kept (the menu background becomes see-through over
 it), unless --wallpaper replaces it or --recolor-wallpaper recolours it.
 """
@@ -19,6 +23,7 @@ from ..core.mapping import colour_report
 from ..core.naming import output_name
 from ..core.options import Option, step
 from ..core.palette import FLAVOR_TITLES, PALETTES
+from ..core.system import place, read_text
 from ..core.target import Target
 
 BEGIN = "# >>> catppuccinizer"
@@ -51,7 +56,7 @@ class LimineTarget(Target):
         if not built["wallpapers"]:
             print("  nothing to copy: no new wallpaper (the current one, if any, is kept)")
         for f in built["wallpapers"]:
-            system.copy_file(f, built["esp"] / WALL_DIR / f.name)
+            system.copy_file(f, place(built["esp"] / WALL_DIR, f.name, "wallpaper name"))
 
     def apply(self, a, built, system):
         conf = built["conf"]
@@ -62,7 +67,12 @@ class LimineTarget(Target):
     def restore(self, a, system):
         esp = a.esp or default_esp()
         conf = a.conf or find_conf(esp)
-        system.write_text(conf, strip_theme(read(conf)), backup=True)
+        text = read(conf)
+        stripped = strip_theme(text)
+        if stripped == text:
+            print(f"  {conf}: no catppuccinizer theme in it, left as it is")
+        else:
+            system.write_text(conf, stripped, backup=True)
         walls = esp / WALL_DIR
         ours = sorted(walls.glob("catppuccin-*-wallpaper*"))
         for f in ours:
@@ -153,10 +163,22 @@ def find_conf(esp):
     raise SystemExit(f"limine.conf not found under {esp} (use --conf)")
 
 
+# our block, and the blank line insert_theme puts after it
+BLOCK = re.compile(rf"^{re.escape(BEGIN)}[^\n]*\n(?:.*?\n)??{re.escape(END)}\n\n?", re.M | re.S)
+
+
+def markers(text):
+    return (len(re.findall(rf"^{re.escape(BEGIN)}", text, re.M)),
+            len(re.findall(rf"^{re.escape(END)}$", text, re.M)))
+
+
 def strip_theme(text):
-    """Remove our block and re-enable the options we had commented out."""
-    text = re.sub(rf"^{re.escape(BEGIN)}.*?^{re.escape(END)}\n(\n(?=\s*/))?", "", text,
-                  flags=re.M | re.S)
+    """Remove our block and re-enable the options we had commented out: exactly what
+    insert_theme added, so the rest of the file comes back byte for byte."""
+    text, n = BLOCK.subn("", text)
+    if markers(text) != (0, 0):
+        raise SystemExit(f"limine.conf: a '{BEGIN}' line without its '{END}' line (or the "
+                         "reverse); fix it by hand, nothing was written")
     return re.sub(rf"^{re.escape(DISABLED)}", "", text, flags=re.M)
 
 
@@ -173,31 +195,52 @@ def global_values(text, key):
 
 
 def resolve_on_esp(ref, esp):
-    """'boot():/path#hash' (or any 'xxx():/path') -> file on the mounted ESP."""
+    """'boot():/path#hash' (or any 'xxx():/path') -> file on the mounted ESP (never
+    out of it: '../' is refused)."""
     path = re.sub(r"^[a-z_]+\([^)]*\):", "", ref).split("#", 1)[0]
-    return esp / path.lstrip("/")
+    f = esp / path.lstrip("/")
+    if not f.resolve().is_relative_to(esp.resolve()):
+        raise SystemExit(f"limine.conf: wallpaper {ref} is not on the ESP ({esp})")
+    return f
 
 
 def insert_theme(text, lines, replace_wallpaper=False):
-    text = strip_theme(text)
+    """limine.conf with our block (lines) before the first menu entry (at the top
+    when there is none) and the conflicting global options commented out; the
+    rest of the file is kept byte for byte (line endings included)."""
+    base = strip_theme(text)
     disable = KEYS + (WALL_KEYS if replace_wallpaper else [])
-    out, in_globals, inserted = [], True, False
-    for line in text.splitlines():
+    block = "".join(line + "\n" for line in lines) + "\n"
+    out, in_globals = [], True
+    for line in base.splitlines(keepends=True):
         if in_globals and line.lstrip().startswith("/"):        # first menu entry
-            out += lines + [""]
-            in_globals, inserted = False, True
+            out.append(block)
+            in_globals = False
         key = line.split(":", 1)[0].strip().lower()
         if in_globals and key in disable and not line.lstrip().startswith("#"):
             line = DISABLED + line
         out.append(line)
-    if not inserted:
-        out += [""] + lines
-    return "\n".join(out) + "\n"
+    if in_globals:
+        out.insert(0, block)
+    new = "".join(out)
+    check_insert(base, new, block)
+    return new
+
+
+def check_insert(base, new, block):
+    """Read the new limine.conf back before it is written: one block, exactly ours,
+    and the rest of the file unchanged byte for byte (once our commented-out
+    options are enabled again)."""
+    found = BLOCK.search(new)
+    if (markers(new) != (1, 1) or not found or found.group(0) != block
+            or strip_theme(new) != base):
+        raise SystemExit("limine.conf: the new file would change more than the "
+                         "catppuccinizer block; nothing was written")
 
 
 def read(conf):
     try:
-        return conf.read_text()
+        return read_text(conf)              # as it is: byte for byte when written back
     except PermissionError:
         raise SystemExit(f"Cannot read {conf}: run with sudo (--dry-run too: it changes nothing, but it reads limine.conf)")
 

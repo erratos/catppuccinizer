@@ -63,9 +63,13 @@ interface_help_colour_bright: cba6f7
 `--apply` installs, then:
 
 1. finds `limine.conf` on the ESP (override with `--conf`);
-2. **backs it up** (`limine.conf.<date>.bak`);
-3. inserts the block before the first menu entry and comments out the global
-   options it replaces.
+2. **backs it up** (`limine.conf.<date>.bak`, the 5 most recent are kept);
+3. inserts the block before the first menu entry (at the top when there is
+   none) and comments out the global options it replaces;
+4. reads the result back before writing it: one block, exactly the theme, and
+   the rest of the file unchanged byte for byte (line endings included).
+   Otherwise nothing is written. The file is replaced atomically, with its
+   rights.
 
 A wallpaper already set in `limine.conf` is kept (the menu background becomes
 slightly see-through over it) unless `--wallpaper` replaces it or
@@ -80,6 +84,13 @@ config enrollment is enabled, run `sudo limine-enroll-config` afterwards.
 `--restore` removes the block from `limine.conf` (after a backup), restores
 the options it had commented out and deletes the copied wallpapers. It builds
 nothing.
+
+It takes away exactly what `--apply` added: if nothing else changed, the file
+is the backup made by the first `--apply`, byte for byte. Changes made since
+(a kernel update that added a menu entry) are kept, which putting the backup
+back would lose; the backups stay on the ESP if you want one anyway. A file
+without a theme is left as it is; a broken block (a begin line without its end)
+is refused, to be fixed by hand.
 
 ## Options
 
