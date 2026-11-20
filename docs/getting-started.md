@@ -63,18 +63,24 @@ fetch 80 ready-made animations by name (list them with
 `catppuccinize plymouth --list`) and recolour them:
 
 ```bash
-catppuccinize plymouth rings_2 -a mauve --test
+sudo catppuccinize plymouth rings_2 -a mauve --test
 ```
 
 `--test` shows the result for 10 seconds, right now, without rebooting. If you
-like it, install it:
+like it, make it your boot splash:
 
 ```bash
-catppuccinize plymouth rings_2 -a mauve --install
+sudo catppuccinize plymouth rings_2 -a mauve --apply
 ```
 
-It asks for your password (the theme goes into `/usr/share/plymouth/themes/`)
-and makes it the default. You will see it at the next boot.
+`--apply` copies the theme into `/usr/share/plymouth/themes/` (that is
+`--install`), makes it the default and rebuilds the initramfs: you will see it
+at the next boot. `sudo catppuccinize plymouth --restore` brings your previous
+theme back, and `--dry-run` (no sudo needed) lists what any of them would
+change without doing it.
+
+If `sudo` says *command not found* (pipx installs into `~/.local/bin`, which
+sudo does not search), use `sudo "$(command -v catppuccinize)" …`.
 
 ## 5. Not happy with a colour?
 

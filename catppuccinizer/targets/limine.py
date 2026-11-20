@@ -1,10 +1,10 @@
 """Limine target: Catppuccin colours (and optionally a recoloured wallpaper) for
 the Limine boot menu.
 
-Without --apply, writes a snippet (limine-theme.conf) and the wallpaper into the
-output folder. With --apply, inserts the snippet into limine.conf between marker
-comments (a backup is made, conflicting global options are commented out) and
-copies the wallpaper to the ESP. --remove undoes it.
+Writes a snippet (limine-theme.conf) and the wallpaper into the output folder.
+--install copies the wallpaper to the ESP; --apply (which installs first)
+inserts the snippet into limine.conf between marker comments (a backup is made,
+conflicting global options are commented out). --restore undoes both.
 
 An existing wallpaper is kept (the menu background becomes see-through over
 it), unless --wallpaper replaces it or --recolor-wallpaper recolours it.
@@ -12,15 +12,13 @@ it), unless --wallpaper replaces it or --recolor-wallpaper recolours it.
 import os
 import re
 import shutil
-from datetime import datetime
 from pathlib import Path
 
 from ..core import recolor
 from ..core.mapping import colour_report
 from ..core.naming import output_name
-from ..core.options import Option
+from ..core.options import Option, step
 from ..core.palette import FLAVOR_TITLES, PALETTES
-from ..core.paths import give_back
 from ..core.target import Target
 
 BEGIN = "# >>> catppuccinizer"
@@ -46,8 +44,30 @@ class LimineTarget(Target):
     def check(self, a):
         check_args(a)
 
-    def run(self, a):
-        run(a)
+    def build(self, a):
+        return build(a)
+
+    def install(self, a, built, system):
+        for f in built["wallpapers"]:
+            system.copy_file(f, built["esp"] / WALL_DIR / f.name)
+
+    def apply(self, a, built, system):
+        conf = built["conf"]
+        system.write_text(conf, insert_theme(read(conf), built["lines"],
+                                             bool(built["wallpapers"])), backup=True)
+        enrollment_note()
+
+    def restore(self, a, system):
+        esp = a.esp or default_esp()
+        conf = a.conf or find_conf(esp)
+        system.write_text(conf, strip_theme(read(conf)), backup=True)
+        walls = esp / WALL_DIR
+        ours = sorted(walls.glob("catppuccin-*-wallpaper*"))
+        for f in ours:
+            system.remove(f)
+        if walls.is_dir() and not set(walls.iterdir()) - set(ours):     # nothing else in it
+            system.remove(walls)
+        enrollment_note()
 
     def colours(self, a):
         return colours(a)
@@ -61,10 +81,11 @@ OPTIONS = [
     *recolor.method_options(),
     Option("--style", choices=["stretched", "centered", "tiled"],
            help="wallpaper_style (default: the current one, or stretched)"),
-    Option("--apply", switch=True, stage="apply", sudo="run",
-           help="write the theme into limine.conf (run with sudo; a backup is made)"),
-    Option("--remove", switch=True, stage="restore", sudo="run",
-           help="remove the theme from limine.conf"),
+    step("install", sudo="run", help=f"copy the wallpaper to <ESP>/{WALL_DIR}/ (sudo)"),
+    step("apply", sudo="run",
+         help="install, then write the theme into limine.conf (sudo; a backup is made)"),
+    step("restore", sudo="run",
+         help="remove the theme from limine.conf and its wallpapers from the ESP (sudo)"),
     Option("--conf", type=Path, accept="file", stage="apply",
            help="limine.conf to edit (default: searched on the ESP)"),
     Option("--esp", type=Path, accept="dir", stage="apply",
@@ -73,8 +94,8 @@ OPTIONS = [
 
 
 def check_args(a):
-    if a.apply and (len(a.flavor) > 1 or len(a.accent) > 1):
-        raise SystemExit("--apply needs a single flavour and a single accent")
+    if (a.install or a.apply) and (len(a.flavor) > 1 or len(a.accent) > 1):
+        raise SystemExit("--install / --apply need a single flavour and a single accent")
     if a.wallpaper and a.recolor_wallpaper:
         raise SystemExit("use either --wallpaper or --recolor-wallpaper")
     if a.wallpaper and not a.wallpaper.is_file():
@@ -172,27 +193,16 @@ def insert_theme(text, lines, replace_wallpaper=False):
     return "\n".join(out) + "\n"
 
 
-def apply(conf, esp, lines, wallpaper_files=()):
+def read(conf):
     try:
-        text = conf.read_text()
-        backup = conf.with_name(conf.name + datetime.now().strftime(".%Y%m%d-%H%M%S-%f.bak"))
-        shutil.copy2(conf, backup)
-        for wf in wallpaper_files:
-            (esp / WALL_DIR).mkdir(exist_ok=True)
-            shutil.copy(wf, esp / WALL_DIR / wf.name)
-        conf.write_text(insert_theme(text, lines, bool(wallpaper_files)) if lines
-                        else strip_theme(text))
-        if not lines:                            # --remove: drop our wallpapers too
-            for f in (esp / WALL_DIR).glob("catppuccin-*-wallpaper*"):
-                f.unlink()
-            if (esp / WALL_DIR).is_dir() and not any((esp / WALL_DIR).iterdir()):
-                (esp / WALL_DIR).rmdir()
-    except PermissionError as e:
-        raise SystemExit(f"{e}\nRun with sudo to edit {conf}.")
-    print(f"  backup: {backup}")
-    print(f"  updated: {conf}")
-    if Path("/etc/limine-entry-tool.conf").exists() and re.search(
-            r"^ENABLE_ENROLL_LIMINE_CONFIG=yes", Path("/etc/limine-entry-tool.conf").read_text(), re.M):
+        return conf.read_text()
+    except PermissionError:
+        raise SystemExit(f"Cannot read {conf}: run with sudo.")
+
+
+def enrollment_note():
+    tool = Path("/etc/limine-entry-tool.conf")
+    if tool.exists() and re.search(r"^ENABLE_ENROLL_LIMINE_CONFIG=yes", tool.read_text(), re.M):
         print("  config enrollment is on: run 'sudo limine-enroll-config' now")
 
 
@@ -202,10 +212,7 @@ def wallpapers(a, esp, read_conf):
     conf, current, style = None, [], a.style
     if read_conf:
         conf = a.conf or find_conf(esp)
-        try:
-            text = strip_theme(conf.read_text())
-        except PermissionError:
-            raise SystemExit(f"Cannot read {conf}: run with sudo.")
+        text = strip_theme(read(conf))
         current = global_values(text, "wallpaper")
         style = style or next(iter(global_values(text, "wallpaper_style")), None)
         if current:
@@ -228,14 +235,12 @@ def colours(a):
             *(recolor.colour_report(src, *recolor.plan(src, a, verbose=False)) for src in sources)]
 
 
-def run(a):
+def build(a):
+    """The snippet and wallpapers of each flavour and accent; for the system steps,
+    those of the last one (they need a single flavour and accent)."""
     esp = a.esp or default_esp()
-    if a.remove:
-        conf = a.conf or find_conf(esp)
-        print(f"Removing the Catppuccin theme from {conf}")
-        return apply(conf, esp, None)
-
     conf, current, style, sources = wallpapers(a, esp, a.apply or a.recolor_wallpaper)
+    built = None
     plans = [recolor.plan(src, a) for src in sources]          # analysed once per image
     done = {}       # (image, flavour, accent or None) -> files already written for it
     for flv in a.flavor:
@@ -269,14 +274,13 @@ def run(a):
                                 over_wallpaper=bool(current) and not wall_files)
             (dst / "limine-theme.conf").write_text("\n".join(lines) + "\n")
             print(f"Catppuccin {FLAVOR_TITLES[flv]} ({acc}) -> {dst}")
-            if a.apply:
-                apply(conf, esp, lines, wall_files)
-            else:
+            if not a.apply:
                 print(f"  paste {dst / 'limine-theme.conf'} at the top of limine.conf"
                       + (f", copy {', '.join(f.name for f in wall_files)} to <ESP>/{WALL_DIR}/"
                          if wall_files else "")
                       + ", or rerun with --apply (sudo)")
-    give_back(a.out)      # files written under sudo belong to the invoking user
+            built = {"esp": esp, "conf": conf, "lines": lines, "wallpapers": wall_files}
+    return built
 
 
 TARGET = LimineTarget()

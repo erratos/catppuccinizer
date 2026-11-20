@@ -8,9 +8,11 @@ Recolours any Plymouth boot splash theme folder (`script`, `two-step`,
 by name (needs `git`, or a [local copy](#using-a-local-copy-of-the-adi1090x-themes)).
 
 ```bash
-catppuccinize plymouth --list                        # adi1090x themes you can fetch by name
-catppuccinize plymouth rings_2 -a mauve --test       # build it and show it, no reboot
-catppuccinize plymouth rings_2 -a mauve --install    # install + rebuild the initramfs
+catppuccinize plymouth --list                          # adi1090x themes you can fetch by name
+catppuccinize plymouth rings_2 -a mauve                # build it into themes/
+sudo catppuccinize plymouth rings_2 -a mauve --test    # build it and show it, no reboot
+sudo catppuccinize plymouth rings_2 -a mauve --apply   # install, make it the default
+sudo catppuccinize plymouth --restore                  # back to your previous theme
 catppuccinize plymouth /usr/share/plymouth/themes/spinner -a mauve   # a theme you have
 ```
 
@@ -148,14 +150,49 @@ variant that adds, under the animation:
 All themes use the flavour's `base` for the whole screen and `text` for
 password prompts and messages.
 
-## Testing and installing
+## Steps
 
-`--test` shows the result for a few seconds without rebooting (it always quits
-Plymouth and restores your default theme afterwards).
+Building writes into the output folder only. The steps that change the system
+are separate options; they need a single theme, flavour and accent, and root
+(`sudo catppuccinize …`: your tuned configs and downloaded themes are still
+taken from your home). Add `--dry-run` to any of them to only list what they
+would copy, write and run.
 
-`--install` copies the theme (its `-status` variant if any) to
-`/usr/share/plymouth/themes/`, sets it as default and rebuilds the initramfs
-(it asks for sudo).
+### Preview
+
+`--preview` renders one before/after image per theme into `<out>/previews/`,
+nothing else.
+
+### Build (default)
+
+The theme folders, `themes/catppuccin-<flavor>-<theme>[-<accent>][-<suffix>]/`
+(and their `-status` variant), ready to copy.
+
+### Install
+
+`--install` copies the result (its `-status` variant if any) to
+`/usr/share/plymouth/themes/`, without selecting it. On KDE you can then pick
+it in *System Settings → Boot Splash Screen*.
+
+### Apply
+
+`--apply` installs, then makes the theme the default and rebuilds the
+initramfs (`plymouth-set-default-theme -R`). The theme in use before is
+remembered (in `/var/lib/catppuccinizer/plymouth.json`) for `--restore`.
+
+### Test
+
+`--test [SECONDS]` installs the theme and shows it for 10 seconds (or
+SECONDS) without rebooting; it always quits Plymouth and restores your default
+theme afterwards. Run it from a text console (Ctrl+Alt+F3) if the screen does
+not switch.
+
+### Restore
+
+`--restore` makes the theme in use before `--apply` the default again (with
+`-R`) and removes the themes catppuccinizer installed. It builds nothing.
+
+### By hand
 
 To install from an archive of
 [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes/releases):
@@ -222,7 +259,10 @@ for it.
 | `--list` | | list upstream themes (`[config]` = has a config) |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |
 | `-o, --out` | `themes/` | output folder |
-| `--test [S]` | `10` | show the result for S seconds without rebooting (always quits Plymouth, restores your default theme) |
-| `--install` | | install the result (its `-status` variant if any) and rebuild the initramfs |
+| `--install` | | copy the result (its `-status` variant if any) to `/usr/share/plymouth/themes/` (sudo) |
+| `--apply` | | install, make it the default theme, rebuild the initramfs (sudo) |
+| `--test [S]` | `10` | install and show it for S seconds without rebooting (sudo) |
+| `--restore` | | previous default theme again, installed themes removed (sudo) |
+| `--dry-run` | | with the steps above: only list what they would change |
 
 Output names: `catppuccin-<flavor>-<theme>[-<accent>][-<suffix>]`.

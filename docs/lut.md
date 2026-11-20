@@ -22,7 +22,9 @@ mpv --vf=lut3d=luts/catppuccin-mocha-lut.cube video.mkv
 magick in.jpg luts/catppuccin-mocha-lut-hald.png -hald-clut out.jpg
 ```
 
-A LUT has no source colours: `-m` and `--colours` do not apply.
+A LUT has no source colours: `-m` and `--colours` do not apply. There is no
+preview and nothing to install: the files are written into the output folder
+only.
 
 ## Options
 

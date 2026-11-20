@@ -169,6 +169,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .warn { color: var(--yellow); font-size: 13px; margin: 8px 0 0; }
 .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
 .actions .sp { flex: 1; }
+.btn .badge { margin-left: 6px; vertical-align: 1px; }
 .check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; color: var(--subtext1); font-size: 13px; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--subtext0); margin: 12px 0 6px; }
@@ -253,10 +254,13 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
       <div class="err hidden" id="err"></div>
       <div class="warn hidden" id="sudowarn"></div>
       <div class="actions">
-        <label class="check hidden" id="sudobox" title="Run the command with sudo (a password prompt opens)"><input type="checkbox" id="sudo"> Run with sudo</label>
-        <span class="sp"></span>
         <button class="btn big" id="previewbtn" title="Only render before/after images (--preview)">Preview</button>
-        <button class="btn primary big" id="runbtn">Run</button>
+        <button class="btn primary big" id="runbtn" title="Write the result into the output folder">Build</button>
+      </div>
+      <div class="actions hidden" id="steps"></div>
+      <div class="actions hidden" id="stepopts">
+        <label class="check" id="drybox" title="Build as usual, then only list what the system steps would change (--dry-run)"><input type="checkbox" id="dryrun"> Dry run</label>
+        <label class="check" id="sudobox" title="Run every command with sudo (a password prompt opens); the steps marked sudo always do"><input type="checkbox" id="sudo"> Always with sudo</label>
       </div>
     </section>
     <section class="card">
@@ -317,7 +321,7 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 "use strict";
 const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
-const S = { schema: null, target: null, values: {}, sudo: {}, job: null, since: 0, detected: new Map(), cmd: null, lastOut: null };
+const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, detected: new Map(), cmd: null, lastOut: null };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -396,7 +400,7 @@ function sendVals() {
   // drop what the page does not show for this target (a shared accent for lut...)
   const v = { ...vals() }, t = cur();
   if (!t.default_accent.length) delete v.accent;
-  for (const o of t.options) if (o.when && !shown(o)) delete v[o.dest];
+  for (const o of t.options) if ((o.when && !shown(o)) || o.role === "step" || o.dest === "dry_run") delete v[o.dest];
   return v;
 }
 // facts from the analysis of the sources that an option's `when` can use; unknown
@@ -415,7 +419,13 @@ function whenMet(when) {
 }
 const shown = (o) => whenMet(o.when);
 // common options with their own place in the page; the others go to the Options card
-const COMMON_WIDGETS = new Set(["flavor", "accent", "map", "preview", "out"]);
+const COMMON_WIDGETS = new Set(["flavor", "accent", "map", "preview", "out", "dry_run"]);
+// the system steps: one button each, in this order (core.options.STEPS)
+const STEP_LABELS = { install: "Install", apply: "Apply", test: "Test", restore: "Restore" };
+const steps = () => cur().options.filter((o) => o.role === "step");
+// the options of the steps that touch the system, and of the analysis, get their own groups
+const STAGE_GROUPS = { analyse: "Analyse (writes no output)", install: "System steps", apply: "System steps",
+                       test: "System steps", restore: "System steps" };
 
 // ------------------------------------------------------------------ render
 function renderTabs() {
@@ -436,9 +446,11 @@ function render() {
   const options = t.options.filter((o) => o.role === "option" || (o.role === "common" && !COMMON_WIDGETS.has(o.dest)));
   if (options.length) cards.push(card(++n, "Options", optionsCard(options)));
   cards.push(card(++n, "Output folder", [pathField(opt("out"), { placeholder: `${tidy(S.schema.cwd)}/${t.default_out}`, accept: "dir" }),
-    h("p", { class: "hint" }, "Nothing is installed on the system unless you turn on an install / apply option.")]));
+    h("p", { class: "hint" }, steps().length ? "Build writes here only; the system is changed by the Install / Apply buttons (try them with Dry run first)."
+      : "Nothing is written outside this folder.")]));
   form.replaceChildren(...cards.filter(Boolean));
   $("previewbtn").classList.toggle("hidden", !(sources.length && opt("preview")));
+  renderSteps();
   refreshVisibility();
 }
 function card(n, title, body) {
@@ -583,9 +595,10 @@ function mapEditor() {
 
 // ----------------------------------------------------------------- options
 function optionsCard(options) {
-  const plain = options.filter((o) => !o.group);
+  const group = (o) => o.group || STAGE_GROUPS[o.stage];
+  const plain = options.filter((o) => !group(o));
   const groups = {};
-  for (const o of options.filter((o) => o.group)) (groups[o.group] ||= []).push(o);
+  for (const o of options.filter(group)) (groups[group(o)] ||= []).push(o);
   const out = [h("div", { class: "opts" }, plain.map(optionField))];
   for (const [title, list] of Object.entries(groups)) {
     const d = h("details", { class: "group", open: true },
@@ -686,24 +699,36 @@ function refreshVisibility() {
   document.querySelectorAll("[data-when]").forEach((el) => el.classList.toggle("hidden", !whenMet(JSON.parse(el.dataset.when))));
   // a group of options with none shown (the --lutgen-* ones without --method lutgen)
   document.querySelectorAll("details.group").forEach((d) => d.classList.toggle("hidden", ![...d.querySelectorAll(".opt")].some((e) => !e.classList.contains("hidden"))));
-  // sudo: on by default when an option says the command needs it, until the user changes it
-  const t = cur(), on = (o) => vals()[o.dest] !== undefined && shown(o);
-  const needs = t.options.some((o) => o.sudo === "run" && on(o));
-  const chosen = S.sudo[S.target];
-  $("sudo").checked = chosen === undefined ? needs : chosen;
-  $("sudobox").classList.toggle("hidden", !needs && !$("sudo").checked);
+  // sudo: the steps marked sudo always run with it (not in a dry run); "Always with sudo" for the rest
+  $("sudo").checked = !!S.sudo[S.target];
+  $("dryrun").checked = !!S.dry[S.target];
   const w = $("sudowarn");
-  const sudoOn = $("sudo").checked;
-  const helperNeeded = sudoOn || t.options.some((o) => o.sudo === "self" && on(o));
-  w.classList.toggle("hidden", !(helperNeeded && !S.schema.askpass));
-  w.textContent = "No graphical sudo prompt (ksshaskpass, ssh-askpass) was found: copy the command and run it in a terminal.";
+  const sudoSteps = steps().some((o) => o.sudo === "run");
+  w.classList.toggle("hidden", !((sudoSteps || $("sudo").checked) && !S.schema.askpass));
+  w.textContent = "No graphical sudo prompt (ksshaskpass, ssh-askpass) was found: the steps marked sudo need a terminal (copy their command: hover the button).";
 }
 
 // ----------------------------------------------------------------- command
 let cmdTimer = null;
 function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCommand, 120); }
+// what a button runs: the form values, plus --preview or one step (null: Build)
+function action(step) {
+  const values = sendVals(), o = step && step !== "preview" ? opt(step) : null;
+  if (step === "preview") values.preview = true;
+  if (o) { values[step] = true; if (S.dry[S.target]) values.dry_run = true; }
+  const sudo = $("sudo").checked || (!!o && o.sudo === "run" && !S.dry[S.target]);
+  return { target: S.target, values, sudo };
+}
+function renderSteps() {
+  const list = steps();
+  $("steps").classList.toggle("hidden", !list.length);
+  $("stepopts").classList.toggle("hidden", !list.length);
+  $("steps").replaceChildren(...list.map((o) => h("button", { class: "btn" + (o.dest === "restore" ? " danger" : ""), "data-step": o.dest, title: o.help,
+    onclick: () => run(o.dest), onmouseenter: () => { S.hover = o.dest; updateCommand(); }, onmouseleave: () => { S.hover = null; updateCommand(); } },
+    STEP_LABELS[o.dest] || o.dest, o.sudo === "run" ? h("span", { class: "badge" }, "sudo") : null)));
+}
 async function updateCommand() {
-  const r = await api("/api/command", { target: S.target, values: sendVals(), sudo: $("sudo").checked });
+  const r = await api("/api/command", action(S.hover));
   S.cmd = r;
   const c = $("cmdtext");
   const parts = (r.command || "").split(" ");
@@ -713,17 +738,16 @@ async function updateCommand() {
   const busy = S.job && !S.job.done;
   $("runbtn").disabled = !!r.error || busy;
   $("previewbtn").disabled = !!r.error || busy;
+  document.querySelectorAll("#steps button").forEach((b) => { b.disabled = busy || (!!r.error && !S.hover); });
 }
 
 // --------------------------------------------------------------------- run
-async function run(preview) {
-  const values = sendVals();
-  if (preview) values.preview = true;
-  const r = await api("/api/run", { target: S.target, values, sudo: $("sudo").checked });
+async function run(step) {
+  const r = await api("/api/run", action(step));
   if (r.error) { toast(r.error); return; }
   S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.detected.clear(); S.group = ""; S.accentIgnored = false;
   $("log").replaceChildren(); $("results").replaceChildren(); renderDetected();
-  $("prog").style.width = "0"; setStatus("run", preview ? "Rendering previews…" : "Running…");
+  $("prog").style.width = "0"; setStatus("run", step === "preview" ? "Rendering previews…" : step ? `${STEP_LABELS[step] || step}${S.dry[S.target] && step !== "preview" ? " (dry run)" : ""}…` : "Building…");
   $("stopbtn").classList.remove("hidden"); $("openout").classList.add("hidden");
   updateCommand(); poll();
 }
@@ -879,8 +903,9 @@ $("copy").onclick = async () => {
   try { await navigator.clipboard.writeText(text); toast("Command copied"); }
   catch { const r = document.createRange(); r.selectNodeContents($("cmdtext")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("Selected: Ctrl+C to copy"); }
 };
-$("runbtn").onclick = () => run(false);
-$("previewbtn").onclick = () => run(true);
+$("runbtn").onclick = () => run(null);
+$("previewbtn").onclick = () => run("preview");
+$("dryrun").onchange = (e) => { S.dry[S.target] = e.target.checked; refreshVisibility(); scheduleCommand(); };
 $("stopbtn").onclick = () => S.job && api("/api/stop", { id: S.job.id });
 $("openout").onclick = () => S.lastOut && api("/api/open", { path: S.lastOut });
 $("sudo").onchange = (e) => { S.sudo[S.target] = e.target.checked; refreshVisibility(); scheduleCommand(); };

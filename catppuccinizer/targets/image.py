@@ -68,7 +68,7 @@ class ImageTarget(Target):
                 out.append(recolor.colour_report(path, *recolor.plan(path, a, verbose=False)))
         return out
 
-    def run(self, a):
+    def build(self, a):
         files = collect(a.images)
         if not files:
             raise SystemExit("No images found")

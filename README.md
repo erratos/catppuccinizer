@@ -25,12 +25,13 @@ pipx install git+https://github.com/erratos/catppuccinizer.git
 
 ```bash
 catppuccinize image ~/Pictures/wall.jpg -f macchiato     # -> ./images/
-catppuccinize plymouth rings_2 -a mauve --test           # boot splash, shown without rebooting
+sudo catppuccinize plymouth rings_2 -a mauve --test      # boot splash, shown without rebooting
 ```
 
 `-f` picks the flavour, `-a` the accent colour, `--preview` writes a
 before/after image instead of the result. Nothing is installed on your system
-unless you pass `--install` or `--apply`.
+unless you pass `--install` or `--apply` (`--dry-run` lists what they would
+change, `--restore` undoes them).
 
 Every command names its outputs `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]`
 ([output names](docs/colours.md#output-names)).

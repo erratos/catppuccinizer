@@ -8,11 +8,11 @@ what a front-end needs to show it:
 - scope: "common" (every target, declared here), "method" / "method:<name>"
   (the recolouring methods, declared in core.recolor and core.lutgen) or
   "target" (declared by the target);
-- stage: the step it belongs to (STAGES): "analyse" lists or detects and writes
+- stage: the stage it belongs to (STAGES): "analyse" lists or detects and writes
   no output, "preview" / "build" write into the output folder, "install",
-  "apply", "test" and "restore" touch the system;
-- sudo: None, "run" (the command must run as root) or "self" (the target asks
-  for root itself, through sudo, so a graphical password prompt is needed);
+  "apply", "test" and "restore" touch the system. The option that runs a system
+  step is made with step() (dest = stage = the step's name);
+- sudo: None or "run" (the command must run as root);
 - when: when the option matters, {key: allowed values}. A key is another
   option's dest ({"method": ["lutgen"]}) or "analysis.<fact>", a fact from the
   analysis of the sources (see analysis()); a fact not known yet (nothing
@@ -32,8 +32,9 @@ from .naming import suffix_type
 
 STAGES = ("analyse", "preview", "build", "install", "apply", "test", "restore")
 SYSTEM_STAGES = ("install", "apply", "test", "restore")
+STEPS = SYSTEM_STAGES                  # Target methods, each with its option (step())
 SCOPES = ("common", "method", "target")          # + "method:<name>"
-SUDO = (None, "run", "self")
+SUDO = (None, "run")
 ACCEPT = (None, "image", "images", "dir", "file")
 KINDS = ("bool", "optional", "choice", "multichoice", "int", "float", "path", "text",
          "flavor", "accent", "map", "colour")
@@ -138,7 +139,8 @@ class Option:
             "image": self.image, "range": list(self.range) if self.range else None,
             "group": self.group, "when": self.when, "scope": self.scope, "stage": self.stage,
             "sudo": self.sudo, "accept": self.accept,
-            "role": "source" if self.source else ("common" if self.scope == "common" else "option"),
+            "role": ("source" if self.source else "step" if is_step(self)
+                     else "common" if self.scope == "common" else "option"),
         }
 
 
@@ -206,6 +208,19 @@ def defaults(options, **values):
     return a
 
 
+def step(name, help, sudo=None, **kw):
+    """The option that runs a system step of a target (--install, --apply, --test,
+    --restore): its dest and stage are the step's name. kw: e.g. --test [SECONDS]."""
+    if name not in STEPS:
+        raise ValueError(f"unknown step {name}")
+    kw = {"switch": True, **kw} if "nargs" not in kw else kw
+    return Option(f"--{name}", help=help, stage=name, sudo=sudo, **kw)
+
+
+def is_step(o):
+    return o.dest in STEPS and o.stage == o.dest
+
+
 # ---------------------------------------------------------- common options
 COMMON = [
     Option("-f", "--flavor", nargs="+", default=["mocha"], metavar="FLAVOR", kind="flavor",
@@ -222,6 +237,12 @@ COMMON = [
     Option("-s", "--suffix", default="", type=suffix_type, metavar="SUFFIX", scope="common",
            help="extra word at the end of the output names (lowercase letters, digits and '-')"),
 ]
+
+# added to the targets that have system steps
+DRY_RUN = Option("--dry-run", switch=True, scope="common", stage="install",
+                 help="with --install, --apply, --test or --restore: build as usual, then "
+                      "only list the files the steps would copy, change or remove and the "
+                      "commands they would run")
 
 # added to the targets that define colours() (core.target.Target.colours)
 COLOURS = [

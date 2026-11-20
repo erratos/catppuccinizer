@@ -1,36 +1,21 @@
 #!/usr/bin/env bash
-# Preview a Plymouth theme without rebooting; always gives control back.
+# Show an installed Plymouth theme without rebooting; always gives control back.
+# Run as root by `catppuccinize plymouth --test` (which installs the theme first).
 #
-#   ./preview.sh [theme] [seconds]
-#   ./preview.sh catppuccin-mocha-hexa-retro-status 12
+#   preview.sh THEME [SECONDS]
 #
-# - no theme: uses the current default theme
-# - copies the theme from themes/ (or from a given folder) if available
 # - simulates service status messages (names of your running services)
 # - always quits Plymouth at the end, even after Ctrl+C, and restores
 #   the previous default theme
 # Run it from a text console (Ctrl+Alt+F3) if the screen does not switch.
 
 set -u
-[[ $EUID -eq 0 ]] || exec sudo "$0" "$@"
+[[ $EUID -eq 0 ]] || { echo "preview.sh must run as root" >&2; exit 1; }
 
-prev="$(plymouth-set-default-theme)"
-arg="${1:-$prev}"
+theme="${1:?Usage: $0 THEME [SECONDS]}"
 dur="${2:-10}"
-
-if [[ -d "$arg" ]]; then
-    src="$(readlink -f "$arg")"
-else
-    src="$PWD/themes/$arg"
-fi
-theme="$(basename "$src")"
-dest="/usr/share/plymouth/themes/$theme"
-
-if [[ -d "$src" ]]; then
-    install -d "$dest"
-    cp -r "$src"/. "$dest/"
-fi
-[[ -f "$dest/$theme.plymouth" ]] || { echo "Theme not found: $theme" >&2; exit 1; }
+prev="$(plymouth-set-default-theme)"
+[[ -f "/usr/share/plymouth/themes/$theme/$theme.plymouth" ]] || { echo "Theme not installed: $theme" >&2; exit 1; }
 
 cleanup() {
     plymouth --quit 2>/dev/null

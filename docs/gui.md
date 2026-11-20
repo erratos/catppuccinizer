@@ -41,13 +41,13 @@ ten minutes after the page is closed. `--port N` picks the port,
    `--smooth` with `auto` / `lut`, the `--lutgen-*` ones with `lutgen` (and
    each algorithm's own knobs with that algorithm), `--hald-level` /
    `--cube-size` with their format.
-5. **Preview** renders the before/after images (`--preview`); **Run** writes
+5. **Preview** renders the before/after images (`--preview`); **Build** writes
    the result. The output folder defaults to `./<target folder>` in the folder
    the GUI was started from.
 
 The *Command* box always shows the exact `catppuccinize …` line the page runs,
-with the error the command line would give when something is missing. Copy it
-to script the same thing later.
+with the error the command line would give when something is missing (hover a
+step button to see its own command). Copy it to script the same thing later.
 
 ### Remapping a colour
 
@@ -56,14 +56,20 @@ under the output, with what they were mapped to. Click one: it is added to
 *Colour remapping* in the Colours card, where you choose its new target.
 This is the same as `-m NAME=TARGET` ([Colours and mapping](colours.md)).
 
-### Install, apply, test
+### Install, apply, test, restore
 
-Options that change the system (`plymouth --install / --test`,
-`limine --apply / --remove`, `ksplash --install`) work from the page too.
-When an option needs root (marked **sudo**), *Run with sudo* is ticked (for
-`limine`; Plymouth's helper scripts ask for it themselves): the
-password is asked by a graphical prompt (`ksshaskpass`, `ssh-askpass`…, through
-`SUDO_ASKPASS`). Without one, copy the command and run it in a terminal.
+Targets that can change the system (Plymouth, Limine, KDE splash) get one
+button per step under *Preview* and *Build*: **Install**, **Apply** (installs
+first), **Test**, **Restore** ([what each one does](architecture.md#steps)).
+Each button builds, then runs its step; *Restore* only undoes. Their settings
+(`--esp`, `--conf`…) are in the *System steps* group of the options.
+
+- **Dry run**: the step only lists the files it would copy, change or remove
+  and the commands it would run; nothing is changed and no password is asked.
+- A button marked **sudo** runs the command with sudo: the password is asked by
+  a graphical prompt (`ksshaskpass`, `ssh-askpass`…, through `SUDO_ASKPASS`).
+  Without one, copy its command (hover the button) and run it in a terminal.
+  *Always with sudo* runs the other buttons with sudo too.
 
 ## Security
 
@@ -87,9 +93,10 @@ GUI without GUI code:
   `--method lutgen`, `--lutgen-radius` with `--lutgen-algo blur`, `-m` only
   for targets that have colours to remap; options whose `when` is not met are
   left out of the command;
-- `sudo="run"` ticks *Run with sudo*; `sudo="self"` (the target calls sudo
-  itself, like `plymouth --install`) only needs the graphical password prompt;
-  both show a **sudo** badge;
+- a step option (`options.step()`) becomes a button, `sudo="run"` marks it
+  **sudo** and runs it with sudo; options of the `install` / `apply` / `test` /
+  `restore` stages go to the *System steps* group, those of `analyse` to
+  *Analyse*;
 - `gui=False` keeps an option out of the forms (`--colours` lists, it does not run);
 - `Target.sources()` fills the catalogue (see [Architecture](architecture.md));
 - `Target.accent_also` names what still uses the accent when `--method` is a

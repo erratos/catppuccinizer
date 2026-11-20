@@ -13,6 +13,7 @@ catppuccinizer/
   gui/                `catppuccinize gui`: local web page built from the same options
   core/
     options.py        Option: every option declared once (CLI + GUI), the common ones
+    system.py         System: every change of the install / apply / test / restore steps
     palette.py        Catppuccin palettes, colour helpers, Oklab
     detect.py         background + source colours of a group of images
     mapping.py        --map overrides, automatic mapping of plain colour lists
@@ -20,7 +21,7 @@ catppuccinizer/
     clut.py           3D LUTs: trilinear application, resampling, Hald CLUT and .cube files
     lutgen.py         --lutgen-* options, runs the external lutgen binary
     formats.py        colours written as text (QML, SVG/SVGZ), animations (GIF, WebP)
-    paths.py          user config / cache folders, sudo-aware ownership
+    paths.py          user config / cache / restore state, sudo-aware home and ownership
     naming.py         output names (catppuccin-<flavor>-<source>[-<accent>][-<suffix>])
     target.py         Target base class + discovery
   targets/
@@ -31,6 +32,7 @@ catppuccinizer/
     lut.py            LUT export (Hald CLUT, .cube)
 tests/
   test_regression.py  every target on small fixtures, compared with golden.json
+  test_steps.py       System, step chaining, each target's steps in a dry run
   test_architecture.py
   test_options.py     every declared option is complete and coherent
   test_gui.py         forms, command lines, access control of the GUI
@@ -56,7 +58,10 @@ tests/
 | `formats.collect_text_colours(files)` / `recolour_text_file(f, lookup)` | colours inside QML / SVG / SVGZ |
 | `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
 | `recolor.recolor_frames(frames, ...)` | keys method over a stream of frames, in parallel |
-| `paths.config_dir(target)` / `cache_dir()` / `give_back(path)` | where to store things, sudo ownership |
+| `paths.config_dir(target)` / `cache_dir()` / `give_back(path)` | where to store things (the invoking user's home under sudo), sudo ownership |
+| `paths.state_file(target, system)` | where a step keeps what `restore` needs (the theme in use before…) |
+| `system.System` | `copy_tree`, `copy_file`, `write_text(…, backup=True)`, `remove`, `run`, `load_state` / `save_state`: every change a step makes, printed (only listed with `--dry-run`) |
+| `options.step(name, help, sudo)` | the option of a system step: `--install`, `--apply`, `--test`, `--restore` |
 | `naming.output_name(flavor, source, accent, suffix)` / `slug(text)` | the name of every output: `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]` |
 
 ## Writing a target
@@ -64,8 +69,10 @@ tests/
 ```python
 # catppuccinizer/targets/grub.py   (or any package, see below)
 """GRUB target: recolour a GRUB theme (theme.txt + images)."""
+from pathlib import Path
+
 from ..core import recolor
-from ..core.options import Option
+from ..core.options import Option, step
 from ..core.target import Target
 
 
@@ -79,13 +86,25 @@ class GrubTarget(Target):
         return [
             Option("theme", accept="dir", help="theme folder"),
             *recolor.method_options(),
-            Option("--install", switch=True, stage="install", sudo="run",
-                   help="copy the theme to /boot/grub/themes"),
+            step("install", sudo="run", help="copy the theme to /boot/grub/themes (sudo)"),
+            step("apply", sudo="run", help="install, then select it in /etc/default/grub (sudo)"),
+            step("restore", sudo="run", help="select the previous theme again (sudo)"),
         ]
 
-    def run(self, a):
+    def build(self, a):
         # a.flavor, a.accent, a.map, a.preview, a.out, a.suffix are already resolved;
-        # name outputs with naming.output_name(flavor, source, accent, a.suffix)
+        # name outputs with naming.output_name(flavor, source, accent, a.suffix).
+        # Write into a.out only; return what the steps work on (or None).
+        ...
+        return a.out / name
+
+    def install(self, a, built, system):
+        system.copy_tree(built, Path("/boot/grub/themes") / built.name)
+
+    def apply(self, a, built, system):
+        ...                      # system.write_text(..., backup=True), system.run([...])
+
+    def restore(self, a, system):
         ...
 
 
@@ -112,6 +131,32 @@ declare an entry point and install it next to catppuccinizer:
 grub = "my_package.grub:TARGET"
 ```
 
+### Steps
+
+`build()` writes the result into the output folder (`--preview`: only
+before/after images) and returns what the system steps work on. The steps are
+optional methods, each with its option made by `options.step()`; the command
+line runs build, then `install` (also for `--apply`), `apply` and `test`, in
+that order. `restore` runs alone, without building; `--dry-run` is added to
+targets that have steps.
+
+| Step | Effect | Typical rights |
+|---|---|---|
+| `preview` | before/after images in `<out>/previews/` | user |
+| `build` | the result in the output folder (default) | user |
+| `install` | copied where the system looks for it, not selected | often root |
+| `apply` | selected / configured | often root |
+| `test` | shown without rebooting or logging out | depends |
+| `restore` | `apply` and `install` undone | as `apply` |
+
+A step changes the system only through the `System` object it gets: each change
+is printed, and with `--dry-run` only listed. Reading is free (the current
+theme, `limine.conf`). What `restore` needs (the theme in use before `apply`)
+goes into `paths.state_file()` with `system.save_state()`. When a step needs
+root, the whole command runs with sudo (`sudo="run"`): configs and downloads
+still come from the invoking user's home, and what build wrote is handed back
+to them.
+
 ### Options
 
 `options()` returns the target's own options only; the common ones (`-f -a -m
@@ -127,7 +172,7 @@ option), then:
 | `explain`, `image` | a longer text, an illustration in `assets/` |
 | `scope` | `common`, `method` / `method:<name>` (core) or `target` (default) |
 | `stage` | `analyse`, `preview`, `build` (default), `install`, `apply`, `test`, `restore` |
-| `sudo` | `"run"`: the command must run as root; `"self"`: the target calls sudo itself |
+| `sudo` | `"run"`: the command must run as root |
 | `when` | when it matters: `{"method": ["lutgen"]}` (another option's value) or `{"analysis.remappable": [True]}` (a fact from `--colours`); `method:<name>` options get `{"method": [<name>]}` |
 | `source` | what is recoloured (positional arguments by default): the GUI's *Source* card |
 | `accept` | for a path: `image`, `images` (files or folders), `dir`, `file` |
@@ -135,7 +180,8 @@ option), then:
 | `kind` | the GUI control when it cannot be guessed (`colour`: a palette colour) |
 
 `tests/test_options.py` checks every declared option (a help, a known stage,
-`sudo` only on a system stage, `when` naming existing options).
+`sudo` only on a system stage, `when` naming existing options, one step option
+per step method).
 
 Add a case to `tests/test_regression.py` (small synthetic fixture) and run
 `python3 tests/test_regression.py --update` once the output looks right.

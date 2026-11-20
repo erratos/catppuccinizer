@@ -9,6 +9,9 @@ package: Splash.qml plus images. Colours are recoloured everywhere:
 - animated GIFs and WebPs: frame by frame, with the same mapping for every
   frame (frames are streamed, so long animations do not fill the memory).
 The result is a new look-and-feel package containing only the splash screen.
+--install copies it to ~/.local/share/plasma/look-and-feel/, --apply (which
+installs first) selects it, --test shows it in a window, --restore selects the
+previous splash screen again and removes the installed ones.
 """
 import json
 import re
@@ -26,11 +29,13 @@ from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect
 from ..core.mapping import (apply_maps, background_of, colour_report, map_colour_counts,
                             note_accent_ignored, print_colours, resolve_target, uses_accent)
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
-from ..core.options import Option
+from ..core.options import Option, step
+from ..core.paths import state_file
 from ..core.target import Target
 
 SEARCH = [Path.home() / ".local/share/plasma/look-and-feel", Path("/usr/share/plasma/look-and-feel")]
 USER_DIR = SEARCH[0]
+SETTINGS = ("Theme", "Engine")              # [KSplash] of ksplashrc
 
 
 class KSplashTarget(Target):
@@ -46,18 +51,48 @@ class KSplashTarget(Target):
             *recolor.method_options(),
             Option("--list", switch=True, stage="analyse",
                    help="list installed splash screens and exit"),
-            Option("--install", switch=True, stage="install",
-                   help=f"copy to {USER_DIR} and select it as the splash screen"),
-            Option("--test", switch=True, stage="test",
-                   help="show the result with ksplashqml --test"),
+            step("install", help=f"copy the result to {USER_DIR}"),
+            step("apply", help="install, then select it as the splash screen"),
+            step("test", help="show the result in a window (ksplashqml --test)"),
+            step("restore", help="select the previous splash screen again and remove "
+                                 "the installed ones"),
         ]
 
     def check(self, a):
-        if (a.install or a.test) and (len(a.flavor) > 1 or len(a.accent) > 1):
-            raise SystemExit("--install / --test need a single flavour and a single accent")
+        if (a.install or a.apply or a.test) and (len(a.flavor) > 1 or len(a.accent) > 1):
+            raise SystemExit("--install / --apply / --test need a single flavour and a single accent")
 
-    def run(self, a):
-        run(a)
+    def build(self, a):
+        return build(a)
+
+    def install(self, a, built, system):
+        state = system.load_state(state_file("ksplash"))
+        system.copy_tree(built[0], USER_DIR / built[0].name)
+        state["installed"] = sorted({*state.get("installed", []), built[0].name})
+        system.save_state(state_file("ksplash"), state)
+
+    def apply(self, a, built, system):
+        state = system.load_state(state_file("ksplash"))
+        current = {key: read_setting(key) for key in SETTINGS}
+        if "previous" not in state and current["Theme"] not in state.get("installed", []):
+            state["previous"] = current             # what restore selects again
+        set_settings(system, {"Theme": built[0].name, "Engine": "KSplashQML"})
+        system.save_state(state_file("ksplash"), state)
+
+    def test(self, a, built, system):
+        print("  (closes by itself, or click it)")
+        system.run(["ksplashqml", "--test", "--window", built[0]])
+
+    def restore(self, a, system):
+        state = system.load_state(state_file("ksplash"))
+        if not state:
+            raise SystemExit(f"Nothing to restore ({state_file('ksplash')} not found: nothing was installed "
+                             "or applied)")
+        if "previous" in state:
+            set_settings(system, state["previous"])
+        for pid in state.get("installed", []):
+            system.remove(USER_DIR / pid)
+        system.save_state(state_file("ksplash"), {})
 
     def colours(self, a):
         return colours(a)
@@ -192,7 +227,23 @@ def colours(a):
     return out
 
 
-def run(a):
+def read_setting(key):
+    """Current value of a KSplash setting of ksplashrc ("" when unset)."""
+    try:
+        r = subprocess.run(["kreadconfig6", "--file", "ksplashrc", "--group", "KSplash",
+                            "--key", key], capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        raise SystemExit("kreadconfig6 not found (KDE Plasma 6)")
+    return r.stdout.strip()
+
+
+def set_settings(system, values):
+    for key, value in values.items():
+        system.run(["kwriteconfig6", "--file", "ksplashrc", "--group", "KSplash", "--key", key,
+                    *([value] if value else ["--delete"])])
+
+
+def build(a):
     if a.list:
         return list_packages()
     if a.preview:
@@ -269,20 +320,7 @@ def run(a):
             built.append(dst)
             print(f"  -> {dst}  ({name})")
     shutil.rmtree(tmp, ignore_errors=True)
-
-    if a.install and built:
-        target = USER_DIR / built[0].name
-        if target.exists():
-            shutil.rmtree(target)
-        shutil.copytree(built[0], target)
-        subprocess.run(["kwriteconfig6", "--file", "ksplashrc", "--group", "KSplash",
-                        "--key", "Theme", built[0].name], check=False)
-        subprocess.run(["kwriteconfig6", "--file", "ksplashrc", "--group", "KSplash",
-                        "--key", "Engine", "KSplashQML"], check=False)
-        print(f"  installed in {target} and selected as splash screen")
-    if a.test and built:
-        print("  showing it with ksplashqml (closes by itself, or click it)")
-        subprocess.run(["ksplashqml", "--test", "--window", str(built[0])], check=False)
+    return built or None
 
 
 TARGET = KSplashTarget()

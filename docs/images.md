@@ -14,6 +14,8 @@ catppuccinize image photo.jpg --method lutgen --lutgen-algo rbf   # LUT made by 
 
 Output: `images/catppuccin-<flavor>-<name>[-<accent>][-<suffix>].png` (JPEG/WebP
 photos keep their format; see [output names](colours.md#output-names)).
+`--preview` writes before/after images into `images/previews/` instead. There is
+nothing to install: nothing is written outside the output folder.
 
 ## Reading the comparison images
 

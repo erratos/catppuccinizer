@@ -1,7 +1,9 @@
 """Target interface and discovery.
 
 A target is a subcommand of `catppuccinize`. It subclasses Target and uses only
-catppuccinizer.core. Built-in targets live in catppuccinizer/targets/<name>
+catppuccinizer.core. It writes its result with build(); the steps that touch the
+system (install, apply, test, restore) are separate, optional methods, each with
+its option (core.options.step), run in that order by the command line. Built-in targets live in catppuccinizer/targets/<name>
 (module attribute TARGET); other packages can add targets with an entry point:
 
     [project.entry-points."catppuccinizer.targets"]
@@ -33,8 +35,15 @@ class Target:
         return []
 
     def all_options(self):
-        """Every option of the subcommand, in order: common, the target's, --colours."""
-        return [*opts.COMMON, *self.options(), *(opts.COLOURS if self.has_colours else [])]
+        """Every option of the subcommand, in order: common, the target's, --colours,
+        --dry-run (when it has system steps)."""
+        return [*opts.COMMON, *self.options(), *(opts.COLOURS if self.has_colours else []),
+                *([opts.DRY_RUN] if self.steps else [])]
+
+    @property
+    def steps(self):
+        """The system steps the target defines, in order (core.options.STEPS)."""
+        return [s for s in opts.STEPS if getattr(type(self), s) is not getattr(Target, s)]
 
     @property
     def has_colours(self):
@@ -60,8 +69,28 @@ class Target:
         without source colours (lut) leave it out: the option is not offered."""
         raise NotImplementedError
 
-    def run(self, args):
+    # ------------------------------------------------------------- steps
+    def build(self, args):
+        """preview / build: write the result into args.out (only before/after images
+        with --preview). Returns what the system steps work on (the built folders…),
+        or None when there is nothing for them (--list, --preview…)."""
         raise NotImplementedError
+
+    # The system steps get what build() returned and a core.system.System, through
+    # which every change outside the output folder goes (printed, or only listed
+    # with --dry-run). Each one needs its option, made with core.options.step().
+
+    def install(self, args, built, system):
+        """Copy the result where the system looks for it, without selecting it."""
+
+    def apply(self, args, built, system):
+        """Select / configure it (after install)."""
+
+    def test(self, args, built, system):
+        """Show it without rebooting or logging out."""
+
+    def restore(self, args, system):
+        """Undo apply and install (without building anything)."""
 
 
 def discover():

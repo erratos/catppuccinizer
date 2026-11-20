@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .clut import read_hald
 from .options import Option
+from .paths import user_home
 from .palette import PALETTES
 
 # algorithm: (lutgen flag, options it accepts besides --level/--preserve/--lum)
@@ -88,9 +89,7 @@ def options(a):
 
 
 def binary():
-    homes = [Path.home()]
-    if os.environ.get("SUDO_USER"):                  # under sudo, also the invoking user's cargo
-        homes.append(Path(os.path.expanduser(f"~{os.environ['SUDO_USER']}")))
+    homes = [Path.home(), user_home()]               # under sudo, also the invoking user's cargo
     for c in (os.environ.get("CATPPUCCINIZER_LUTGEN"), shutil.which("lutgen"),
               *(h / ".cargo/bin/lutgen" for h in homes)):
         if c and Path(c).is_file() and os.access(c, os.X_OK):

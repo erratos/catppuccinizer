@@ -8,7 +8,8 @@ folder of a look-and-feel package. Any of them can be recoloured:
 ```bash
 catppuccinize ksplash --list                           # installed splash screens
 catppuccinize ksplash org.kde.breeze.desktop -a mauve --test
-catppuccinize ksplash CachyOS-Nord -f macchiato -a teal --install
+catppuccinize ksplash CachyOS-Nord -f macchiato -a teal --apply
+catppuccinize ksplash --restore                        # your previous splash screen
 catppuccinize ksplash ~/Downloads/some-splash -m '#3daee9=peach'
 ```
 
@@ -39,15 +40,38 @@ Catppuccin hue; `-m` remaps any of them by name or `#rrggbb`. `--colours`
 lists them (QML / SVG colours, then each image and animation) without building
 anything; a name applies to every part that has it.
 
-## Result
+## Steps
+
+No step needs root. Install, apply and test need a single flavour and accent;
+add `--dry-run` to only list what they would copy and run.
+
+### Build (default)
 
 A new look-and-feel package (`themes/catppuccin-<flavor>-<name>[-<accent>][-<suffix>]/`)
 containing only the splash screen. As a derived work, its `metadata.json` keeps
 the original authors, licence and website (catppuccinizer is added as an
 author), and the original licence file is copied when there is one.
+`--preview` is not available: use `--test`.
 
-- `--test` shows it in a window with `ksplashqml --test --window`;
-- `--install` copies it to `~/.local/share/plasma/look-and-feel/` and selects
-  it (or pick it in *System Settings → Colours & Themes → Splash Screen*).
+### Install
+
+`--install` copies it to `~/.local/share/plasma/look-and-feel/`, where
+*System Settings → Colours & Themes → Splash Screen* lists it.
+
+### Apply
+
+`--apply` installs, then selects it as the splash screen (`kwriteconfig6`,
+`ksplashrc`). The splash screen in use before is remembered (in
+`~/.local/state/catppuccinizer/ksplash.json`) for `--restore`.
+
+### Test
+
+`--test` shows the built package in a window (`ksplashqml --test --window`);
+it closes by itself, or click it.
+
+### Restore
+
+`--restore` selects the previous splash screen again and removes the packages
+catppuccinizer installed. It builds nothing.
 
 See `catppuccinize ksplash --help` for all options.

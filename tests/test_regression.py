@@ -223,7 +223,7 @@ def run_all():
         out["limine_accents"] = tree(tmp / "limine-accents", tmp)
         steps["recolor"] = (esp / "limine.conf").read_text()
         steps["recolor_files"] = tree(esp, tmp)
-        cli("limine", "--remove", "--esp", esp)
+        cli("limine", "--restore", "--esp", esp)
         steps["removed_is_original"] = (esp / "limine.conf").read_text() == LIMINE_CONF
         out["limine"] = {k: (hashlib.sha256(v.encode()).hexdigest()[:16] if isinstance(v, str) else v)
                          for k, v in steps.items()}

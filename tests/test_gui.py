@@ -69,7 +69,8 @@ class Gui(unittest.TestCase):
         self.assertTrue(plymouth["has_sources"])
         ply = {o["dest"]: o for o in plymouth["options"]}
         self.assertEqual(ply["test"]["kind"], "optional")
-        self.assertEqual(ply["install"]["sudo"], "self")     # the helper script asks for sudo
+        self.assertEqual((ply["install"]["sudo"], ply["install"]["role"]), ("run", "step"))
+        self.assertEqual(ply["dry_run"]["role"], "common")
         self.assertEqual(ply["bar"]["kind"], "colour")
         lut = next(t for t in s["targets"] if t["name"] == "lut")
         self.assertFalse(lut["has_colours"])

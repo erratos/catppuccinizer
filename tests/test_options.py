@@ -48,8 +48,17 @@ class Declarations(unittest.TestCase):
                     self.assertIn(o.stage, options.SYSTEM_STAGES)
                 if o.source:            # what is recoloured
                     self.assertEqual(o.stage, "build")
-                if o.scope != "target":  # core options do not touch the system
-                    self.assertIn(o.stage, ("analyse", "preview", "build"))
+                if o.scope != "target":  # core options never need root
+                    self.assertIsNone(o.sudo)
+
+    def test_steps_have_their_option(self):
+        for name, t in TARGETS.items():
+            with self.subTest(target=name):
+                declared = [o.dest for o in t.all_options() if options.is_step(o)]
+                self.assertEqual(declared, t.steps)           # one option per method, in order
+                self.assertEqual(any(o.dest == "dry_run" for o in t.all_options()), bool(t.steps))
+        self.assertEqual(TARGETS["image"].steps, [])
+        self.assertEqual(TARGETS["limine"].steps, ["install", "apply", "restore"])
 
     def test_when_refers_to_existing_options(self):
         facts = options.analysis([])

@@ -10,6 +10,8 @@ from . import __version__
 from .core import options
 from .core.mapping import format_colour_report
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
+from .core.paths import cache_dir, config_dir, give_back
+from .core.system import System
 from .core.target import discover
 
 
@@ -51,9 +53,33 @@ def parse(argv=None, parser=None):
     a.out = a.out or Path.cwd() / t.default_out
     if getattr(a, "json", False) and not a.colours:
         raise SystemExit("--json only goes with --colours")
+    asked = [s for s in t.steps if getattr(a, s)]
+    if getattr(a, "dry_run", False) and not asked:
+        raise SystemExit("--dry-run goes with " + " / ".join(f"--{s}" for s in t.steps))
+    if "restore" in asked and len(asked) > 1:
+        raise SystemExit("--restore goes alone (it undoes --install / --apply)")
     options.check(a, t.all_options())
     t.check(a)
     return a
+
+
+def run(t, a):
+    """build, then the system steps asked for, in order: --apply implies --install;
+    --restore runs alone, without building."""
+    system = System(dry_run=getattr(a, "dry_run", False))
+    dry = " (dry run: nothing is changed)" if system.dry_run else ""
+    if getattr(a, "restore", False):
+        print(f"restore{dry}")
+        return t.restore(a, system)
+    built = t.build(a)
+    # under sudo, what build wrote (output, configs, downloads) belongs to the invoking user
+    give_back(a.out, config_dir(t.name), cache_dir())
+    if built is None or a.preview:
+        return
+    asked = [s for s in t.steps if getattr(a, s) or (s == "install" and getattr(a, "apply", False))]
+    for s in asked:
+        print(f"{s}{dry}")
+        getattr(t, s)(a, built, system)
 
 
 def main(argv=None):
@@ -68,7 +94,7 @@ def main(argv=None):
                 items = a.target.colours(a)
             print(json.dumps(items, indent=2) if a.json else format_colour_report(items))
             return
-        a.target.run(a)
+        run(a.target, a)
     except KeyboardInterrupt:
         raise SystemExit("\ninterrupted")
     except OSError as e:

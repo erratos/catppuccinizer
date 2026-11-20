@@ -5,6 +5,11 @@ Colours are detected per group of images (each numbered sequence, plus "ui"
 for single images) and saved in ~/.config/catppuccinizer/plymouth/<theme>.toml
 (hand-tuned defaults ship with the package). Themes built on adi1090x's script
 template also get a "-status" variant (progress bar + latest systemd services).
+
+--install copies the result (its -status variant if any) to
+/usr/share/plymouth/themes, --apply (which installs first) makes it the default
+theme and rebuilds the initramfs, --test shows it without rebooting, --restore
+makes the previous default theme active again and removes the installed ones.
 """
 import configparser
 import re
@@ -23,8 +28,8 @@ from ...core.mapping import (apply_maps, background_of, colour_report, note_acce
                              print_colours, uses_accent)
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
 from ...core.naming import output_name, slug
-from ...core.options import Option
-from ...core.paths import config_dir
+from ...core.options import Option, step
+from ...core.paths import config_dir, state_file
 from ...core.recolor import recolor_image, recolor_job
 from ...core.target import Target
 from .upstream import local_src, resolve_theme, upstream_themes
@@ -47,8 +52,45 @@ class PlymouthTarget(Target):
     def check(self, a):
         check_args(a)
 
-    def run(self, a):
-        run(a)
+    def build(self, a):
+        return build(a)
+
+    def install(self, a, built, system):
+        state = system.load_state(state_file("plymouth", system=True))
+        system.copy_tree(built, Path(INSTALL_DIR) / built.name)
+        state["installed"] = sorted({*state.get("installed", []), built.name})
+        system.save_state(state_file("plymouth", system=True), state)
+
+    def apply(self, a, built, system):
+        state = system.load_state(state_file("plymouth", system=True))
+        current = default_theme()
+        if "previous" not in state and current and current not in state.get("installed", []):
+            state["previous"] = current             # what restore makes active again
+        system.save_state(state_file("plymouth", system=True), state)
+        if system.run(["plymouth-set-default-theme", "-R", built.name]):   # -R: initramfs
+            raise SystemExit("plymouth-set-default-theme failed")
+
+    def test(self, a, built, system):
+        if not a.install and not a.apply:           # the theme must be in INSTALL_DIR
+            self.install(a, built, system)
+        system.run(["bash", SCRIPTS / "preview.sh", built.name, a.test])
+
+    def restore(self, a, system):
+        path = state_file("plymouth", system=True)
+        state = system.load_state(path)
+        if not state:
+            raise SystemExit(f"Nothing to restore ({path} not found: nothing was installed "
+                             "or applied)")
+        installed = state.get("installed", [])
+        if default_theme() in installed:
+            if "previous" not in state:
+                raise SystemExit("The theme in use before is not known: choose one with "
+                                 "sudo plymouth-set-default-theme -R NAME, then rerun --restore")
+            if system.run(["plymouth-set-default-theme", "-R", state["previous"]]):
+                raise SystemExit("plymouth-set-default-theme failed")
+        for name in installed:
+            system.remove(Path(INSTALL_DIR) / name)
+        system.save_state(path, {})
 
     def colours(self, a):
         return colours(a)
@@ -69,17 +111,21 @@ OPTIONS = [
     Option("--detect", switch=True, stage="analyse",
            help="(re)detect colours, overwrite the theme's config, then stop"),
     Option("--list", switch=True, stage="analyse", help="list adi1090x themes and exit"),
-    # the helper scripts call sudo themselves
-    Option("--install", switch=True, stage="install", sudo="self",
-           help="install the result (its -status variant if any) and rebuild the initramfs"),
-    Option("--test", nargs="?", const=10, type=int, metavar="SECONDS", stage="test", sudo="self",
-           help="show the result without rebooting (default: 10 s)"),
+    step("install", sudo="run",
+         help=f"copy the result (its -status variant if any) to {INSTALL_DIR} (sudo)"),
+    step("apply", sudo="run",
+         help="install, then make it the default theme and rebuild the initramfs (sudo)"),
+    step("test", sudo="run", nargs="?", const=10, type=int, metavar="SECONDS",
+         help="show the result for SECONDS without rebooting (default: 10; sudo)"),
+    step("restore", sudo="run",
+         help="make the previous default theme active again, remove the installed ones (sudo)"),
 ]
 
 
 def check_args(a):
-    if (a.install or a.test) and (len(a.themes) > 1 or len(a.flavor) > 1 or len(a.accent) > 1):
-        raise SystemExit("--install / --test need a single theme, flavour and accent")
+    if (a.install or a.apply or a.test) and (len(a.themes) > 1 or len(a.flavor) > 1
+                                             or len(a.accent) > 1):
+        raise SystemExit("--install / --apply / --test need a single theme, flavour and accent")
     if a.bar and a.bar not in PALETTES["mocha"]:
         raise SystemExit(f"--bar: unknown colour '{a.bar}'")
 
@@ -377,9 +423,13 @@ def list_themes():
         print(f"{path}{mark}")
 
 
-def script(name, *args):
-    """Run one of the helper shell scripts (they call sudo themselves)."""
-    return subprocess.run(["bash", str(SCRIPTS / name), *map(str, args)], check=False).returncode
+def default_theme():
+    """The default Plymouth theme ("" when unknown)."""
+    try:
+        return subprocess.run(["plymouth-set-default-theme"], capture_output=True, text=True,
+                              check=False).stdout.strip()
+    except FileNotFoundError:
+        return ""
 
 
 def colours(a):
@@ -401,7 +451,9 @@ def colours(a):
     return out
 
 
-def run(a):
+def build(a):
+    """The themes; for the system steps, the folder to install (the -status variant
+    if any) of the first one (they need a single theme)."""
     if a.list:
         return list_themes()
 
@@ -468,7 +520,7 @@ def run(a):
                                with_status))
 
     if not jobs:
-        return
+        return None
     print(f"{len(status)} theme(s), {len(jobs)} images", flush=True)
     with Pool() as pool:
         for i, _ in enumerate(pool.imap_unordered(recolor_job, jobs, chunksize=8), 1):
@@ -481,13 +533,8 @@ def run(a):
             write_status_variant(*args)
         print(f"  {args[0].name}" + (f"  (+ {args[0].name}-status)" if with_st else ""))
 
-    if (a.install or a.test) and status:
-        folder, with_st = status[0][0][0], status[0][1]
-        folder = folder.parent / f"{folder.name}-status" if with_st else folder
-        if a.test:
-            script("preview.sh", folder, a.test)
-        if a.install:
-            script("install.sh", folder)
+    folder, with_st = status[0][0][0], status[0][1]
+    return folder.parent / f"{folder.name}-status" if with_st else folder
 
 
 TARGET = PlymouthTarget()

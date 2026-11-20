@@ -46,7 +46,7 @@ class LutTarget(Target):
             print("note: --preview and -m are ignored by the lut target")
         note_accent_ignored(a, "by the lut target (a LUT has no accent)", indent="")
 
-    def run(self, a):
+    def build(self, a):
         a.out.mkdir(parents=True, exist_ok=True)
         for flv in a.flavor:
             title = f"Catppuccin {FLAVOR_TITLES[flv]}"
