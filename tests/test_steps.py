@@ -126,12 +126,12 @@ class DryRun(unittest.TestCase):
         name = "catppuccin-mocha-glow"
         self.assertIn(f"would copy {self.tmp / 'out' / name}", out)
         self.assertIn(f"-> /usr/share/plymouth/themes/{name}", out)
-        self.assertRegex(out, rf"would run plymouth-set-default-theme -R {name}\b")
+        self.assertRegex(out, rf"would run (/\S+/)?plymouth-set-default-theme -R {name}\b")
         self.assertFalse((self.tmp / "state").exists())
         out = cli("plymouth", FIXTURES / "glow_mini", "-a", "mauve", "--test", "3", "--dry-run",
                   "-o", self.tmp / "out")
         self.assertIn("would copy", out)                       # --test installs first
-        self.assertRegex(out, rf"would run bash \S+preview\.sh {name}\S* 3")
+        self.assertRegex(out, rf"would run (/\S+/)?bash \S+preview\.sh {name}\S* 3")
 
     def test_ksplash(self):
         make_splash(self.tmp / "splash")

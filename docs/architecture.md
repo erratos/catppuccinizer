@@ -36,6 +36,7 @@ tests/
   test_architecture.py
   test_options.py     every declared option is complete and coherent
   test_gui.py         forms, command lines, access control of the GUI
+  test_security.py    names, links, atomic writes, backups, commands, GUI requests
 ```
 
 ## Core API (what targets use)
@@ -61,6 +62,9 @@ tests/
 | `paths.config_dir(target)` / `cache_dir()` / `give_back(path)` | where to store things (the invoking user's home under sudo), sudo ownership |
 | `paths.state_file(target, system)` | where a step keeps what `restore` needs (the theme in use before…) |
 | `system.System` | `copy_tree`, `copy_file`, `write_text(…, backup=True)`, `remove`, `run`, `load_state` / `save_state`: every change a step makes, printed (only listed with `--dry-run`) |
+| `system.place(base, name)` / `naming.check_name(name)` | a system path built from a theme or package name, checked first (no `/`, `..`, leading `-`) |
+| `system.copy_folder(src, dst)` / `source_file(path, root)` | copy a source theme without following links out of it; the file to read for a theme file, or None |
+| `system.which(name)` / `read_text(path)` | a command's absolute path (as root: system folders only); a text file as it is, for a byte-exact rewrite |
 | `options.step(name, help, sudo)` | the option of a system step: `--install`, `--apply`, `--test`, `--restore` |
 | `naming.output_name(flavor, source, accent, suffix)` / `slug(text)` | the name of every output: `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]` |
 
@@ -197,6 +201,55 @@ User mistakes end with a one-line message, never a traceback: a target raises
 `SystemExit("...")`, and `cli.main` turns file errors (`OSError`: missing,
 unreadable or unwritable files) into `error: ...`. Set `CATPPUCCINIZER_DEBUG=1`
 to get the traceback back.
+
+## Security
+
+What catppuccinizer writes, where, and with which rights. Everything outside the
+output folder goes through `core.system` (the `System` object of the steps).
+
+| Where | What | Step | Rights |
+|---|---|---|---|
+| output folder (`-o`) | the results | build | the user; under sudo, handed back to them |
+| `~/.config/catppuccinizer/` | tuned Plymouth configs | build | the user |
+| `~/.cache/catppuccinizer/` | adi1090x themes (git), GUI uploads | build, GUI | the user |
+| `/usr/share/plymouth/themes/<name>/` | Plymouth themes | install | root, files 644, folders 755 |
+| `/var/lib/catppuccinizer/<target>.json` | what `restore` needs (system-wide steps) | install, apply | root, 644 |
+| `~/.local/state/catppuccinizer/<target>.json` | the same, for the user's steps | install, apply | the user |
+| `<ESP>/catppuccin/` | Limine wallpapers | install | root (FAT: no Unix rights) |
+| `<ESP>/…/limine.conf` + dated backups | the theme block | apply, restore | root, rights of the existing file |
+| `~/.local/share/plasma/look-and-feel/<id>/` | KDE splash packages | install | the user, 644 / 755 |
+| `ksplashrc`, Plymouth default theme | through `kwriteconfig6`, `plymouth-set-default-theme -R` | apply, restore | the user / root |
+
+How:
+
+- **Names**: a theme or package name that goes into a system path or command is
+  checked first (`system.place`, `naming.check_name`: letters, digits, `.`, `_`,
+  `+`, `-`, no `/`, no `..`, no leading `-` or `.`), also when it is read back
+  from a state file by `restore`.
+- **Source themes**: a theme's links are followed only to files inside the theme
+  folder (`system.source_file`, `copy_folder`); links out of it (to
+  `/etc/shadow`, `~/.ssh`…), links to folders and special files are skipped
+  with a note, so a downloaded theme cannot make a sudo run copy a private file
+  into a world-readable theme.
+- **Copies** to the system get explicit rights (files 644, folders 755, whatever
+  the umask), and replace the old copy at once: written under a temporary name
+  next to it, then renamed. A link at the destination is replaced, never
+  followed; `remove` removes a link, never what it points to.
+- **Files** are written atomically (temporary file in the same folder, flushed,
+  `os.replace`), keep the rights and owner of the file they replace, and are
+  written byte for byte (`system.read_text` keeps line endings and undecodable
+  bytes). `write_text(…, backup=True)` first copies the file next to itself as
+  `<name>.<date>.bak`; the `KEEP_BACKUPS` (5) most recent are kept.
+- **Commands** are lists, never a shell. Run as root, a command is looked up in
+  the system folders only (`/usr/sbin`, `/usr/bin`…, not `$PATH`) and run by
+  its absolute path. `plymouth/scripts/preview.sh` sets its own `PATH` and
+  checks its arguments.
+- **Under sudo**, what the run wrote in the user's folders is handed back to
+  them (`paths.give_back`): only files root owns, never through a link, never a
+  file with other hard links.
+
+`tests/test_security.py` covers each point (malicious names, links out of a
+theme, atomic writes, backups, commands).
 
 ## Performances
 

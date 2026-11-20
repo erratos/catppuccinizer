@@ -31,6 +31,8 @@ from ...core.naming import output_name, slug
 from ...core.options import Option, step
 from ...core.paths import config_dir, state_file
 from ...core.recolor import recolor_image, recolor_job
+from ...core.naming import check_name
+from ...core.system import place, source_file, which
 from ...core.target import Target
 from .upstream import local_src, resolve_theme, upstream_themes
 
@@ -57,7 +59,7 @@ class PlymouthTarget(Target):
 
     def install(self, a, built, system):
         state = system.load_state(state_file("plymouth", system=True))
-        system.copy_tree(built, Path(INSTALL_DIR) / built.name)
+        system.copy_tree(built, place(INSTALL_DIR, built.name, "theme name"))
         state["installed"] = sorted({*state.get("installed", []), built.name})
         system.save_state(state_file("plymouth", system=True), state)
 
@@ -67,13 +69,14 @@ class PlymouthTarget(Target):
         if "previous" not in state and current and current not in state.get("installed", []):
             state["previous"] = current             # what restore makes active again
         system.save_state(state_file("plymouth", system=True), state)
-        if system.run(["plymouth-set-default-theme", "-R", built.name]):   # -R: initramfs
+        if system.run(["plymouth-set-default-theme", "-R",                 # -R: initramfs
+                       check_name(built.name, "theme name")]):
             raise SystemExit("plymouth-set-default-theme failed")
 
     def test(self, a, built, system):
         if not a.install and not a.apply:           # the theme must be in INSTALL_DIR
             self.install(a, built, system)
-        system.run(["bash", SCRIPTS / "preview.sh", built.name, a.test])
+        system.run(["bash", SCRIPTS / "preview.sh", check_name(built.name, "theme name"), a.test])
 
     def restore(self, a, system):
         path = state_file("plymouth", system=True)
@@ -81,15 +84,17 @@ class PlymouthTarget(Target):
         if not state:
             raise SystemExit(f"Nothing to restore ({path} not found: nothing was installed "
                              "or applied)")
-        installed = state.get("installed", [])
+        # names read back from the state file are checked like new ones
+        installed = [check_name(n, f"theme name in {path}") for n in state.get("installed", [])]
+        previous = state.get("previous") and check_name(state["previous"], f"theme name in {path}")
         if default_theme() in installed:
-            if "previous" not in state:
+            if not previous:
                 raise SystemExit("The theme in use before is not known: choose one with "
                                  "sudo plymouth-set-default-theme -R NAME, then rerun --restore")
-            if system.run(["plymouth-set-default-theme", "-R", state["previous"]]):
+            if system.run(["plymouth-set-default-theme", "-R", previous]):
                 raise SystemExit("plymouth-set-default-theme failed")
         for name in installed:
-            system.remove(Path(INSTALL_DIR) / name)
+            system.remove(place(INSTALL_DIR, name))
         system.save_state(path, {})
 
     def colours(self, a):
@@ -139,9 +144,10 @@ class Theme:
 
     def __init__(self, folder):
         self.dir = folder
-        files = sorted(folder.glob("*.plymouth"))
+        # only the theme's own files: a link out of the folder is not followed
+        files = sorted(f for f in folder.glob("*.plymouth") if source_file(f, folder))
         own = folder / f"{folder.name}.plymouth"
-        if own.exists():
+        if own in files:
             files = [own]
         if not files:
             raise SystemExit(f"No .plymouth file in {folder}")
@@ -163,7 +169,8 @@ class Theme:
         if self.module == "script":
             sf = cp.get("script", "ScriptFile", fallback=f"{folder.name}.script")
             cand = folder / Path(sf).name
-            self.script = cand if cand.exists() else next(iter(folder.glob("*.script")), None)
+            self.script = cand if source_file(cand, folder) else next(
+                (f for f in folder.glob("*.script") if source_file(f, folder)), None)
 
         # images: theme folder, or the ImageDir of the module if it lives elsewhere
         self.image_dir = folder
@@ -171,7 +178,8 @@ class Theme:
             idir = cp.get(self.module, "ImageDir", fallback="")
             if idir and Path(idir).is_dir():
                 self.image_dir = Path(idir)
-        self.groups = group_images(sorted(self.image_dir.glob("*.png")))
+        self.groups = group_images(sorted(p for p in self.image_dir.glob("*.png")
+                                          if source_file(p, self.image_dir)))
 
     @property
     def adi_template(self):
@@ -353,9 +361,11 @@ def write_theme(theme, new_name, flavor, acc, bar, dst_dir):
         shutil.rmtree(dst_dir)
     dst_dir.mkdir(parents=True)
     skip = {theme.conf_file.name, theme.script.name if theme.script else None}
-    for f in theme.dir.iterdir():                # fonts, licences, ... (symlinks followed)
-        if f.is_file() and f.suffix != ".png" and f.name not in skip:
-            shutil.copy(f, dst_dir / f.name)
+    for f in theme.dir.iterdir():                # fonts, licences, ...
+        if f.suffix != ".png" and f.name not in skip and (real := source_file(f, theme.dir)):
+            shutil.copyfile(real, dst_dir / f.name)     # a link inside the theme: its file
+        elif f.is_symlink() and f.suffix != ".png":
+            print(f"note: skipped {f}: a link out of {theme.dir}")
     desc = f"{theme.title} - Catppuccin {FLAVOR_TITLES[flavor]}" + (f" {acc}" if acc else "")
     (dst_dir / f"{new_name}.plymouth").write_text(patch_plymouth(theme, new_name, desc, flavor, bar))
     if theme.script:
@@ -429,9 +439,10 @@ def list_themes():
 def default_theme():
     """The default Plymouth theme ("" when unknown)."""
     try:
-        return subprocess.run(["plymouth-set-default-theme"], capture_output=True, text=True,
-                              check=False).stdout.strip()
-    except FileNotFoundError:
+        exe = which("plymouth-set-default-theme")
+        return subprocess.run([exe], capture_output=True, text=True,
+                              check=False).stdout.strip() if exe else ""
+    except OSError:
         return ""
 
 

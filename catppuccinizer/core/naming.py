@@ -33,3 +33,16 @@ def suffix_type(value):
         raise argparse.ArgumentTypeError("use lowercase letters, digits and '-'")
     return value
 
+
+
+# a theme / package name that goes into a system path (/usr/share/plymouth/themes/<name>)
+# or a system command: no "/", no "..", no leading "-" or "."
+NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}")
+
+
+def check_name(name, what="name"):
+    """name itself if it is safe in a system path or command, else SystemExit."""
+    if not isinstance(name, str) or not NAME.fullmatch(name) or ".." in name:
+        raise SystemExit(f"Invalid {what}: {name!r} (letters, digits, '.', '_', '+', '-'; "
+                         "no '/' or '..')")
+    return name

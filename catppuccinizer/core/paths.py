@@ -1,5 +1,6 @@
 """Where things live: user configuration, cache, restore state, and sudo-aware file ownership."""
 import os
+import stat
 from pathlib import Path
 
 
@@ -40,12 +41,19 @@ def state_file(target, system=False):
 
 
 def give_back(*paths):
-    """Under sudo, hand files we created back to the invoking user."""
+    """Under sudo, hand files we created back to the invoking user: only what root
+    owns, never through a link (a link in the user's folders could point to a system
+    file), never a file with other hard links."""
     if os.geteuid() != 0 or "SUDO_UID" not in os.environ:
         return
     uid, gid = int(os.environ["SUDO_UID"]), int(os.environ.get("SUDO_GID", os.environ["SUDO_UID"]))
     for root in paths:
         root = Path(root)
-        if root.exists():
-            for p in [root, *root.rglob("*")]:
-                os.chown(p, uid, gid)
+        if not root.is_dir() or root.is_symlink():
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):     # does not enter linked folders
+            for p in [Path(dirpath), *(Path(dirpath) / n for n in filenames)]:
+                st = os.lstat(p)
+                if (st.st_uid == 0 and not stat.S_ISLNK(st.st_mode)
+                        and (stat.S_ISDIR(st.st_mode) or st.st_nlink == 1)):
+                    os.chown(p, uid, gid, follow_symlinks=False)

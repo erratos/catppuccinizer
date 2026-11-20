@@ -31,6 +31,8 @@ from ..core.mapping import (apply_maps, background_of, colour_report, map_colour
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
 from ..core.options import Option, step
 from ..core.paths import state_file
+from ..core.naming import check_name
+from ..core.system import copy_folder, place, source_file, which
 from ..core.target import Target
 
 SEARCH = [Path.home() / ".local/share/plasma/look-and-feel", Path("/usr/share/plasma/look-and-feel")]
@@ -67,7 +69,7 @@ class KSplashTarget(Target):
 
     def install(self, a, built, system):
         state = system.load_state(state_file("ksplash"))
-        system.copy_tree(built[0], USER_DIR / built[0].name)
+        system.copy_tree(built[0], place(USER_DIR, built[0].name, "package id"))
         state["installed"] = sorted({*state.get("installed", []), built[0].name})
         system.save_state(state_file("ksplash"), state)
 
@@ -90,8 +92,8 @@ class KSplashTarget(Target):
                              "or applied)")
         if "previous" in state:
             set_settings(system, state["previous"])
-        for pid in state.get("installed", []):
-            system.remove(USER_DIR / pid)
+        for pid in state.get("installed", []):      # read back: checked like new names
+            system.remove(place(USER_DIR, pid, f"package id in {state_file('ksplash')}"))
         system.save_state(state_file("ksplash"), {})
 
     def colours(self, a):
@@ -181,6 +183,8 @@ def analyse(a, pkg, tmp):
     rasters = {}                                   # path -> ("anim"|method, grp, extra)
     previews = pkg / "contents/previews/splash.png"
     for f in [*sorted(splash.rglob("*")), *([previews] if previews.exists() else [])]:
+        if not source_file(f, splash if f != previews else pkg):
+            continue                               # not copied either (core.system.copy_folder)
         ext = f.suffix.lower()
         if f == previews and (grp := preview_group(f, rasters)):
             # the preview is a still of an animation: same colours and -m, so it
@@ -229,16 +233,20 @@ def colours(a):
 
 def read_setting(key):
     """Current value of a KSplash setting of ksplashrc ("" when unset)."""
-    try:
-        r = subprocess.run(["kreadconfig6", "--file", "ksplashrc", "--group", "KSplash",
-                            "--key", key], capture_output=True, text=True, check=False)
-    except FileNotFoundError:
+    exe = which("kreadconfig6")
+    if not exe:
         raise SystemExit("kreadconfig6 not found (KDE Plasma 6)")
+    r = subprocess.run([exe, "--file", "ksplashrc", "--group", "KSplash", "--key", key],
+                       capture_output=True, text=True, check=False)
     return r.stdout.strip()
 
 
 def set_settings(system, values):
     for key, value in values.items():
+        if key not in SETTINGS:
+            raise SystemExit(f"Unknown KSplash setting: {key!r}")
+        if value:
+            check_name(value, f"KSplash {key}")
         system.run(["kwriteconfig6", "--file", "ksplashrc", "--group", "KSplash", "--key", key,
                     *([value] if value else ["--delete"])])
 
@@ -256,7 +264,7 @@ def build(a):
 
     tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
     vcolors, rasters = analyse(a, pkg, tmp)
-    previews = pkg / "contents/previews/splash.png"
+    preview_src = source_file(pkg / "contents/previews/splash.png", pkg)
 
     accent_used = uses_accent(vcolors) or any(
         m not in recolor.LUT_METHODS and uses_accent(g["colors"]) for m, g, _ in rasters.values())
@@ -272,14 +280,14 @@ def build(a):
             dst = a.out / pid
             if dst.exists():
                 shutil.rmtree(dst)
-            shutil.copytree(splash, dst / "contents/splash",
-                            ignore=shutil.ignore_patterns("*.qmlc", "*.jsc"))  # stale caches
-            if previews.exists():
+            # no link followed out of the package; *.qmlc / *.jsc: stale caches
+            copy_folder(splash, dst / "contents/splash", ignore=("*.qmlc", "*.jsc"))
+            if preview_src:
                 (dst / "contents/previews").mkdir(parents=True)
-                shutil.copy(previews, dst / "contents/previews/splash.png")
+                shutil.copyfile(preview_src, dst / "contents/previews/splash.png")
             for lic in pkg.iterdir():                # the original licence travels with it
-                if lic.is_file() and re.match(r"(licen[cs]e|copying)", lic.name, re.I):
-                    shutil.copy(lic, dst / lic.name)
+                if re.match(r"(licen[cs]e|copying)", lic.name, re.I) and (real := source_file(lic, pkg)):
+                    shutil.copyfile(real, dst / lic.name)
             (dst / "metadata.json").write_text(json.dumps(metadata(
                 pkg, pid, name, f"Catppuccin {FLAVOR_TITLES[flv]} recolour of the "
                                 f"{title} splash screen"), indent=4) + "\n")

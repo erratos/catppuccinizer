@@ -11,9 +11,15 @@
 
 set -u
 [[ $EUID -eq 0 ]] || { echo "preview.sh must run as root" >&2; exit 1; }
+# system tools only, whatever the caller's PATH
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
 
 theme="${1:?Usage: $0 THEME [SECONDS]}"
 dur="${2:-10}"
+# same rule as catppuccinizer.core.naming.check_name: no "/", "..", leading "-"
+[[ "$theme" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ && "$theme" != *..* ]] || { echo "Invalid theme name: $theme" >&2; exit 1; }
+[[ "$dur" =~ ^[0-9]+$ ]] || { echo "Invalid duration: $dur" >&2; exit 1; }
 prev="$(plymouth-set-default-theme)"
 [[ -f "/usr/share/plymouth/themes/$theme/$theme.plymouth" ]] || { echo "Theme not installed: $theme" >&2; exit 1; }
 
