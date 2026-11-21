@@ -259,6 +259,8 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 .dlg footer .sp { flex: 1; }
 .lightbox { width: min(1400px, calc(100vw - 32px)); }
 .lightbox img { display: block; max-width: 100%; max-height: calc(100vh - 160px); margin: 0 auto; }
+.lightbox img.pick { cursor: crosshair; }
+.lightbox .pickhint { margin: 0; padding: 8px 12px 0; }
 .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
 .catalog button { text-align: left; border: 1px solid var(--surface0); background: var(--base); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
 .catalog button:hover { border-color: var(--accent); }
@@ -354,6 +356,8 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
   <div class="dlg">
     <header><h3 id="lbtitle" class="mono" style="font-size:13px;word-break:break-all"></h3>
       <button class="btn small" id="lbopen">Open</button><button class="btn small" id="lbclose">Close</button></header>
+    <p id="lbpick" class="hint pickhint hidden">Click a colour of the original image (on the left) to add it to
+      <i>Colour remapping (-m)</i> as <code>#rrggbb</code>: a colour the analysis missed becomes a source colour of its own.</p>
     <div style="padding:12px;background:var(--crust)"><img id="lbimg" alt=""></div>
   </div>
 </dialog>
@@ -426,7 +430,7 @@ function helpParts(o, content = null, onToggle = null) {
   return [btn, panel];
 }
 function showImage(src, title) {
-  $("lbtitle").textContent = title; $("lbimg").src = src;
+  $("lbtitle").textContent = title; $("lbimg").src = src; setPicker(false);
   $("lbopen").classList.add("hidden"); $("lightbox").showModal();
 }
 function helpText(o) {
@@ -1083,7 +1087,39 @@ function lightbox(o) {
   $("lbtitle").textContent = tidy(o.path);
   $("lbimg").src = o.thumb.match(/\.(png|jpe?g|webp|gif|svg)$/i) && !o.dir ? fileURL(o.thumb, o.version) : thumb(o.thumb, 1600, o.version);
   $("lbopen").onclick = () => api("/api/open", { path: o.path });
+  // a preview while -m can be used: its original image is a colour picker
+  setPicker(!!o.preview && !!document.querySelector(".mapeditor") && !!S.addMap);
   $("lightbox").showModal();
+}
+function setPicker(on) {
+  $("lbpick").classList.toggle("hidden", !on);
+  $("lbimg").classList.toggle("pick", on);
+  $("lbimg").onclick = on ? pickColour : null;
+}
+// The previews are "original | result [| separation]" with plain gap columns between
+// them (core.recolor SHEET_GAP_COLOUR): the original ends at the first such column.
+const SHEET_GAP = [69, 71, 90];
+function pickColour(e) {
+  const img = $("lbimg"), w = img.naturalWidth, ht = img.naturalHeight;
+  if (!w) return;
+  const c = h("canvas", { width: w, height: ht }), g = c.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, w, ht).data, r = img.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) * w / r.width), y = Math.floor((e.clientY - r.top) * ht / r.height);
+  const gap = (i) => d[i] === SHEET_GAP[0] && d[i + 1] === SHEET_GAP[1] && d[i + 2] === SHEET_GAP[2];
+  let edge = w;
+  for (let cx = 0; cx < w && edge === w; cx++) {
+    let all = true;
+    for (let cy = 0; cy < ht && all; cy += 2) all = gap((cy * w + cx) * 4);
+    if (all) edge = cx;
+  }
+  const i = (y * w + x) * 4;
+  if (x >= edge) return toast("Click in the original image, on the left");
+  if (gap(i)) return;
+  const hex = "#" + [d[i], d[i + 1], d[i + 2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+  $("lightbox").close();
+  S.addMap(hex);
+  toast(`${hex} added: choose its target`);
 }
 
 // ------------------------------------------------------------ file browser

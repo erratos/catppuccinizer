@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from ...core.detect import UI_GROUP, detect_group
+from ...core.detect import DEFAULT_SEPARATION, UI_GROUP, detect_group, detect_params
 from ...core.mapping import (apply_maps, background_of, colour_report, note_accent_ignored,
                              print_colours, uses_accent)
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
@@ -32,7 +32,8 @@ from ...core.naming import output_name, planned, slug
 from ...core.options import Option, step
 from ...core.paths import config_dir, state_file
 from ...core.sources import item, section, tidy
-from ...core.recolor import recolor_image, recolor_job
+from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, recolor_image,
+                             recolor_job, separation_image)
 from ...core.naming import check_name
 from ...core.system import System, place, source_file, which
 from ...core.target import Target
@@ -123,6 +124,10 @@ OPTIONS = [
     Option("--redetect", label="Detect the colours again", switch=True,
            help="detect the colours again instead of using the theme's saved config "
                 "(a build saves the new one)"),
+    SEPARATION.replace(
+        when={}, help=f"0 = merge close colours, 1 = keep faint ones apart, when the colours "
+                        f"are detected (default: {DEFAULT_SEPARATION}; shipped configs are kept, "
+                        f"unless --redetect)"),
     step("install", sudo="run",
          help=f"copy the result (its -status variant if any) to {INSTALL_DIR} (sudo)"),
     step("apply", sudo="run",
@@ -221,9 +226,11 @@ def group_images(paths):
     return dict(sorted(groups.items(), key=lambda kv: (kv[0] == UI_GROUP, -len(kv[1]))))
 
 
-def detect(theme):
-    groups = {g: detect_group(paths, g == UI_GROUP) for g, paths in theme.groups.items()}
-    cfg = {"bar": None, "bar_gap": 20, "bar_width": 0.5, "groups": groups}
+def detect(theme, separation=DEFAULT_SEPARATION):
+    params = detect_params(separation)
+    groups = {g: detect_group(paths, g == UI_GROUP, params) for g, paths in theme.groups.items()}
+    cfg = {"bar": None, "bar_gap": 20, "bar_width": 0.5, "separation": separation,
+           "groups": groups}
     anim = next((g for g in groups.values() if g is not groups.get(UI_GROUP)), None)
     if anim:
         x0, _, x1, y1 = anim["_bbox"]
@@ -239,6 +246,31 @@ def config_path(name):
     user = config_dir("plymouth") / f"{name}.toml"
     default = DEFAULT_CONFIGS / f"{name}.toml"
     return user if user.exists() or not default.exists() else default
+
+
+def shipped(name):
+    """Whether the theme's config is one shipped with the package (hand-made)."""
+    return config_path(name).parent == DEFAULT_CONFIGS
+
+
+def must_detect(theme, a):
+    """Whether the colours are detected (and a build saves them): no config,
+    --redetect, or a saved detection made with another --separation. A shipped
+    config is hand-made: kept unless --redetect."""
+    path = config_path(theme.name)
+    if a.redetect or not path.exists():
+        return True
+    if shipped(theme.name):
+        return False
+    saved = tomllib.loads(path.read_text()).get("separation", DEFAULT_SEPARATION)
+    return saved != a.separation
+
+
+def config_of(theme, a):
+    """(config, saved): the saved one, or a fresh detection (not saved)."""
+    if must_detect(theme, a):
+        return detect(theme, a.separation), False
+    return load_config(theme, a.separation), True
 
 
 def save_config(theme, cfg):
@@ -257,6 +289,8 @@ def save_config(theme, cfg):
         "",
         f'bar_gap = {cfg["bar_gap"]}              # -status: px between frame bottom and bar',
         f'bar_width = {cfg["bar_width"]}          # -status: bar width / frame width',
+        f'separation = {cfg.get("separation", DEFAULT_SEPARATION)}       # --separation of this '
+        f'detection (another value detects again)',
         f'bar = "{cfg["bar"]}"            # progress bar colour' if cfg.get("bar") else
         '# bar = "blue"          # progress bar colour (default: accent or main colour)',
     ]
@@ -275,7 +309,7 @@ def save_config(theme, cfg):
     path.write_text("\n".join(lines) + "\n")
 
 
-def load_config(theme):
+def load_config(theme, separation=DEFAULT_SEPARATION):
     cfg = tomllib.loads(config_path(theme.name).read_text())
     cfg.setdefault("bar", None)
     cfg.setdefault("bar_gap", 20)
@@ -288,7 +322,7 @@ def load_config(theme):
                                  f"'{c.get('target')}' is not a Catppuccin colour or 'accent'")
     missing = set(theme.groups) - set(cfg["groups"])
     if missing:   # new images since the config was written
-        fresh = detect(theme)["groups"]
+        fresh = detect(theme, separation)["groups"]
         for g in missing:
             cfg["groups"][g] = fresh[g]
     return cfg
@@ -410,8 +444,9 @@ def write_status_variant(base_dir, flavor, bar, bar_width, bar_gap):
 
 
 # ------------------------------------------------------------------- preview
-def preview_sheet(theme, plan, base, out):
-    """One row per image group: original (over its background) | recoloured (over base)."""
+def preview_sheet(theme, plan, cfg, base, out):
+    """One row per image group: original (over its background) | recoloured (over base)
+    | separation (each source colour in its own plain colour, see recolor)."""
     rows = []
     for g, (src_bg, keys, targets) in plan.items():
         paths = theme.groups[g]
@@ -427,15 +462,17 @@ def preview_sheet(theme, plan, base, out):
         after.alpha_composite(recolor_image(path, src_bg, keys, targets, base).convert("RGBA"))
         scale = min(240 / im.height, 560 / im.width, 8)
         size = (max(1, round(im.width * scale)), max(1, round(im.height * scale)))
-        rows.append((before.resize(size), after.resize(size)))
-    W = max(a.width for a, _ in rows) * 2 + 8
-    H = sum(a.height + 8 for a, _ in rows)
-    sheet = Image.new("RGB", (W, H), (69, 71, 90))
+        sep, legend = separation_image(path, cfg["groups"][g])
+        rows.append([before.convert("RGB").resize(size), after.convert("RGB").resize(size),
+                     draw_legend(sep.resize(size), legend)])
+    col = max(r[0].width for r in rows) + SHEET_GAP
+    sheet = Image.new("RGB", (3 * col - SHEET_GAP, sum(r[0].height + SHEET_GAP for r in rows)),
+                      SHEET_GAP_COLOUR)
     y = 0
-    for a, b in rows:
-        sheet.paste(a.convert("RGB"), (0, y))
-        sheet.paste(b.convert("RGB"), (W // 2 + 4, y))
-        y += a.height + 8
+    for row in rows:
+        for i, panel in enumerate(row):
+            sheet.paste(panel, (i * col, y))
+        y += row[0].height + SHEET_GAP
     sheet.save(out)
 
 
@@ -511,8 +548,7 @@ def colours(a):
     out = []
     for arg in themes_of(a):
         theme = Theme(find_theme(arg))
-        saved = config_path(theme.name).exists() and not a.redetect
-        cfg = load_config(theme) if saved else detect(theme)
+        cfg, saved = config_of(theme, a)
         apply_maps(cfg, a.map)
         several = len(cfg["groups"]) > 1
         for g, grp in cfg["groups"].items():
@@ -532,8 +568,7 @@ def outputs(a):
         theme = Theme(find_theme(arg))
         if not theme.groups:
             continue
-        saved = config_path(theme.name).exists() and not a.redetect
-        cfg = load_config(theme) if saved else detect(theme)
+        cfg, saved = config_of(theme, a)
         apply_maps(cfg, a.map)
         used = any(uses_accent(grp["colors"]) for grp in cfg["groups"].values())
         status = not a.no_status and theme.adi_template
@@ -558,11 +593,19 @@ def build(a):
         if not theme.groups:
             print(f"{theme.title}: no PNG images, nothing to recolour")
             continue
-        if a.redetect or not config_path(theme.name).exists():
+        if must_detect(theme, a):
             print(f"Detecting colours of {theme.title} ...", flush=True)
-            save_config(theme, detect(theme))
-            print(f"  -> {config_path(theme.name)}")
-        cfg = load_config(theme)
+            old = config_dir("plymouth") / f"{theme.name}.toml"
+            kept = old.exists()       # it may have been edited by hand
+            if kept:
+                shutil.copyfile(old, old.with_suffix(".toml.bak"))
+            save_config(theme, detect(theme, a.separation))
+            print(f"  -> {config_path(theme.name)}"
+                  + (f" (the previous one kept as {old.name}.bak)" if kept else ""))
+        elif shipped(theme.name) and a.separation != DEFAULT_SEPARATION:
+            print(f"  note: --separation is ignored: {theme.title} has a hand-made config "
+                  f"(--redetect detects its colours)")
+        cfg = load_config(theme, a.separation)
         apply_maps(cfg, a.map)
         print_mapping(theme, cfg)
 
@@ -594,7 +637,7 @@ def build(a):
                 if a.preview:
                     (a.out / "previews").mkdir(parents=True, exist_ok=True)
                     out = a.out / "previews" / f"{out_name}.png"
-                    preview_sheet(theme, plan, base, out)
+                    preview_sheet(theme, plan, cfg, base, out)
                     print(f"  preview: {out}")
                     continue
                 write_theme(theme, out_name, flv, acc, bar, a.out / out_name)

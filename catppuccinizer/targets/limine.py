@@ -379,7 +379,8 @@ def build(a):
                 files = [recolor.save_image(im.convert("RGB"), dst / stem, method, src)]
                 if a.preview:
                     (a.out / "previews").mkdir(parents=True, exist_ok=True)
-                    recolor.side_by_side(src, im, a.out / "previews" / f"{stem}.png")
+                    recolor.side_by_side(src, im, a.out / "previews" / f"{stem}.png",
+                                         grp if method == "keys" else None)
                 done[key] = files
                 wall_files.append(files[0])
             wall_refs = [f"boot():/{WALL_DIR}/{f.name}" for f in wall_files]

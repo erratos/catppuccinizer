@@ -109,6 +109,41 @@ each hue to the closest Catppuccin colour, and a design made of a single
 colour goes to `accent`. Anti-aliasing, glow, shading and transparency are
 preserved.
 
+## Separating colours
+
+An element that has no source colour of its own is rebuilt from its
+neighbour's, with little intensity: it fades into the background or takes the
+wrong colour. Typically a yellow sun on an orange sky, next to white clouds
+that are far more contrasted, or a shape darker than the background.
+`--separation` (0 to 1, `keys` only) sets how the colours are told apart:
+
+- higher keeps faint and small colours apart and, above the default (`0.5`),
+  also finds colours **darker than the background**;
+- lower merges close colours into fewer source colours.
+
+![--separation](../catppuccinizer/assets/options-separation.jpg)
+
+The default is the detection as it has always been. With `--preview`, a
+picture recoloured with `keys` gets a third panel that shows what `keys` sees:
+each source colour in its own plain colour (named in the corner), as bright as
+the pixel is made of it, black for the background. A part shown in its
+neighbour's colour, or dark, has no colour of its own. `--colours` lists the
+colours of the chosen setting. With `auto`, more colours also rebuild a
+picture better, so `keys` may be picked where `lut` was.
+
+### Adding a missing colour
+
+Instead of (or as well as) raising the setting, add the colour yourself: a
+`#rrggbb` that `-m` does not find among the source colours becomes a source
+colour of its own.
+
+```bash
+catppuccinize image poster.png --method keys -m '#fad23c=yellow'
+```
+
+In the [graphical interface](gui.md#remapping-a-colour), click it in the
+original image of a preview.
+
 ## Manual mapping
 
 To see the names first, `--colours` lists the colours `-m` can remap and
@@ -150,10 +185,12 @@ last one winning.
 ## How it works
 
 - **Detection** (per image group): on ~24 images, the background is the most
-  common border colour (or none for transparent images); bright content pixels
-  are split into grays and hues, hue clusters are found from histogram peaks
-  (plus extra centres for spread-out rainbows), and each cluster's brightest
-  pixels give its source colour.
+  common border colour (or none for transparent images); the pixels far enough
+  from it (half the distance of the most contrasted ones, by default) are split
+  into grays and hues, hue clusters are found from histogram peaks (plus extra
+  centres for spread-out rainbows), and each cluster's brightest pixels give
+  its source colour. A colour must cover a few percent of these pixels, and at
+  most 8 are kept; `--separation` moves all these thresholds together.
 - **Recolouring**: every pixel is modelled as `background + t × (source −
   background)`. For each pixel the source colour and intensity `t` that explain
   it best are found, then it is rebuilt as `base + t × (target − base)`.
@@ -170,4 +207,5 @@ last one winning.
   generated once per flavour and set of options.
 - **Limits**: where two colours blend (overlapping lines, gradients between
   hues) a pixel is attached to one of them; very photographic themes keep their
-  shapes but lose subtle hue variations.
+  shapes but lose subtle hue variations. A faint, small or darker element can
+  be missed: see [Separating colours](#separating-colours).

@@ -46,7 +46,7 @@ tests/
 
 | Function | Purpose |
 |---|---|
-| `detect.detect_group(paths, is_ui)` | detect the background and source colours of images, with automatic targets |
+| `detect.detect_group(paths, is_ui, params)` / `detect.detect_params(separation)` | detect the background and source colours of images, with automatic targets; the thresholds (`DetectParams`) from `--separation` (the default gives the default thresholds) |
 | `mapping.apply_maps(cfg, maps, strict)` | apply `-m NAME=TARGET` to `{"groups": {name: group}}` |
 | `mapping.map_colour_counts(counts)` | map a `{#hex: count}` list (QML, SVG, CSS…) to Catppuccin roles |
 | `mapping.resolve_target(flavor, accent, target)` | target name -> RGB |
@@ -55,7 +55,8 @@ tests/
 | `recolor.recolor_image(path, bg, keys, targets, base)` | keys method on one image (alpha kept) |
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
 | `options.Option(...)` / `options.defaults(opts, **values)` | declare an option ([below](#options)); a namespace of defaults for scripts |
-| `recolor.method_options(methods=None, help=None)` | `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` (only the given methods) |
+| `recolor.method_options(methods=None, help=None, needs=None, keys_always=False)` | `--method`, `--separation`, `--keep-lum`, `--smooth`, `--lutgen-*` (only the given methods; `keys_always`: `--separation` matters whatever `--method`, for a target that also recolours with keys on its own) |
+| `recolor.SEPARATION` / `side_by_side(src, im, out, grp)` / `separation_image(path, grp)` | the `--separation` option (Plymouth adds it alone); a before/after preview, with a keys group the separation panel |
 | `recolor.LUT_METHODS` / `recolor.lut_for(method, flavor, args, n)` | the LUT methods (no source colours, no accent) and their cube |
 | `recolor.accent_ignored_reason(method, grp)` | why the accent has no effect on an image, or None |
 | `clut.apply_cube` / `resample` / `read_hald` / `write_hald` / `write_cube` | 3D LUT application and files |

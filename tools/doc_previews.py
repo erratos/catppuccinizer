@@ -75,12 +75,28 @@ def flat():
     return left.resize((480, 270), Image.LANCZOS)
 
 
-def render(src, method, flavor, a):
+def poster(w=480, h=270):
+    """Flat art with faint and dark parts: a yellow sun on an orange sky (close
+    colours), white clouds (far more contrasted) and hills darker than the sky."""
+    im = Image.new("RGB", (w, h), (240, 120, 30))
+    d = ImageDraw.Draw(im)
+    d.ellipse((60, 50, 170, 160), fill=(250, 205, 60))
+    for x, y in ((250, 50), (330, 85), (200, 110)):
+        d.rounded_rectangle((x, y, x + 110, y + 26), radius=13, fill=(255, 255, 255))
+    d.polygon([(0, h), (0, 200), (120, 160), (260, 215), (380, 170), (w, 205), (w, h)],
+              fill=(110, 40, 15))
+    return im
+
+
+def render(src, method, flavor, a, mode="result"):
     if method == "original":
         return Image.open(src).convert("RGB")
     if method == "keys":
         a.method = "keys"
         m, grp = recolor.plan(src, a, verbose=False)
+        if mode == "separation":
+            im, legend = recolor.separation_image(src, grp)
+            return recolor.draw_legend(im, legend)
         im = recolor.render(src, m, grp, flavor, "mauve", a).convert("RGBA")
         bg = Image.new("RGBA", im.size, BG + (255,))
         bg.alpha_composite(im)
@@ -106,7 +122,13 @@ def grid(name, title, columns, sources):
             lw = d.textlength(label, font=f)
             d.text((x + lw + 10, title_h + 2), sub, font=fs, fill=SUB)
         for j, src in enumerate(sources):
-            im = render(src, method, flavor, a).resize((tw, th), Image.LANCZOS)
+            src, mode = src if isinstance(src, tuple) else (src, "result")
+            if mode == "separation" and method == "original":
+                im = Image.new("RGB", (tw, th), BG)
+                ImageDraw.Draw(im).text((12, th // 2 - 20), "what keys sees:\none plain colour\n"
+                                        "per source colour", font=font(14), fill=SUB)
+            else:
+                im = render(src, method, flavor, a, mode).resize((tw, th), Image.LANCZOS)
             sheet.paste(im, (x, title_h + LABEL_H + j * (th + GAP)))
     out = OPTION_IMAGES / f"options-{name}.jpg"
     sheet.save(out, quality=88, optimize=True, progressive=True)
@@ -122,6 +144,12 @@ GRIDS = {
         ("original", "", "original", "mocha", O()),
         ("keys", "--method keys", "keys", "mocha", O()),
         ("lut", "--method lut", "lut", "mocha", O()),
+    ]),
+    "separation": ("--separation: how source colours are told apart (keys, Mocha)", [
+        ("original", "", "original", "mocha", O()),
+        ("0.5", "default", "keys", "mocha", O(separation=0.5)),
+        ("0.6", "", "keys", "mocha", O(separation=0.6)),
+        ("0.8", "", "keys", "mocha", O(separation=0.8)),
     ]),
     "lut": ("Built-in lut vs lutgen (Mocha, default settings)", [
         ("original", "", "original", "mocha", O()),
@@ -171,15 +199,16 @@ GRIDS = {
 def main():
     names = sys.argv[1:] or list(GRIDS)
     with tempfile.TemporaryDirectory() as d:
-        files = {"scene": scene(), "chart": chart(), "flat": flat()}
+        files = {"scene": scene(), "chart": chart(), "flat": flat(), "poster": poster()}
         paths = {}
         for k, im in files.items():
             paths[k] = Path(d) / f"{k}.png"
             im.save(paths[k])
         for name in names:
             title, cols = GRIDS[name]
-            rows = ["flat", "scene"] if name == "method" else ["scene", "chart"]
-            grid(name, title, cols, [paths[r] for r in rows])
+            rows = {"method": [paths["flat"], paths["scene"]],
+                    "separation": [paths["poster"], (paths["poster"], "separation")]}
+            grid(name, title, cols, rows.get(name, [paths["scene"], paths["chart"]]))
 
 
 if __name__ == "__main__":

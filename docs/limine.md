@@ -118,5 +118,5 @@ is refused, to be fixed by hand.
 | `--restore` | remove the theme from `limine.conf` and its wallpapers (sudo) |
 | `--dry-run` | with the steps above: only list what they would change |
 | `--conf`, `--esp` | `limine.conf` to edit, ESP mount point (searched by default) |
-| `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) (with `--wallpaper`) |
+| `--method`, `--separation`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) (with `--wallpaper`) |
 | `-o, --out` | output folder (default `themes/`) |

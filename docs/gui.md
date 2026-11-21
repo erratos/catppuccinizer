@@ -55,8 +55,8 @@ ten minutes after the page is closed. `--port N` picks the port,
    current choices is greyed, and hovering it says why: `--keep-lum` and
    `--smooth` need `auto` / `lut`, the `--lutgen-*` ones `lutgen` (and each
    algorithm's own knobs that algorithm; the whole group stays folded until
-   then), `--hald-level` / `--cube-size` their format; for Limine, the
-   recolouring options and `--style` need a wallpaper.
+   then), `--separation` `auto` / `keys`, `--hald-level` / `--cube-size` their
+   format; for Limine, the recolouring options and `--style` need a wallpaper.
    Preview, Build and the system steps are greyed the same way when their
    command would fail (several accents for Install, no wallpaper for a
    Limine preview…): the tooltip gives the command line's own message.
@@ -83,7 +83,15 @@ run again when the source or an option that changes the analysis (`--method`…)
 changes; *Analyse again* reruns it (e.g. after editing the files).
 
 Click a colour: a row is added to *Colour remapping (-m)*, where you choose its
-new target; the list then shows the new target. A name the analysis did not
+new target; the list then shows the new target. *Colour separation*
+(`--separation`) changes the list as it moves: raise it when a part of the
+image is missing from it ([Separating colours](colours.md#separating-colours)).
+
+A colour the analysis missed can be picked in a preview: open one (click it
+under *Results*) and click a colour of the **original** image, on the left. It
+is added as a `#rrggbb` row, a source colour of its own once you choose its
+target. The preview's third panel, for pictures recoloured with `keys`, shows
+the colour each pixel is attached to. A name the analysis did not
 find is underlined in red (a `#rrggbb` source colour is always accepted). When
 nothing can be remapped (`--method lut`, a LUT has no source colours), the
 editor is hidden and the list says why.

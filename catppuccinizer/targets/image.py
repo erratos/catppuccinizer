@@ -110,7 +110,7 @@ class ImageTarget(Target):
                     if a.preview:
                         (a.out / "previews").mkdir(exist_ok=True)
                         dst = a.out / "previews" / f"{name}.png"
-                        recolor.side_by_side(path, im, dst)
+                        recolor.side_by_side(path, im, dst, grp if method == "keys" else None)
                     else:
                         dst = recolor.save_image(im, a.out / name, method, path)
                     print(f"  -> {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + acc if acc else ''})")

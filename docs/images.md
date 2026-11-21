@@ -56,6 +56,17 @@ works on anything, at the cost of slightly duller flat art.
 
 ![photo wallpaper](../assets/demo-wallpaper-photo.jpg)
 
+## Tuning the `keys` method
+
+**`--separation`** (0 to 1, default 0.5): how the source colours are told
+apart. Raise it when an element disappears or takes its neighbour's colour (a
+yellow sun on an orange sky); above the default it also finds colours darker
+than the background. With `--preview`, a third panel shows the colour each
+pixel is attached to. See [Separating colours](colours.md#separating-colours),
+which also shows how to add a missing colour with `-m '#rrggbb=TARGET'`.
+
+![--separation](../catppuccinizer/assets/options-separation.jpg)
+
 ## Tuning the `lut` method
 
 Two knobs change the look; try them with `--preview`.
@@ -89,11 +100,12 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `IMAGE …` | | files or folders (searched recursively) |
 | `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` |
 | `--method` | `auto` | `keys`, `lut`, `lutgen` or `auto` (never picks `lutgen`) |
+| `--separation` | `0.5` | keys: 0 = merge close colours, 1 = keep faint (and darker) ones apart |
 | `--keep-lum` | `0.5` | lut: 0 = palette lightness, 1 = original lightness |
 | `--smooth` | `0.08` | lut: accent blend radius; smaller = purer accents |
-| `-a` | `mauve` | accent for colours mapped to `accent` (keys) |
+| `-a` | `all` | accent(s) for colours mapped to `accent` (keys), or `all` |
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
-| `--preview` | | only render before/after images in `<out>/previews/` |
+| `--preview` | | only render before/after images in `<out>/previews/` (`keys`: and the separation panel) |
 | `--list` | | list the wallpapers of `/usr/share/wallpapers`, `/usr/share/backgrounds`, `~/.local/share/wallpapers` |
 | `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap, and the method each image would get ([details](colours.md#manual-mapping)); `--json` for JSON |

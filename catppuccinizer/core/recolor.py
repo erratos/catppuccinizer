@@ -13,11 +13,11 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from . import lutgen, mapping
 from .clut import apply_cube as apply_lut
-from .detect import detect_group, load_rgba
+from .detect import DEFAULT_SEPARATION, detect_group, detect_params, load_rgba
 from .mapping import NO_ACCENT, apply_maps, print_colours, uses_accent
 from .options import Option
 from .palette import ACCENTS, PALETTES, hex2rgb, oklab_to_srgb, rgb, srgb_to_oklab
@@ -32,17 +32,21 @@ LUT_METHODS = ("lut", "lutgen")   # whole-image colour tables: no source colours
 OPTIMIZE_MAX_PIXELS = 2_000_000   # larger PNGs are saved without optimize (much faster)
 
 
-def method_options(methods=None, help=None, needs=None):
+def method_options(methods=None, help=None, needs=None, keys_always=False):
     """The options of the recolouring methods (--method, --keep-lum, --smooth,
     --lutgen-*), for a target that recolours images with them. methods: the ones
     it accepts, the first is the default (lut target: LUT_METHODS), with the help
     of --method that goes with them. needs: options of which one must be given for
-    the methods to matter (Limine: a wallpaper to recolour)."""
+    the methods to matter (Limine: a wallpaper to recolour). keys_always: the target
+    also recolours with keys whatever --method is (KDE splash animations), so
+    --separation always matters."""
     method = METHOD if methods is None else METHOD.replace(
         choices=list(methods), default=methods[0], help=help or METHOD.help,
         **(LUT_ONLY if set(methods) <= set(LUT_METHODS) else {}))
     methods = method.choices
-    out = [method, *(LUT_OPTIONS if "lut" in methods else []),
+    separation = SEPARATION.replace(when={}) if keys_always else SEPARATION
+    out = [method, *([separation] if "keys" in methods else []),
+           *(LUT_OPTIONS if "lut" in methods else []),
            *(lutgen.OPTIONS if "lutgen" in methods else [])]
     return [o.replace(needs=needs) for o in out] if needs else out
 
@@ -57,6 +61,19 @@ METHOD = Option("--method", label="Method", choices=["auto", "keys", *LUT_METHOD
                         "look-up table, for photos, paintings and gradients. auto picks keys when "
                         "the detected colours rebuild the image almost exactly, a plain "
                         "background covers a good part of it and its edges are crisp.")
+SEPARATION = Option("--separation", label="Colour separation", type=float, default=DEFAULT_SEPARATION,
+                    range=(0, 1), scope="method:keys", when={"method": ["auto", "keys"]},
+                    image="options-separation.jpg",
+                    help=f"keys: 0 = merge close colours, 1 = keep faint ones apart "
+                         f"(default: {DEFAULT_SEPARATION})",
+                    explain="How the source colours are found. Higher values keep faint or small "
+                            "colours apart (a yellow sun on an orange sky, a thin outline) and, "
+                            "above the default, also find colours darker than the background; "
+                            "lower values merge close colours into fewer source colours. An "
+                            "element that disappears or takes the colour of its neighbour needs a "
+                            "higher value, or its colour added with -m '#rrggbb=TARGET'. With "
+                            "auto, more colours also rebuild the image better, so keys may be "
+                            "picked where lut was.")
 # --method when only the LUT methods are offered (the lut target)
 LUT_ONLY = {"image": "options-lut.jpg",
             "explain": "lut is the built-in table: every colour is pulled towards the palette "
@@ -153,10 +170,10 @@ def recolor_job(args):
 
 
 # ---------------------------------------------------------------- analysis
-def analyse(path):
+def analyse(path, separation=DEFAULT_SEPARATION):
     """Detect source colours; return them with the reconstruction error on the
     content pixels and the share of the image covered by the plain background."""
-    grp = detect_group([path], is_ui=False)
+    grp = detect_group([path], is_ui=False, params=detect_params(separation))
     err, bg_share = fit_error(path, grp)
     return grp, err, bg_share, sharpness(path)
 
@@ -258,7 +275,7 @@ def plan(path, a, verbose=True):
     check_method_arguments(a)
     grp, err, bg_share, sharp = None, None, None, None
     if a.method in ("auto", "keys"):
-        grp, err, bg_share, sharp = analyse(path)
+        grp, err, bg_share, sharp = analyse(path, a.separation)
     flat = (err is not None and err < FIT_THRESHOLD and bg_share >= MIN_BG_SHARE
             and sharp >= MIN_SHARPNESS)
     method = a.method if a.method != "auto" else ("keys" if flat else "lut")
@@ -329,15 +346,59 @@ def save_image(im, dst, method, src):
     return dst
 
 
-def side_by_side(src, im, out):
+# ------------------------------------------------------------------ previews
+SHEET_GAP, SHEET_GAP_COLOUR = 8, (69, 71, 90)     # between the panels (the GUI's picker finds it)
+# well-separated plain colours for the separation panel, one per source colour
+SEPARATION_COLOURS = [(230, 25, 75), (60, 180, 75), (255, 225, 25), (0, 130, 200), (245, 130, 48),
+                      (145, 30, 180), (70, 240, 240), (240, 50, 230), (210, 245, 60),
+                      (250, 190, 212), (0, 128, 128), (220, 190, 255), (170, 110, 40),
+                      (255, 250, 200), (128, 0, 0), (170, 255, 195)]
+
+
+def on_black(im):
+    out = Image.new("RGBA", im.size, (0, 0, 0, 255))
+    out.alpha_composite(im.convert("RGBA"))
+    return out.convert("RGB")
+
+
+def separation_image(path, grp):
+    """What keys sees: each source colour of grp in its own plain colour, as bright
+    as the pixel is made of it (t), black for the background. A part of the image
+    that has no colour of its own shows in its neighbour's colour, or dark.
+    Returns (image, [(name, colour)]) for the legend."""
+    names = list(grp["colors"])
+    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
+    cols = np.array([SEPARATION_COLOURS[i % len(SEPARATION_COLOURS)] for i in range(len(keys))],
+                    np.float32)
+    im = recolor_image(path, hex2rgb(grp["background"]), keys, cols, np.zeros(3, np.float32),
+                       quantize=False)
+    return on_black(im), [(n, tuple(int(v) for v in c)) for n, c in zip(names, cols)]
+
+
+def draw_legend(im, items):
+    """The names of the separation panel's colours, in its top-left corner."""
+    d = ImageDraw.Draw(im, "RGBA")
+    font = ImageFont.load_default(size=13)
+    lines = [(n, c) for n, c in items]
+    w = max(int(d.textlength(n, font=font)) for n, _ in lines) + 30
+    d.rectangle((4, 4, 4 + w, 8 + 18 * len(lines)), fill=(0, 0, 0, 170))
+    for i, (n, c) in enumerate(lines):
+        y = 8 + 18 * i
+        d.rectangle((10, y + 2, 20, y + 12), fill=c)
+        d.text((26, y), n, fill=(255, 255, 255), font=font)
+    return im
+
+
+def side_by_side(src, im, out, grp=None):
+    """before | after, and with a keys group (grp) the separation panel."""
     before = Image.open(src).convert("RGB")
-    after = im.convert("RGBA")
-    bg = Image.new("RGBA", after.size, (0, 0, 0, 255))
-    bg.alpha_composite(after)
-    after = bg.convert("RGB")
-    for x in (before, after):
-        x.thumbnail((900, 900))
-    sheet = Image.new("RGB", (before.width * 2 + 8, before.height), (69, 71, 90))
-    sheet.paste(before, (0, 0))
-    sheet.paste(after.resize(before.size), (before.width + 8, 0))
+    before.thumbnail((900, 900))
+    panels = [before, on_black(im).resize(before.size)]
+    if grp is not None:
+        sep, legend = separation_image(src, grp)
+        panels.append(draw_legend(sep.resize(before.size), legend))
+    sheet = Image.new("RGB", (len(panels) * (before.width + SHEET_GAP) - SHEET_GAP, before.height),
+                      SHEET_GAP_COLOUR)
+    for i, p in enumerate(panels):
+        sheet.paste(p, (i * (before.width + SHEET_GAP), 0))
     sheet.save(out)

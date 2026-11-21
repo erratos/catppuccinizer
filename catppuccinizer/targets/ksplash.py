@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from ..core import naming, recolor
-from ..core.detect import detect_group
+from ..core.detect import detect_group, detect_params
 from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect_text_colours,
                             is_animated, recolour_text_file, save_animation, text_files)
 from ..core.mapping import (apply_maps, background_of, colour_report, map_colour_counts,
@@ -51,7 +51,7 @@ class KSplashTarget(Target):
         return [
             Option("theme", label="Splash screen", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
                    accept="dir", help="look-and-feel id or folder (default: org.kde.breeze.desktop)"),
-            *recolor.method_options(),
+            *recolor.method_options(keys_always=True),
             step("install", help=f"copy the result to {USER_DIR}"),
             step("apply", help="install, then select it as the splash screen",
                  explain="Here: it becomes the splash screen in ksplashrc (kwriteconfig6), "
@@ -213,7 +213,8 @@ def analyse(a, pkg, tmp):
             continue
         if is_animated(f):
             n, durations, loop = anim_info(f)
-            grp = detect_group(anim_sample(f, n, tmp), is_ui=False)
+            grp = detect_group(anim_sample(f, n, tmp), is_ui=False,
+                               params=detect_params(a.separation))
             cfg = {"groups": {"image": grp}}
             apply_maps(cfg, a.map, strict=False)
             rasters[f] = ("anim", grp, (n, durations, loop))

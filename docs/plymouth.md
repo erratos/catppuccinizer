@@ -127,6 +127,14 @@ the listing, not saved). `--redetect` ignores the saved config and detects the
 colours again: with a build it saves the new config, with `--colours` it only
 lists the fresh detection.
 
+When a part of the animation fades away or takes another colour,
+`--separation` (0 to 1, default 0.5) [keeps faint colours apart](colours.md#separating-colours):
+the saved config records the value it was detected with, and another value
+detects the colours again (a build saves them, keeping the previous config as
+`<theme>.toml.bak`, in case you edited it). The configs shipped with the tool
+are hand-made: they are kept, unless `--redetect`. `--preview` shows, for each
+group, what the detection sees (one plain colour per source colour).
+
 To change it, use the colour names listed by `--colours`, prefixed by the group
 when the theme has several (`ui.white`), or a `#rrggbb` source colour:
 
@@ -258,7 +266,8 @@ for it.
 | `--bar` | auto | progress bar colour (`-status` variants, two-step bar) |
 | `--no-status` | | skip the `-status` variants |
 | `--redetect` | | detect the colours again instead of using the saved config (a build saves it) |
-| `--preview` | | only render one before/after image per theme in `<out>/previews/` |
+| `--separation` | `0.5` | when the colours are detected: 0 = merge close colours, 1 = keep faint (and darker) ones apart; another value than the saved config's detects again |
+| `--preview` | | only render one before/after/separation image per theme in `<out>/previews/` |
 | `--list` | | list the installed themes (`*` = the default one) and the adi1090x themes (*tuned* = has a config) |
 | `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |
