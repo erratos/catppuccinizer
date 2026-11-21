@@ -33,7 +33,7 @@ dark: `latte`, `frappe`, `macchiato`, `mocha`. Pick one with `-f` (default:
 Each flavour has 14 **accent** colours (`mauve`, `blue`, `peach`, `green`…).
 Pick the one you like with `-a`.
 
-![flavours](../assets/options-flavors.jpg)
+![flavours](../catppuccinizer/assets/options-flavors.jpg)
 
 That is all you need for most commands.
 

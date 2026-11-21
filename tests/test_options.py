@@ -39,7 +39,24 @@ class Declarations(unittest.TestCase):
                 self.assertIn(o.accept, options.ACCEPT)
                 self.assertIn(o.kind, options.KINDS)
                 if o.image:
-                    self.assertTrue((ROOT / o.image).is_file(), o.image)
+                    self.assertTrue(options.image_file(o.image).is_file(), o.image)
+
+    def test_long_texts(self):
+        """What the GUI's "?" shows: every step, the common options that need it, and the
+        method choice of the lut target with its own comparison."""
+        for name, t in TARGETS.items():
+            for o in t.all_options():
+                if options.is_step(o) or o.dest in ("flavor", "accent", "map", "preview", "dry_run",
+                                                    "method"):
+                    with self.subTest(target=name, option=o.dest):
+                        self.assertTrue(o.explain and len(o.explain) > 40, o.explain)
+        steps = {o.dest: o for o in TARGETS["limine"].options() if options.is_step(o)}
+        self.assertTrue(steps["apply"].explain.startswith(options.STEP_EXPLAIN["apply"]))
+        self.assertIn("byte for byte", steps["apply"].explain)       # the target's own part
+        lut = {o.dest: o for o in TARGETS["lut"].options()}
+        self.assertEqual(lut["method"].image, "options-lut.jpg")
+        self.assertEqual({o.dest: o for o in TARGETS["image"].options()}["method"].image,
+                         "options-method.jpg")
 
     def test_stage_is_coherent(self):
         for name, _, o in every_option():

@@ -3,8 +3,9 @@
 An Option holds what argparse needs (flags, type, choices, default, nargs…) and
 what a front-end needs to show it:
 
-- help: one line; explain: a longer text; image: an illustration (path in the
-  repository, e.g. "assets/options-method.jpg");
+- help: one line; explain: a longer text (the GUI's "?" panel); image: an
+  illustration, a file of catppuccinizer/assets/ ("options-method.jpg") or an
+  absolute path (a target from another package): see image_file();
 - scope: "common" (every target, declared here), "method" / "method:<name>"
   (the recolouring methods, declared in core.recolor and core.lutgen) or
   "target" (declared by the target);
@@ -35,6 +36,7 @@ from pathlib import Path
 
 from .naming import suffix_type
 
+ASSETS = Path(__file__).resolve().parent.parent / "assets"     # catppuccinizer/assets
 STAGES = ("analyse", "preview", "build", "install", "apply", "test", "restore")
 SYSTEM_STAGES = ("install", "apply", "test", "restore")
 STEPS = SYSTEM_STAGES                  # Target methods, each with its option (step())
@@ -215,13 +217,37 @@ def defaults(options, **values):
     return a
 
 
-def step(name, help, sudo=None, **kw):
+def image_file(image):
+    """The file of an option's illustration: an absolute path as it is, else a file
+    of catppuccinizer/assets/."""
+    p = Path(image)
+    return p if p.is_absolute() else ASSETS / p
+
+
+# what each system step does, for every target (a target adds its specifics with
+# step(..., explain=...))
+STEP_EXPLAIN = {
+    "install": "Copies the result where the system looks for it, without selecting it: what "
+               "is in use stays in use. What it installs is recorded, so that Restore can "
+               "remove it.",
+    "apply": "Installs, then selects or configures the result. A configuration file it edits "
+             "is backed up first, and the setting it replaces is recorded, so that Restore "
+             "can bring it back.",
+    "test": "Shows the result without rebooting or logging out, then gives control back.",
+    "restore": "Undoes Apply and Install with what they recorded: the previous setting comes "
+               "back and what was installed is removed. Nothing is built.",
+}
+
+
+def step(name, help, sudo=None, explain=None, **kw):
     """The option that runs a system step of a target (--install, --apply, --test,
-    --restore): its dest and stage are the step's name. kw: e.g. --test [SECONDS]."""
+    --restore): its dest and stage are the step's name; explain: what this target's
+    step does, after the common text (STEP_EXPLAIN). kw: e.g. --test [SECONDS]."""
     if name not in STEPS:
         raise ValueError(f"unknown step {name}")
     kw = {"switch": True, **kw} if "nargs" not in kw else kw
-    return Option(f"--{name}", help=help, stage=name, sudo=sudo, **kw)
+    text = STEP_EXPLAIN[name] + (" " + explain if explain else "")
+    return Option(f"--{name}", help=help, stage=name, sudo=sudo, explain=text, **kw)
 
 
 def is_step(o):
@@ -231,15 +257,34 @@ def is_step(o):
 # ---------------------------------------------------------- common options
 COMMON = [
     Option("-f", "--flavor", nargs="+", default=["mocha"], metavar="FLAVOR", kind="flavor",
-           scope="common", image="assets/options-flavors.jpg",
-           help="one or more flavors, or 'all' (default: mocha)"),
+           scope="common", image="options-flavors.jpg",
+           help="one or more flavors, or 'all' (default: mocha)",
+           explain="Latte is the light flavour; Frappé, Macchiato and Mocha are darker and "
+                   "softer, in that order. Each flavour gives its own result, named after it "
+                   "(catppuccin-mocha-…); 'all' picks the four."),
     Option("-a", "--accent", nargs="+", metavar="ACCENT", kind="accent", scope="common",
-           help="accent(s) for colours mapped to 'accent', or 'all'"),
+           help="accent(s) for colours mapped to 'accent', or 'all'",
+           explain="Catppuccin has 14 accents (mauve, peach, blue…). A colour mapped to "
+                   "'accent' takes the one you pick: the main colour of a monochrome design, "
+                   "a menu highlight, a progress bar. Each accent gives its own result. What "
+                   "uses no accent (a photo recoloured with a LUT) is written once per "
+                   "flavour, without the accent in its name, and a note says the accent was "
+                   "ignored."),
     Option("-m", "--map", nargs="+", extend=True, default=[], metavar="NAME=TARGET", kind="map",
            scope="common", when={"analysis.remappable": [True]},
-           help="override the colour mapping: white=mauve, ui.white=text, '#ffad03=peach'"),
+           help="override the colour mapping: white=mauve, ui.white=text, '#ffad03=peach'",
+           explain="Each source colour is sent to a Catppuccin colour automatically: grays to "
+                   "the neutral ramp (base to text, by lightness), saturated colours to the "
+                   "closest accent hue, the main one to 'accent'. NAME=TARGET changes one: "
+                   "NAME is a name from the colour list (white, blue-3), with its group for "
+                   "a theme that has several (ui.white), or a '#rrggbb' value; TARGET is a "
+                   "Catppuccin colour (text, surface1, peach…) or 'accent'. Only the keys "
+                   "method has source colours: a LUT has nothing to remap."),
     Option("--preview", switch=True, scope="common", stage="preview",
-           help="only render before/after images into <out>/previews/"),
+           help="only render before/after images into <out>/previews/",
+           explain="Instead of the result, one image per result with the original on the "
+                   "left and the recoloured version on the right, in <out>/previews/: a "
+                   "quick way to compare flavours, accents or settings before building."),
     Option("-o", "--out", type=Path, accept="dir", scope="common", help="output folder"),
     Option("-s", "--suffix", default="", type=suffix_type, metavar="SUFFIX", scope="common",
            help="extra word at the end of the output names (lowercase letters, digits and '-')"),
@@ -247,6 +292,10 @@ COMMON = [
 
 # added to the targets that have system steps
 DRY_RUN = Option("--dry-run", switch=True, scope="common", stage="install",
+                 explain="Nothing is copied, written or removed, no command is run: each "
+                         "change is listed instead ('would copy …'). The system is still "
+                         "read (the theme in use, limine.conf), so a step that needs root "
+                         "still runs with sudo.",
                  help="with --install, --apply, --test or --restore: build as usual, then "
                       "only list the files the steps would copy, change or remove and the "
                       "commands they would run (reading the system may still need sudo)")

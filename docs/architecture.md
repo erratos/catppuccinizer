@@ -68,7 +68,8 @@ tests/
 | `system.place(base, name)` / `naming.check_name(name)` | a system path built from a theme or package name, checked first (no `/`, `..`, leading `-`) |
 | `system.copy_folder(src, dst)` / `source_file(path, root)` | copy a source theme without following links out of it; the file to read for a theme file, or None |
 | `system.which(name)` / `read_text(path)` | a command's absolute path (as root: system folders only); a text file as it is, for a byte-exact rewrite |
-| `options.step(name, help, sudo)` | the option of a system step: `--install`, `--apply`, `--test`, `--restore` |
+| `options.step(name, help, sudo, explain)` | the option of a system step: `--install`, `--apply`, `--test`, `--restore`; its long text is the common one (`STEP_EXPLAIN`) followed by `explain`, what this target's step does |
+| `options.image_file(image)` | the file of an option's illustration |
 | `naming.output_name(flavor, source, accent, suffix)` / `slug(text)` | the name of every output: `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]` |
 | `naming.planned(path, folder)` | one entry of `outputs()` / `--names` (`exists`: the build would replace it) |
 | `recolor.output_suffix(method, src)` | the extension a recoloured image gets (a LUT keeps an opaque JPEG / WebP) |
@@ -208,7 +209,7 @@ option), then:
 | Field | Meaning |
 |---|---|
 | `help` | one line (`--help`, the GUI) |
-| `explain`, `image` | a longer text, an illustration in `assets/` |
+| `explain`, `image` | a longer text and an illustration, shown by the GUI's **?** next to the option; `image` is a file of `catppuccinizer/assets/` (`"options-method.jpg"`, package data, made by `tools/doc_previews.py`) or an absolute path for a target from another package |
 | `scope` | `common`, `method` / `method:<name>` (core) or `target` (default) |
 | `stage` | `analyse`, `preview`, `build` (default), `install`, `apply`, `test`, `restore` |
 | `sudo` | `"run"`: the command must run as root |

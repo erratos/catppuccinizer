@@ -42,7 +42,7 @@ a plain background covers a good part of it and its edges are crisp, `lut`
 otherwise. The accent only matters with `keys`, when a colour goes to `accent`
 (see [which method, and does the accent count?](colours.md#which-method-and-does-the-accent-count)).
 
-![keys vs lut](../assets/options-method.jpg)
+![keys vs lut](../catppuccinizer/assets/options-method.jpg)
 
 `keys` is exact on flat art (top) but breaks on a photo (bottom): it knows only
 a handful of source colours, so a gradient sky collapses into one accent. `lut`
@@ -65,14 +65,14 @@ colour takes the lightness of the palette's neutrals (`crust` → `text`): low
 contrast, very Catppuccin. At `1` the original lightness is kept: deep blacks
 and bright highlights, more contrast.
 
-![--keep-lum](../assets/options-keep-lum.jpg)
+![--keep-lum](../catppuccinizer/assets/options-keep-lum.jpg)
 
 **`--smooth`** (default 0.08): how far a colour looks for accents. Small values
 snap each hue to its single closest accent (distinct bands of green, blue,
 pink in the chart); large values blend many accents together, towards a
 pastel, almost uniform tint.
 
-![--smooth](../assets/options-smooth.jpg)
+![--smooth](../catppuccinizer/assets/options-smooth.jpg)
 
 ## SVG / SVGZ
 
@@ -123,7 +123,7 @@ distinction. Dark or muted colours then often land on the gray `surface` /
 `overlay` colours, which gives a moodier, less colourful result. Only bright,
 saturated colours keep an accent. Try both with `--preview`.
 
-![lut vs lutgen](../assets/options-lut.jpg)
+![lut vs lutgen](../catppuccinizer/assets/options-lut.jpg)
 
 In the chart: `lut` keeps a smooth rainbow of Catppuccin accents and a clean
 neutral gray ramp; `lutgen` forms large patches of single palette colours and
@@ -137,14 +137,14 @@ On the scene, the sky turns gray-blue with lutgen instead of staying violet.
 blend; `nearest` does not interpolate at all, every colour snaps to one palette
 colour, which gives a flat, posterised look (visible bands in the sky).
 
-![--lutgen-algo](../assets/options-lutgen-algo.jpg)
+![--lutgen-algo](../catppuccinizer/assets/options-lutgen-algo.jpg)
 
 **`--lutgen-preserve`** keeps the original lightness after interpolation (like
 `--keep-lum 1` for `lut`); **`--lutgen-lum`** changes how much lightness counts
 when matching colours: below 1 colours find a colourful match more easily
 (the deep blue stays blue), above 1 they go to gray more easily.
 
-![--lutgen-preserve and --lutgen-lum](../assets/options-lutgen-lum.jpg)
+![--lutgen-preserve and --lutgen-lum](../catppuccinizer/assets/options-lutgen-lum.jpg)
 
 **Blending**: each algorithm has its own knob for how much neighbouring
 palette colours mix. With `blur`, a small `--lutgen-radius` gives hard
@@ -152,7 +152,7 @@ transitions (close to `nearest`) and a large one washes colours out; with
 `rbf`, `--lutgen-shape` works the other way round (small = blended, large =
 hard).
 
-![blending](../assets/options-lutgen-blend.jpg)
+![blending](../catppuccinizer/assets/options-lutgen-blend.jpg)
 
 | Option | Default | Algorithms | Meaning |
 |---|---|---|---|

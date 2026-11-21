@@ -46,7 +46,10 @@ ten minutes after the page is closed. `--port N` picks the port,
    (`lut`, `lutgen`), the accents are dimmed and the hint says why; with
    `auto` it depends on each image, so the output notes it after the run
    (*the accent was ignored* next to *Done*).
-4. **Options**: every option of the target, with its help. Options that only
+4. **Options**: every option of the target, with its help; **?** next to an
+   option opens a longer explanation and, for the colour options, a comparison
+   picture (click it to enlarge). The flavours, the accents, the remapping and
+   the system steps have one too. Options that only
    apply to a method or a setting show up when it is chosen: `--keep-lum` and
    `--smooth` with `auto` / `lut`, the `--lutgen-*` ones with `lutgen` (and
    each algorithm's own knobs with that algorithm), `--hald-level` /
@@ -142,6 +145,8 @@ GUI without GUI code:
 - `Target.colours()` fills the *Source colours* list and its `when`
   facts (`analysis.remappable`: the remap editor is shown only when something
   can be remapped);
+- `explain` and `image` fill the **?** panel of an option (a step's text starts
+  with what every target's step does);
 - `gui=False` keeps an option out of the forms (`--colours`: the page shows
   that list by itself; `--list` repeats the catalogue);
 - `Target.sources()` fills the catalogue, by sections, with thumbnails and

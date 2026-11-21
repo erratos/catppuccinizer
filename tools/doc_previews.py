@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Build the option comparison grids used in docs/ (assets/options-*.jpg).
+"""Build the option comparison grids used in docs/ and the GUI
+(catppuccinizer/assets/options-*.jpg, package data).
 
 Each grid shows the same two pictures through several settings: a sunset scene
 (the left half of assets/demo-wallpaper-photo.jpg) and a colour chart (every hue
@@ -24,7 +25,8 @@ sys.path.insert(0, str(ROOT))
 from catppuccinizer.core import recolor  # noqa: E402
 from catppuccinizer.core.options import defaults  # noqa: E402
 
-ASSETS = ROOT / "assets"
+ASSETS = ROOT / "assets"                     # the demo pictures
+OPTION_IMAGES = ROOT / "catppuccinizer/assets"
 WIDTH = 1000                 # total grid width
 GAP = 6
 LABEL_H = 30
@@ -106,7 +108,7 @@ def grid(name, title, columns, sources):
         for j, src in enumerate(sources):
             im = render(src, method, flavor, a).resize((tw, th), Image.LANCZOS)
             sheet.paste(im, (x, title_h + LABEL_H + j * (th + GAP)))
-    out = ASSETS / f"options-{name}.jpg"
+    out = OPTION_IMAGES / f"options-{name}.jpg"
     sheet.save(out, quality=88, optimize=True, progressive=True)
     print(out.relative_to(ROOT), sheet.size, f"{out.stat().st_size // 1024} KB")
 

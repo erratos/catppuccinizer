@@ -123,9 +123,14 @@ OPTIONS = [
     step("install", sudo="run",
          help=f"copy the result (its -status variant if any) to {INSTALL_DIR} (sudo)"),
     step("apply", sudo="run",
-         help="install, then make it the default theme and rebuild the initramfs (sudo)"),
+         help="install, then make it the default theme and rebuild the initramfs (sudo)",
+         explain="Here: plymouth-set-default-theme -R makes it the default theme and "
+                 "rebuilds the initramfs, which takes a little while."),
     step("test", sudo="run", nargs="?", const=10, type=int, metavar="SECONDS",
-         help="show the result for SECONDS without rebooting (default: 10; sudo)"),
+         help="show the result for SECONDS without rebooting (default: 10; sudo)",
+         explain="Here: installs it if needed, shows it for SECONDS with the names of your "
+                 "running services as status messages, then puts the default theme back. "
+                 "If the screen does not switch, run it from a text console (Ctrl+Alt+F3)."),
     step("restore", sudo="run",
          help="make the previous default theme active again, remove the installed ones (sudo)"),
 ]

@@ -53,8 +53,12 @@ class KSplashTarget(Target):
                    accept="dir", help="look-and-feel id or folder (default: org.kde.breeze.desktop)"),
             *recolor.method_options(),
             step("install", help=f"copy the result to {USER_DIR}"),
-            step("apply", help="install, then select it as the splash screen"),
-            step("test", help="show the result in a window (ksplashqml --test)"),
+            step("apply", help="install, then select it as the splash screen",
+                 explain="Here: it becomes the splash screen in ksplashrc (kwriteconfig6), "
+                         "as System Settings would do; seen at the next login."),
+            step("test", help="show the result in a window (ksplashqml --test)",
+                 explain="Here: ksplashqml shows it in a window, which closes by itself or "
+                         "on a click."),
             step("restore", help="select the previous splash screen again and remove "
                                  "the installed ones"),
         ]

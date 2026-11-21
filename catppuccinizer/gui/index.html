@@ -127,6 +127,14 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 
 /* options */
 .opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.qbtn { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--surface2); background: transparent; color: var(--overlay1);
+        font-size: 12px; font-weight: 700; line-height: 1; cursor: pointer; padding: 0; margin-left: 6px; vertical-align: 1px; flex: none; }
+.qbtn:hover, .qbtn.on { border-color: var(--accent); color: var(--accent); }
+.explain { margin: 6px 0 2px; padding: 10px 12px; border-radius: 8px; background: var(--crust); color: var(--subtext1); font-size: 13px; line-height: 1.5; }
+.explain p { margin: 0 0 8px; }
+.explain p:last-child { margin-bottom: 0; }
+.explain img { display: block; width: 100%; border-radius: 6px; cursor: zoom-in; margin-top: 4px; }
+.explain b { color: var(--text); }
 .opt { background: var(--base); border: 1px solid var(--surface0); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .opt.wide { grid-column: 1 / -1; }
 .opt .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -280,7 +288,9 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
       <div class="actions hidden" id="stepopts">
         <label class="check" id="drybox" title="Build as usual, then only list what the system steps would change (--dry-run); a step marked sudo still asks for the password, to read the system"><input type="checkbox" id="dryrun"> Dry run</label>
         <label class="check" id="sudobox" title="Run every command with sudo (a password prompt opens); the steps marked sudo always do"><input type="checkbox" id="sudo"> Always with sudo</label>
+        <span class="sp"></span><span id="stepsq"></span>
       </div>
+      <div id="stepshelp"></div>
       <p class="hint dest" id="dest"></p>
       <div class="cmd" id="cmd"><span id="cmdtext"></span><button class="btn ghost small copy" id="copy" title="Copy the command">Copy</button></div>
       <div class="err hidden" id="err"></div>
@@ -342,7 +352,7 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
 const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
-            colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0 };
+            colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0, helpOpen: new Set() };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -380,6 +390,33 @@ function nice(o) {
   if (o.positional) return (o.metavar || o.dest).toLowerCase().replace(/_/g, " ");
   const f = o.flags.find((x) => x.startsWith("--")) || o.flags[0];
   return f.replace(/^--/, "").replace(/^lutgen-/, "").replace(/-/g, " ");
+}
+// The "?" of an option that has a longer text or an illustration (Option.explain, image):
+// a button, and the panel it opens (open ones stay open when the form is drawn again).
+// content: what the panel shows instead of the option's own text and picture.
+const assetURL = (name) => `/api/asset?name=${encodeURIComponent(name)}&t=${encodeURIComponent(TOKEN)}`;
+function helpParts(o, content = null, onToggle = null) {
+  if (!o || (!content && !o.explain && !o.image)) return [null, null];
+  const key = o.dest, panel = h("div", { class: "explain hidden" });
+  const fill = () => {
+    if (panel.childElementCount) return;
+    panel.append(...[content ? content() : [o.explain ? h("p", {}, o.explain) : null,
+      o.image ? h("img", { src: assetURL(o.image), alt: o.flags.join(", "), loading: "lazy", title: "Click to enlarge",
+        onclick: () => showImage(assetURL(o.image), o.flags.join(", ")) }) : null]].flat().filter(Boolean));
+  };
+  const btn = h("button", { class: "qbtn", type: "button", title: "What it does", "aria-label": `What ${o.flags[0] || o.dest} does` }, "?");
+  const set = (open) => {
+    if (open) { S.helpOpen.add(key); fill(); } else S.helpOpen.delete(key);
+    panel.classList.toggle("hidden", !open); btn.classList.toggle("on", open); btn.setAttribute("aria-expanded", String(open));
+    if (onToggle) onToggle(open);
+  };
+  btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); set(!S.helpOpen.has(key)); };
+  queueMicrotask(() => set(S.helpOpen.has(key)));
+  return [btn, panel];
+}
+function showImage(src, title) {
+  $("lbtitle").textContent = title; $("lbimg").src = src;
+  $("lbopen").classList.add("hidden"); $("lightbox").showModal();
 }
 function helpText(o) {
   // "(default: 0.5)" and "lut: " prefixes are shown elsewhere
@@ -547,7 +584,8 @@ function coloursCard(t, hasSource) {
   const out = [];
   const flv = vals().flavor || ["mocha"];
   const fset = new Set(flv[0] === "all" ? S.schema.flavors : flv);
-  out.push(h("div", { class: "label" }, h("span", {}, "Flavour"), h("span", {}, "several = one result each")));
+  const [fq, fhelp] = helpParts(opt("flavor"));
+  out.push(h("div", { class: "label" }, h("span", {}, "Flavour", fq), h("span", {}, "several = one result each")), fhelp);
   out.push(h("div", { class: "flavors" }, S.schema.flavors.map((f) => {
     const p = pal(f);
     return h("button", { class: "flavor" + (fset.has(f) ? " on" : ""), style: { background: p.base, color: p.text },
@@ -571,7 +609,8 @@ function coloursCard(t, hasSource) {
     const aset = new Set(all ? S.schema.accents : acc);
     const p = pal(uiFlavor());
     const dflt = t.default_accent.join(", ");
-    out.push(h("div", { class: "label" }, h("span", {}, "Accent"), h("span", {}, acc.length ? `${all ? 14 : aset.size} selected` : `default: ${dflt}`)));
+    const [aq, ahelp] = helpParts(opt("accent"));
+    out.push(h("div", { class: "label" }, h("span", {}, "Accent", aq), h("span", {}, acc.length ? `${all ? 14 : aset.size} selected` : `default: ${dflt}`)), ahelp);
     out.push(h("div", { class: "accents", id: "accents" }, S.schema.accents.map((a) => h("button", {
       class: "accent" + (aset.has(a) ? " on" : "") + (!acc.length && t.default_accent.includes(a) ? " def" : ""), style: { color: p[a] },
       title: !acc.length && t.default_accent.includes(a) ? "default" : null,
@@ -676,7 +715,8 @@ function mapEditor() {
   const p = pal(uiFlavor());
   const save = () => setVal("map", rows.filter(([a, b]) => a.trim() && b).map(([a, b]) => `${a.trim()}=${b}`));
   const dl = h("datalist", { id: "detnames" }, knownNames().map((k) => h("option", { value: k })));
-  const box = h("div", { class: "mapeditor" }, h("div", { class: "label" }, h("span", {}, "Colour remapping (-m)"), h("span", {}, "optional")), dl);
+  const [mq, mhelp] = helpParts(opt("map"));
+  const box = h("div", { class: "mapeditor" }, h("div", { class: "label" }, h("span", {}, "Colour remapping (-m)", mq), h("span", {}, "optional")), mhelp, dl);
   const list = h("div");
   const draw = () => {
     list.replaceChildren(...rows.map((r, i) => {
@@ -722,8 +762,10 @@ function optionsCard(options) {
 function optionField(o) {
   const V = vals(), v = V[o.dest];
   const box = h("div", { class: "opt" + (v !== undefined ? " set" : ""), "data-dest": o.dest, "data-when": o.when ? JSON.stringify(o.when) : null });
-  const head = h("div", { class: "head" }, h("div", {}, h("div", { class: "name" }, nice(o)), h("div", { class: "flag" }, o.flags.join(", "))));
-  const extra = [];
+  // an open explanation takes the whole row: its picture is a wide comparison grid
+  const [qbtn, explain] = helpParts(o, null, (open) => box.classList.toggle("wide", open || o.kind === "path"));
+  const head = h("div", { class: "head" }, h("div", {}, h("div", { class: "name" }, nice(o), qbtn), h("div", { class: "flag" }, o.flags.join(", "))));
+  const extra = explain ? [explain] : [];
   if (o.sudo) head.append(h("span", { class: "badge", title: o.sudo === "run" ? "Needs administrator rights: run with sudo" : "Asks for the administrator password itself" }, "sudo"));
   let control;
   const def = o.default;
@@ -839,6 +881,13 @@ function renderSteps() {
   $("steps").replaceChildren(...list.map((o) => h("button", { class: "btn" + (o.dest === "restore" ? " danger" : ""), "data-step": o.dest, title: o.help,
     onclick: () => run(o.dest), onmouseenter: () => { S.hover = o.dest; updateCommand(); }, onmouseleave: () => { S.hover = null; updateCommand(); } },
     label(o), o.sudo === "run" ? h("span", { class: "badge" }, "sudo") : null)));
+  // "?": what each step does here (the steps' explain), and the dry run
+  const dry = opt("dry_run");
+  const [q, panel] = list.length ? helpParts({ dest: "__steps", flags: ["the system steps"] }, () => [
+    ...list.map((o) => h("p", {}, h("b", {}, label(o)), " — ", o.explain || o.help)),
+    dry ? h("p", {}, h("b", {}, "Dry run"), " — ", dry.explain || dry.help) : null]) : [null, null];
+  $("stepsq").replaceChildren(...[q].filter(Boolean));
+  $("stepshelp").replaceChildren(...[panel].filter(Boolean));
 }
 async function updateCommand() {
   const r = await api("/api/command", action(S.hover));
@@ -949,6 +998,7 @@ function renderResults(list) {
   }));
 }
 function lightbox(o) {
+  $("lbopen").classList.remove("hidden");
   $("lbtitle").textContent = tidy(o.path);
   $("lbimg").src = o.thumb.match(/\.(png|jpe?g|webp|gif|svg)$/i) && !o.dir ? fileURL(o.thumb, o.version) : thumb(o.thumb, 1600, o.version);
   $("lbopen").onclick = () => api("/api/open", { path: o.path });

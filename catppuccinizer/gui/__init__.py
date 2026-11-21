@@ -41,7 +41,7 @@ from PIL import Image
 from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.paths import cache_dir
-from ..core.options import STEPS, analysis, condition_met
+from ..core.options import STEPS, analysis, condition_met, image_file
 from ..core.recolor import LUT_METHODS
 from ..core.target import discover
 
@@ -292,6 +292,9 @@ class App:
         self.parser = build_parser(self.targets)
         self.schema = schema(self.targets)
         self.options = {t["name"]: t["options"] for t in self.schema["targets"]}
+        # the illustrations the options declare: the only files /api/asset serves
+        self.images = {o.image: image_file(o.image) for t in self.targets.values()
+                       for o in t.all_options() if o.image}
         self.jobs = {}
         self.last_seen = time.time()
         self.port = None
@@ -562,6 +565,12 @@ def make_handler(app):
                 if data is None:
                     return self.send(404, {"error": "no image"})
                 return self.send(200, data, ctype, cache=True)
+            if u.path == "/api/asset":           # an option's illustration (Option.image)
+                f = app.images.get((q.get("name") or [""])[0])
+                ctype = mimetypes.guess_type(f.name)[0] if f else None
+                if not f or not ctype or not ctype.startswith("image/") or not f.is_file():
+                    return self.send(404, {"error": "no such illustration"})
+                return self.send(200, f.read_bytes(), ctype, cache=True)
             if u.path == "/api/file":            # the lightbox: images only
                 p = servable((q.get("path") or [""])[0])
                 if p is None:

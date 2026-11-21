@@ -102,9 +102,14 @@ OPTIONS = [
            help="wallpaper_style (default: the current one, or stretched)"),
     step("install", sudo="run", help=f"copy the wallpaper to <ESP>/{WALL_DIR}/ (sudo)"),
     step("apply", sudo="run",
-         help="install, then write the theme into limine.conf (sudo; a backup is made)"),
+         help="install, then write the theme into limine.conf (sudo; a backup is made)",
+         explain="Here: the theme block goes before the first menu entry and the global "
+                 "options it replaces are commented out; the rest of limine.conf is checked "
+                 "to stay byte for byte the same, otherwise nothing is written."),
     step("restore", sudo="run",
-         help="remove the theme from limine.conf and its wallpapers from the ESP (sudo)"),
+         help="remove the theme from limine.conf and its wallpapers from the ESP (sudo)",
+         explain="Here: exactly the block is removed and the options it had commented out "
+                 "come back, so changes made since (new kernel entries) are kept."),
     Option("--conf", type=Path, accept="file", stage="apply",
            help="limine.conf to edit (default: searched on the ESP)"),
     Option("--esp", type=Path, accept="dir", stage="apply",

@@ -142,6 +142,24 @@ class Gui(unittest.TestCase):
         self.assertIn("required", self.call("/api/names", {"target": "image", "values": {}})["error"])
         self.assertTrue(next(t for t in self.call("/api/schema")["targets"] if t["name"] == "lut")["has_outputs"])
 
+    def test_illustrations(self):
+        """/api/asset serves the illustrations the options declare, nothing else."""
+        url = f"http://127.0.0.1:{self.app.port}/api/asset?name="
+        req = urllib.request.Request(url + "options-method.jpg", headers={"X-Token": self.app.token})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            self.assertEqual(r.headers["Content-Type"], "image/jpeg")
+            self.assertEqual(r.read()[:2], b"\xff\xd8")
+        for name in ("../../pyproject.toml", "demo-glow.png", "options-nope.jpg", ""):
+            with self.subTest(name=name), self.assertRaises(urllib.error.HTTPError) as e:
+                urllib.request.urlopen(urllib.request.Request(
+                    url + urllib.request.quote(name), headers={"X-Token": self.app.token}), timeout=30)
+            self.assertEqual(e.exception.code, 404)
+            e.exception.close()
+        with self.assertRaises(urllib.error.HTTPError) as e:              # no token
+            urllib.request.urlopen(url + "options-method.jpg", timeout=30)
+        self.assertEqual(e.exception.code, 403)
+        e.exception.close()
+
     def test_access_control(self):
         with self.assertRaises(urllib.error.HTTPError) as e:
             self.call("/api/schema", token=False)

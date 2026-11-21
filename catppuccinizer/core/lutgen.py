@@ -43,7 +43,7 @@ BLEND = ("The blending knob of an algorithm: with blur, a small --lutgen-radius 
          "--lutgen-shape works the other way round.")
 OPTIONS = [
     Option("--lutgen-algo", choices=list(ALGORITHMS), default="blur", scope="method:lutgen",
-           group=GROUP, image="assets/options-lutgen-algo.jpg",
+           group=GROUP, image="options-lutgen-algo.jpg",
            help="interpolation: blur (lutgen default), rbf (Gaussian RBF), "
                 "shepard (inverse distance), sampling (Gaussian sampling, slow), "
                 "nearest (no interpolation) (default: blur)",
@@ -53,17 +53,23 @@ OPTIONS = [
     Option("--lutgen-level", type=int, default=10, range=(2, 16), scope="method:lutgen",
            group=GROUP, help="Hald CLUT level: cube of level^2 points per axis (default: 10)"),
     Option("--lutgen-preserve", switch=True, scope="method:lutgen", group=GROUP,
-           image="assets/options-lutgen-lum.jpg",
-           help="keep the original lightness after interpolation"),
+           image="options-lutgen-lum.jpg",
+           help="keep the original lightness after interpolation",
+           explain="After a colour is replaced, its original lightness is put back: more "
+                   "contrast, while the hues still come from the palette."),
     Option("--lutgen-lum", type=float, metavar="FACTOR", scope="method:lutgen", group=GROUP,
-           image="assets/options-lutgen-lum.jpg",
+           image="options-lutgen-lum.jpg",
+           explain="lutgen matches each colour to the palette by distance; this weights the "
+                   "lightness in that distance. Below 1, colours find more colourful "
+                   "matches; above 1, they go towards the neutrals. It is usually combined "
+                   "with --lutgen-preserve.",
            help="lightness weight when matching: <1 prefers colourful matches, "
                 ">1 neutral ones; usually with --lutgen-preserve (default 1)"),
     *(Option(f"--lutgen-{name.replace('_', '-')}", type=typ, metavar=metavar, help=help_,
              scope="method:lutgen", group=GROUP,
              when={"method": ["lutgen"],
                    "lutgen_algo": [a for a, (_, allowed) in ALGORITHMS.items() if name in allowed]},
-             **({"image": "assets/options-lutgen-blend.jpg", "explain": BLEND}
+             **({"image": "options-lutgen-blend.jpg", "explain": BLEND}
                 if name in ("radius", "shape") else {}))
       for name, (typ, metavar, help_) in PARAMS.items()),
 ]

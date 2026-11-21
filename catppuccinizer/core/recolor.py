@@ -38,14 +38,15 @@ def method_options(methods=None, help=None):
     it accepts, the first is the default (lut target: LUT_METHODS), with the help
     of --method that goes with them."""
     method = METHOD if methods is None else METHOD.replace(
-        choices=list(methods), default=methods[0], help=help or METHOD.help)
+        choices=list(methods), default=methods[0], help=help or METHOD.help,
+        **(LUT_ONLY if set(methods) <= set(LUT_METHODS) else {}))
     methods = method.choices
     return [method, *(LUT_OPTIONS if "lut" in methods else []),
             *(lutgen.OPTIONS if "lutgen" in methods else [])]
 
 
 METHOD = Option("--method", choices=["auto", "keys", *LUT_METHODS], default="auto", scope="method",
-                image="assets/options-method.jpg",
+                image="options-method.jpg",
                 help="keys = flat art, lut = photos, lutgen = photos with a LUT made by "
                      "lutgen (default: auto, which never picks lutgen)",
                 explain="keys finds the few source colours of flat art (line art, logos, neon on "
@@ -54,15 +55,22 @@ METHOD = Option("--method", choices=["auto", "keys", *LUT_METHODS], default="aut
                         "look-up table, for photos, paintings and gradients. auto picks keys when "
                         "the detected colours rebuild the image almost exactly, a plain "
                         "background covers a good part of it and its edges are crisp.")
+# --method when only the LUT methods are offered (the lut target)
+LUT_ONLY = {"image": "options-lut.jpg",
+            "explain": "lut is the built-in table: every colour is pulled towards the palette "
+                       "in Oklab, keeping part of its lightness (--keep-lum) and blending "
+                       "neighbouring accents (--smooth). lutgen makes the table with the "
+                       "external lutgen tool, with its own interpolation algorithms "
+                       "(--lutgen-*): similar results, other trade-offs."}
 LUT_OPTIONS = [
     Option("--keep-lum", type=float, default=0.5, range=(0, 1), scope="method:lut",
-           when={"method": ["auto", "lut"]}, image="assets/options-keep-lum.jpg",
+           when={"method": ["auto", "lut"]}, image="options-keep-lum.jpg",
            help="lut: 0 = palette lightness, 1 = original lightness (default: 0.5)",
            explain="At 0 every colour takes the lightness of the palette's neutrals (crust to "
                    "text): low contrast, very Catppuccin. At 1 the original lightness is kept: "
                    "deep blacks and bright highlights, more contrast."),
     Option("--smooth", type=float, default=0.08, metavar="R", scope="method:lut",
-           when={"method": ["auto", "lut"]}, image="assets/options-smooth.jpg",
+           when={"method": ["auto", "lut"]}, image="options-smooth.jpg",
            help="lut: blend radius in Oklab; smaller = purer palette colours (default: 0.08)",
            explain="How far a colour looks for accents. Small values snap each hue to its "
                    "closest accent (distinct bands); large values blend many accents together, "

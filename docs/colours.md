@@ -42,7 +42,7 @@ It analyses what it must to know whether the accent is used (like
 
 ## Flavours
 
-![flavours](../assets/options-flavors.jpg)
+![flavours](../catppuccinizer/assets/options-flavors.jpg)
 
 Latte is the light flavour: its palette spans from dark text to a light
 background and its accents are more saturated, so results stay brighter and
