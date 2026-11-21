@@ -99,11 +99,11 @@ class Gui(unittest.TestCase):
     def test_options_that_do_not_count_are_left_out(self):
         opts = self.app.options["limine"]
         self.assertEqual(build_argv("limine", {"style": "tiled", "keep_lum": 0.3}, opts), ["limine"])
-        self.assertEqual(build_argv("limine", {"style": "tiled", "recolor_wallpaper": True}, opts),
-                         ["limine", "--recolor-wallpaper", "--style", "tiled"])
+        self.assertEqual(build_argv("limine", {"style": "tiled", "wallpaper": "current"}, opts),
+                         ["limine", "--wallpaper", "current", "--style", "tiled"])
         lim = {o["dest"]: o for o in opts}
-        self.assertEqual((lim["style"]["needs"], lim["wallpaper"]["unless"]),
-                         (["wallpaper", "recolor_wallpaper"], ["recolor_wallpaper"]))
+        self.assertEqual(lim["style"]["needs"], ["wallpaper"])
+        self.assertIn("menu colours", lim["wallpaper"]["empty"])
 
     def test_errors_are_the_cli_ones(self):
         r = self.call("/api/command", {"target": "image", "values": {}})

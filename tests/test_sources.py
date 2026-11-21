@@ -137,7 +137,9 @@ class Installed(Tmp):
                     sec = sources.section("Set in limine.conf", limine.current_wallpapers)
                 finally:
                     esp.chmod(0o755)
-                self.assertIn("--recolor-wallpaper", sec["error"])     # what to do instead
+                # only root can read it: "current", read when the command runs (with sudo)
+                self.assertEqual([(i["value"], i["current"]) for i in sec["items"]], [("current", True)])
+                self.assertIn("run with sudo", sec["items"][0]["note"])
 
 
 if __name__ == "__main__":

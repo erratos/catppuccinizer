@@ -188,6 +188,8 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .btn .badge { margin-left: 6px; vertical-align: 1px; }
 .actions.first { margin-top: 0; }
 .hint.dest { margin: 10px 0 8px; overflow-wrap: anywhere; }
+.emptynote { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: var(--subtext1);
+             background: color-mix(in srgb, var(--accent) 10%, var(--crust)); border-left: 3px solid var(--accent); }
 .names { margin-top: 10px; font-size: 12.5px; color: var(--subtext0); }
 .names.loading ul { opacity: .5; }
 .names .sum { margin: 0 0 4px; color: var(--overlay2); }
@@ -584,7 +586,9 @@ function sourceField(o) {
     const def = Array.isArray(o.default) ? o.default.join(", ") : o.default;
     const kids = [h("div", { class: "label" }, h("span", {}, nice(o)), o.multiple ? h("span", {}, list.length ? `${list.length} selected` : "") : null),
       list.length ? items : null, buttons,
-      h("p", { class: "hint" }, o.help, !list.length && def && def !== "None" && !/\(default/.test(o.help) ? [" — empty: ", h("code", {}, def)] : null)];
+      h("p", { class: "hint" }, o.help, !list.length && def && def !== "None" && !/\(default/.test(o.help) ? [" — empty: ", h("code", {}, def)] : null),
+      // what nothing chosen does, said plainly while nothing is chosen (Option.empty)
+      !list.length && o.empty ? h("p", { class: "emptynote" }, h("b", {}, "Nothing chosen: "), o.empty, ".") : null];
     if (takesImages(o)) {
       const drop = h("div", { class: "drop" }, "Drop images here");
       drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });

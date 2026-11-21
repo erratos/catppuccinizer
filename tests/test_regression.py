@@ -215,7 +215,7 @@ def run_all():
         steps = {}
         cli("limine", "-a", "lavender", "--apply", "--esp", esp, "-o", tmp / "limine")
         steps["keep"] = (esp / "limine.conf").read_text()
-        cli("limine", "-a", "lavender", "--recolor-wallpaper", "--apply", "--esp", esp,
+        cli("limine", "-a", "lavender", "--wallpaper", "current", "--apply", "--esp", esp,
             "-o", tmp / "limine")
         # several accents, a LUT wallpaper: rendered once, the same file in each folder
         cli("limine", "-a", "lavender", "peach", "--wallpaper", tmp / "img/photo.jpg",

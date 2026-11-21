@@ -10,8 +10,10 @@ limine.conf is edited byte for byte: apply only adds the block and comments out
 options, restore removes exactly that, and the result is checked before it is
 written (check_insert): the rest of the file stays as it was.
 
-An existing wallpaper is kept (the menu background becomes see-through over
-it), unless --wallpaper replaces it or --recolor-wallpaper recolours it.
+Without --wallpaper only the menu colours change (text, highlight, frame): the
+wallpaper set in limine.conf is kept (the menu background becomes see-through
+over it). --wallpaper IMAGE recolours IMAGE and uses it instead; --wallpaper
+current recolours the wallpaper limine.conf sets (the catalogue offers it).
 """
 import os
 import re
@@ -91,14 +93,15 @@ class LimineTarget(Target):
         return outputs(a)
 
 
-WALLPAPER = ["wallpaper", "recolor_wallpaper"]      # a wallpaper to recolour
+CURRENT = "current"           # --wallpaper current: the wallpaper(s) limine.conf sets
+WALLPAPER = ["wallpaper"]     # a wallpaper to recolour
+MENU_ONLY = ("only the menu colours change (text, highlight, frame): the wallpaper set in "
+             "limine.conf is kept as it is")
 OPTIONS = [
     Option("--wallpaper", type=Path, metavar="IMAGE", accept="image", source=True,
-           unless=["recolor_wallpaper"],
-           help="image to recolour and use as the Limine wallpaper (optional: without it, "
-                "the current wallpaper is kept)"),
-    Option("--recolor-wallpaper", switch=True, unless=["wallpaper"],
-           help="recolour the wallpaper(s) already set in limine.conf"),
+           empty=MENU_ONLY,
+           help="image to recolour and use as the Limine wallpaper, or 'current' for the "
+                "one limine.conf sets (empty: only the menu colours change)"),
     # how the wallpaper is recoloured and shown: only when there is one to recolour
     *recolor.method_options(needs=WALLPAPER),
     Option("--style", choices=["stretched", "centered", "tiled"], needs=WALLPAPER,
@@ -124,11 +127,16 @@ def check_args(a):
     if (a.install or a.apply) and (len(a.flavor) > 1 or len(a.accent) > 1):
         raise SystemExit("--install / --apply need a single flavour and a single accent "
                          "(-f FLAVOR -a ACCENT)")
-    if a.preview and not (a.wallpaper or a.recolor_wallpaper):
-        raise SystemExit("--preview shows the wallpaper before and after: give --wallpaper or "
-                         "--recolor-wallpaper")
-    if a.wallpaper and not a.wallpaper.is_file():
+    if a.preview and not a.wallpaper:
+        raise SystemExit("--preview shows the wallpaper before and after: give --wallpaper "
+                         "IMAGE (or --wallpaper current)")
+    if a.wallpaper and not is_current(a) and not a.wallpaper.is_file():
         raise SystemExit(f"Not found: {a.wallpaper}")
+
+
+def is_current(a):
+    """--wallpaper current (and no file of that name): the wallpaper limine.conf sets."""
+    return a.wallpaper is not None and str(a.wallpaper) == CURRENT and not a.wallpaper.exists()
 
 
 def theme_lines(flavor, accent, wallpapers=(), style=None, over_wallpaper=False):
@@ -280,9 +288,9 @@ def wallpapers(a, esp, read_conf):
         if current:
             print(f"Current Limine wallpaper: {', '.join(current)}")
     sources = [a.wallpaper] if a.wallpaper else []
-    if a.recolor_wallpaper:
+    if is_current(a):
         if not current:
-            raise SystemExit("limine.conf has no wallpaper to recolour (use --wallpaper IMAGE)")
+            raise SystemExit("limine.conf has no wallpaper to recolour (give --wallpaper IMAGE)")
         sources = [resolve_on_esp(w, esp) for w in current]
         for src in sources:
             if not src.is_file():
@@ -292,12 +300,14 @@ def wallpapers(a, esp, read_conf):
 
 def current_wallpapers():
     """The wallpapers limine.conf sets (without the catppuccinizer theme: the one it
-    replaced, which is the one to recolour)."""
+    replaced, which is the one to recolour). When only root can read the ESP, one
+    item, 'current': the wallpaper is read from limine.conf when the command runs."""
     esp = default_esp()
     if esp.is_dir() and not os.access(esp, os.R_OK | os.X_OK):
-        raise SystemExit(f"{esp} can only be read by root: to recolour the wallpaper set in "
-                         "limine.conf, use “recolour the wallpaper(s) already set” "
-                         "(--recolor-wallpaper) and run with sudo")
+        yield item(CURRENT, "Current Limine wallpaper",
+                   f"the one set in limine.conf, read when the command runs ({esp} can only "
+                   "be read by root: run with sudo)", current=True)
+        return
     conf = find_conf(esp)
     for ref in global_values(strip_theme(read(conf)), "wallpaper"):
         f = resolve_on_esp(ref, esp)
@@ -307,7 +317,7 @@ def current_wallpapers():
 
 def colours(a):
     """--colours: the menu (fixed roles, nothing to remap) and each wallpaper."""
-    sources = wallpapers(a, a.esp or default_esp(), a.recolor_wallpaper)[3]
+    sources = wallpapers(a, a.esp or default_esp(), is_current(a))[3]
     return [colour_report("menu", "fixed", note="Catppuccin roles, the accent comes from -a"),
             *(recolor.colour_report(src, *recolor.plan(src, a, verbose=False)) for src in sources)]
 
@@ -319,7 +329,7 @@ def wallpaper_stem(flv, k, n, acc, suffix):
 def outputs(a):
     """Per flavour and accent: the folder, its wallpapers and limine-theme.conf; the
     before/after images with --preview."""
-    sources = wallpapers(a, a.esp or default_esp(), a.recolor_wallpaper)[3]
+    sources = wallpapers(a, a.esp or default_esp(), is_current(a))[3]
     plans = [recolor.plan(src, a, verbose=False) for src in sources]
     out = []
     for flv in a.flavor:
@@ -340,7 +350,10 @@ def build(a):
     """The snippet and wallpapers of each flavour and accent; for the system steps,
     those of the last one (they need a single flavour and accent)."""
     esp = a.esp or default_esp()
-    conf, current, style, sources = wallpapers(a, esp, a.apply or a.recolor_wallpaper)
+    conf, current, style, sources = wallpapers(a, esp, a.apply or is_current(a))
+    if not sources:
+        print("Menu colours only: the wallpaper set in limine.conf is kept "
+              "(--wallpaper IMAGE, or --wallpaper current, recolours one)")
     built = None
     plans = [recolor.plan(src, a) for src in sources]          # analysed once per image
     done = {}       # (image, flavour, accent or None) -> files already written for it

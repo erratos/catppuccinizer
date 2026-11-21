@@ -32,10 +32,12 @@ ten minutes after the page is closed. `--port N` picks the port,
      *tuned* ones have a hand-made colour config), or browse to any theme folder;
    - KDE splash: the catalogue lists the splash screens installed for you and
      for the system, the selected one marked *in use*;
-   - Limine: the wallpaper is optional; the catalogue shows the one set in
-     `limine.conf` and the installed wallpapers. When the ESP can only be read
-     by root, that section says so: use *recolour the wallpaper(s) already
-     set* instead.
+   - Limine: the wallpaper is optional: left empty, only the menu colours
+     change and the current wallpaper is kept (the card says so). The
+     catalogue shows the wallpaper set in `limine.conf` (*in use*: choose it
+     to recolour it) and the installed wallpapers; when only root can read the
+     ESP, *Current Limine wallpaper* (`--wallpaper current`) is read when the
+     command runs, with sudo.
 
    The catalogue is grouped in sections; one that cannot be read (no network
    for the adi1090x themes, an ESP only root can read) shows why, the others
@@ -54,8 +56,7 @@ ten minutes after the page is closed. `--port N` picks the port,
    `--smooth` need `auto` / `lut`, the `--lutgen-*` ones `lutgen` (and each
    algorithm's own knobs that algorithm; the whole group stays folded until
    then), `--hald-level` / `--cube-size` their format; for Limine, the
-   recolouring options and `--style` need a wallpaper (`--wallpaper` or
-   *recolour the wallpaper already set*), and those two exclude each other.
+   recolouring options and `--style` need a wallpaper.
    Preview, Build and the system steps are greyed the same way when their
    command would fail (several accents for Install, no wallpaper for a
    Limine preview…): the tooltip gives the command line's own message.
@@ -141,8 +142,9 @@ GUI without GUI code:
   colour list;
 - `when`, `needs` and `unless` grey an option out while it has no effect, with
   the reason as its tooltip: `--lutgen-*` without `--method lutgen`, Limine's
-  `--style` without a wallpaper (`needs`), `--wallpaper` with
-  `--recolor-wallpaper` (`unless`); such options are left out of the command.
+  `--style` without a wallpaper (`needs`), two options that exclude each other
+  (`unless`); such options are left out of the command; `empty` says what
+  leaving a source empty does (Limine: only the menu colours change).
   A `when` on an analysis fact (`-m` only when something can be remapped)
   hides the option instead;
 - a step option (`options.step()`) becomes a button, `sudo="run"` marks it

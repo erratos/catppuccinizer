@@ -105,28 +105,28 @@ class Declarations(unittest.TestCase):
                     with self.subTest(target=name, option=o.dest, ref=d):
                         self.assertIn(d, dests)
         lim = {o.dest: o for o in TARGETS["limine"].options()}
-        self.assertEqual(lim["wallpaper"].unless, ["recolor_wallpaper"])
-        self.assertEqual(lim["style"].needs, ["wallpaper", "recolor_wallpaper"])
-        self.assertEqual(lim["keep_lum"].needs, ["wallpaper", "recolor_wallpaper"])
+        self.assertEqual(lim["style"].needs, ["wallpaper"])
+        self.assertEqual(lim["keep_lum"].needs, ["wallpaper"])
+        self.assertTrue(lim["wallpaper"].empty)                   # menu only: said plainly
         self.assertIsNone({o.dest: o for o in TARGETS["image"].options()}["keep_lum"].needs)
+        self.assertNotIn("recolor_wallpaper", lim)                # --wallpaper current instead
+        excl = Option("--a", switch=True, unless=["b"], help="a")
+        parser = options.add_to(argparse.ArgumentParser(), [excl, Option("--b", switch=True, help="b")])
         with self.assertRaises(SystemExit) as e:
-            parse(["limine", "--wallpaper", "x.png", "--recolor-wallpaper"])
-        self.assertEqual(str(e.exception), "use either --wallpaper or --recolor-wallpaper")
+            options.check(parser.parse_args(["--a", "--b"]), [excl, Option("--b", switch=True, help="b")])
+        self.assertEqual(str(e.exception), "use either --a or --b")
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             parse(["limine", "--style", "tiled"])
-        self.assertIn("note: --style has no effect without --wallpaper or --recolor-wallpaper",
-                      out.getvalue())
+        self.assertIn("note: --style has no effect without --wallpaper", out.getvalue())
         with self.assertRaises(SystemExit) as e:
             parse(["limine", "--preview"])
         self.assertIn("--preview shows the wallpaper", str(e.exception))
         schema = [o.schema() for o in TARGETS["limine"].all_options()]
         by = {o["dest"]: o for o in schema}
         self.assertFalse(options.active(by["style"], {"style": "tiled"}, schema))
-        self.assertTrue(options.active(by["style"], {"style": "tiled", "recolor_wallpaper": True}, schema))
-        self.assertFalse(options.active(by["wallpaper"], {"wallpaper": "w.png", "recolor_wallpaper": True},
-                                        schema))
-        self.assertFalse(options.active(by["keep_lum"], {"recolor_wallpaper": True, "method": "keys"},
+        self.assertTrue(options.active(by["style"], {"style": "tiled", "wallpaper": "current"}, schema))
+        self.assertFalse(options.active(by["keep_lum"], {"wallpaper": "current", "method": "keys"},
                                         schema))                          # its own `when`
 
     def test_targets_declare_only_their_own(self):

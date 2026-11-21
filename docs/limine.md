@@ -6,14 +6,23 @@ Catppuccin colours for the [Limine](https://github.com/limine-bootloader/limine)
 boot menu, optionally with a recoloured wallpaper.
 
 ```bash
-catppuccinize limine -f mocha -a mauve                        # snippet only
+catppuccinize limine -f mocha -a mauve                        # menu colours only
 catppuccinize limine -a mauve --wallpaper wall.jpg --preview  # + recoloured wallpaper
 sudo catppuccinize limine -a mauve --apply --dry-run          # what --apply would change
-sudo catppuccinize limine -a mauve --apply                    # keeps your current wallpaper
-sudo catppuccinize limine -a mauve --recolor-wallpaper --apply  # recolours it
+sudo catppuccinize limine -a mauve --apply                    # menu only: wallpaper kept
+sudo catppuccinize limine -a mauve --wallpaper current --apply  # recolours your wallpaper
 sudo catppuccinize limine -a mauve --wallpaper wall.jpg --apply # replaces it
 sudo catppuccinize limine --restore
 ```
+
+**Only the menu colours, wallpaper unchanged**: give no `--wallpaper`. The text,
+the highlight and the frame take the Catppuccin colours; the wallpaper set in
+`limine.conf` stays as it is (the menu background becomes slightly see-through
+over it). In the GUI, leave the wallpaper empty: the *Source* card says so.
+
+`--wallpaper current` recolours the wallpaper `limine.conf` sets (the GUI's
+catalogue offers it as the *in use* one; when only root can read the ESP, it is
+read when the command runs, with sudo).
 
 Building writes into the output folder only; `--install`, `--apply` and
 `--restore` change the ESP (root needed, a single flavour and accent). Add
@@ -72,8 +81,8 @@ interface_help_colour_bright: cba6f7
    rights.
 
 A wallpaper already set in `limine.conf` is kept (the menu background becomes
-slightly see-through over it) unless `--wallpaper` replaces it or
-`--recolor-wallpaper` recolours it (its `wallpaper_style` is kept).
+slightly see-through over it) unless `--wallpaper IMAGE` replaces it or
+`--wallpaper current` recolours it (its `wallpaper_style` is kept).
 
 Running it again replaces the block. Menu entries are not touched, so tools
 that regenerate them (e.g. CachyOS's `limine-entry-tool`) keep the theme. If
@@ -98,9 +107,8 @@ is refused, to be fixed by hand.
 |---|---|
 | `-f, --flavor`, `-a, --accent` | flavour and accent of the menu (see [Colours and mapping](colours.md)) |
 | `--wallpaper IMAGE` | image to recolour and use as the Limine wallpaper |
-| `--recolor-wallpaper` | recolour the wallpaper(s) already set in `limine.conf` |
-| `--style` | `stretched`, `centered` or `tiled` (with `--wallpaper` or `--recolor-wallpaper`) |
-| `--preview` | also render before/after images of the wallpaper in `<out>/previews/` (needs `--wallpaper` or `--recolor-wallpaper`) |
+| `--style` | `stretched`, `centered` or `tiled` (with `--wallpaper`) |
+| `--preview` | also render before/after images of the wallpaper in `<out>/previews/` (needs `--wallpaper`) |
 | `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP) and the installed wallpapers |
 | `--names` | only list the folders and files the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | only list the wallpaper colours `-m` can remap (the menu has none); `--json` for JSON |
@@ -110,5 +118,5 @@ is refused, to be fixed by hand.
 | `--restore` | remove the theme from `limine.conf` and its wallpapers (sudo) |
 | `--dry-run` | with the steps above: only list what they would change |
 | `--conf`, `--esp` | `limine.conf` to edit, ESP mount point (searched by default) |
-| `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) (with `--wallpaper` or `--recolor-wallpaper`) |
+| `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) (with `--wallpaper`) |
 | `-o, --out` | output folder (default `themes/`) |

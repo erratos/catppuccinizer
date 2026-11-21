@@ -21,10 +21,12 @@ what a front-end needs to show it:
   matches when one of them is allowed. Options of scope "method:<name>" get
   {"method": [<name>]} by default;
 - needs: options of which one must be given for this one to have an effect
-  (Limine's --style: ["wallpaper", "recolor_wallpaper"]); the command line notes
-  it, the GUI disables the option and says why;
-- unless: options it cannot go with (--wallpaper / --recolor-wallpaper): the
-  command line refuses both, the GUI disables the other one;
+  (Limine's --style: ["wallpaper"]); the command line notes it, the GUI
+  disables the option and says why;
+- unless: options it cannot go with: the command line refuses both, the GUI
+  disables the other one;
+- empty: what leaving the option empty does, when it is worth saying (Limine
+  without --wallpaper: only the menu colours change), shown by the GUI;
 - source: what the target works on (positional arguments by default), shown
   first by the GUI; accept: what a path is ("image", "images" = image files or
   folders, "dir", "file");
@@ -64,7 +66,7 @@ class Option:
               nargs=None, metavar=None, const=None, switch=False, extend=False,
               required=None, kind=None, range=None, accept=None, source=None, group=None,
               explain=None, image=None, scope="target", stage="build", sudo=None,
-              when=None, needs=None, unless=None, gui=True, action=None):
+              when=None, needs=None, unless=None, empty=None, gui=True, action=None):
         if not flags:
             raise ValueError("an option needs at least one flag or a name")
         self.flags = tuple(flags)
@@ -81,6 +83,7 @@ class Option:
         self.source = self.positional if source is None else source
         self.gui, self.action = gui, action
         self.needs, self.unless = list(needs or []) or None, list(unless or []) or None
+        self.empty = empty
         if when is None and scope.startswith("method:"):
             when = {"method": [scope.partition(":")[2]]}
         self.when = {k: list(v) if isinstance(v, (list, tuple)) else [v]
@@ -153,6 +156,7 @@ class Option:
             "metavar": self.metavar, "help": self.help, "explain": self.explain,
             "image": self.image, "range": list(self.range) if self.range else None,
             "group": self.group, "when": self.when, "needs": self.needs, "unless": self.unless,
+            "empty": self.empty,
             "scope": self.scope, "stage": self.stage,
             "sudo": self.sudo, "accept": self.accept,
             "role": ("source" if self.source else "step" if is_step(self)
