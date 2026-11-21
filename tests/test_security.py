@@ -234,11 +234,7 @@ class SourceLinks(Tmp):
         shutil.copytree(FIXTURES / "glow_mini", theme)
         (self.tmp / "secret").write_text("root only")
         (theme / "font.ttf").symlink_to(self.tmp / "secret")
-        os.environ["CATPPUCCINIZER_CONFIGS"] = str(self.tmp / "configs")
-        try:
-            _, out = quiet(main, ["plymouth", str(theme), "-a", "mauve", "-o", str(self.tmp / "out")])
-        finally:
-            os.environ.pop("CATPPUCCINIZER_CONFIGS", None)
+        _, out = quiet(main, ["plymouth", str(theme), "-a", "mauve", "-o", str(self.tmp / "out")])
         self.assertIn("note: skipped", out)
         self.assertFalse(any(p.name == "font.ttf" for p in (self.tmp / "out").rglob("*")))
 

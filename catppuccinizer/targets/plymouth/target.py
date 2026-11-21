@@ -3,8 +3,7 @@ installed theme by name, any theme folder (script, two-step, fade-throbber, ...)
 or one of the 80 themes of the adi1090x catalogue, fetched by name.
 
 Colours are detected per group of images (each numbered sequence, plus "ui"
-for single images) and saved in ~/.config/catppuccinizer/plymouth/<theme>.toml
-(hand-tuned defaults ship with the package). Themes built on adi1090x's script
+for single images) at each run; -m changes them. Themes built on adi1090x's script
 template also get a "-status" variant (progress bar + latest systemd services).
 
 --install copies the result (its -status variant if any) to
@@ -16,7 +15,6 @@ import configparser
 import re
 import shutil
 import subprocess
-import tomllib
 from collections import defaultdict
 from multiprocessing import Pool
 from pathlib import Path
@@ -27,10 +25,10 @@ from PIL import Image
 from ...core.detect import DEFAULT_SEPARATION, UI_GROUP, detect_group, detect_params
 from ...core.mapping import (apply_maps, background_of, colour_report, note_accent_ignored,
                              print_colours, uses_accent)
-from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
+from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, color_args, hex2rgb, rgb
 from ...core.naming import output_name, planned, slug
 from ...core.options import Option, step
-from ...core.paths import config_dir, state_file
+from ...core.paths import state_file
 from ...core.sources import item, section, tidy
 from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, recolor_image,
                              recolor_job, separation_image)
@@ -40,7 +38,6 @@ from ...core.target import Target
 from .upstream import SRC_ENV, local_src, resolve_theme, upstream_themes
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_CONFIGS = HERE / "configs"
 SCRIPTS = HERE / "scripts"
 
 INSTALL_DIR = "/usr/share/plymouth/themes"
@@ -121,13 +118,7 @@ OPTIONS = [
     Option("--bar", label="Progress bar colour", metavar="COLOUR", kind="colour",
            help="progress bar colour: -status variants, and two-step themes' own bar"),
     Option("--no-status", label="No -status variant", switch=True, help="skip the -status variants"),
-    Option("--redetect", label="Detect the colours again", switch=True,
-           help="detect the colours again instead of using the theme's saved config "
-                "(a build saves the new one)"),
-    SEPARATION.replace(
-        when={}, help=f"0 = merge close colours, 1 = keep faint ones apart, when the colours "
-                        f"are detected (default: {DEFAULT_SEPARATION}; shipped configs are kept, "
-                        f"unless --redetect)"),
+    SEPARATION.replace(when={}),
     step("install", sudo="run",
          help=f"copy the result (its -status variant if any) to {INSTALL_DIR} (sudo)"),
     step("apply", sudo="run",
@@ -229,102 +220,13 @@ def group_images(paths):
 def detect(theme, separation=DEFAULT_SEPARATION):
     params = detect_params(separation)
     groups = {g: detect_group(paths, g == UI_GROUP, params) for g, paths in theme.groups.items()}
-    cfg = {"bar": None, "bar_gap": 20, "bar_width": 0.5, "separation": separation,
-           "groups": groups}
+    cfg = {"bar_gap": 20, "bar_width": 0.5, "groups": groups}
     anim = next((g for g in groups.values() if g is not groups.get(UI_GROUP)), None)
     if anim:
         x0, _, x1, y1 = anim["_bbox"]
         w, h = anim["_size"]
         cfg["bar_gap"] = int(20 - (h - 1 - y1))
         cfg["bar_width"] = round(float(0.6 * (x1 - x0 + 1) / w), 2)
-    return cfg
-
-
-# -------------------------------------------------------------------- config
-def config_path(name):
-    """User config if any, else the default shipped with the package."""
-    user = config_dir("plymouth") / f"{name}.toml"
-    default = DEFAULT_CONFIGS / f"{name}.toml"
-    return user if user.exists() or not default.exists() else default
-
-
-def shipped(name):
-    """Whether the theme's config is one shipped with the package (hand-made)."""
-    return config_path(name).parent == DEFAULT_CONFIGS
-
-
-def must_detect(theme, a):
-    """Whether the colours are detected (and a build saves them): no config,
-    --redetect, or a saved detection made with another --separation. A shipped
-    config is hand-made: kept unless --redetect."""
-    path = config_path(theme.name)
-    if a.redetect or not path.exists():
-        return True
-    if shipped(theme.name):
-        return False
-    saved = tomllib.loads(path.read_text()).get("separation", DEFAULT_SEPARATION)
-    return saved != a.separation
-
-
-def config_of(theme, a):
-    """(config, saved): the saved one, or a fresh detection (not saved)."""
-    if must_detect(theme, a):
-        return detect(theme, a.separation), False
-    return load_config(theme, a.separation), True
-
-
-def save_config(theme, cfg):
-    path = config_dir("plymouth") / f"{theme.name}.toml"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    src = theme.dir
-    try:
-        src = src.relative_to(Path.cwd())
-    except ValueError:
-        pass
-    lines = [
-        f"# Colour mapping for the Plymouth theme {theme.title!r} ({src})",
-        "# Edit the targets: any Catppuccin colour name (" + ", ".join(ACCENTS) + ",",
-        "# text, subtext1/0, overlay2/1/0, surface2/1/0, base, mantle, crust) or \"accent\"",
-        "# (\"accent\" = one theme per accent chosen with -a). You can also add colours.",
-        "",
-        f'bar_gap = {cfg["bar_gap"]}              # -status: px between frame bottom and bar',
-        f'bar_width = {cfg["bar_width"]}          # -status: bar width / frame width',
-        f'separation = {cfg.get("separation", DEFAULT_SEPARATION)}       # --separation of this '
-        f'detection (another value detects again)',
-        f'bar = "{cfg["bar"]}"            # progress bar colour' if cfg.get("bar") else
-        '# bar = "blue"          # progress bar colour (default: accent or main colour)',
-    ]
-    for g, grp in cfg["groups"].items():
-        files = ", ".join(p.name for p in theme.groups.get(g, [])[:3])
-        if len(theme.groups.get(g, [])) > 3:
-            files += f", ... ({len(theme.groups[g])} files)"
-        lines += ["", f"[groups.{g}]   # {files}",
-                  f'background = "{grp["background"]}"',
-                  f'transparent = {"true" if grp["transparent"] else "false"}']
-        for n, c in grp["colors"].items():
-            lines += ["", f"[groups.{g}.colors.{n}]",f'source = "{c["source"]}"',
-                      f'target = "{c["target"]}"']
-            if "share" in c:
-                lines.append(f'share = {c["share"]}   # informative')
-    path.write_text("\n".join(lines) + "\n")
-
-
-def load_config(theme, separation=DEFAULT_SEPARATION):
-    cfg = tomllib.loads(config_path(theme.name).read_text())
-    cfg.setdefault("bar", None)
-    cfg.setdefault("bar_gap", 20)
-    cfg.setdefault("bar_width", 0.5)
-    for g, grp in cfg["groups"].items():
-        grp.setdefault("transparent", False)
-        for n, c in grp["colors"].items():
-            if c.get("target") not in TARGETS:
-                raise SystemExit(f"{config_path(theme.name)}: [groups.{g}.colors.{n}] target "
-                                 f"'{c.get('target')}' is not a Catppuccin colour or 'accent'")
-    missing = set(theme.groups) - set(cfg["groups"])
-    if missing:   # new images since the config was written
-        fresh = detect(theme, separation)["groups"]
-        for g in missing:
-            cfg["groups"][g] = fresh[g]
     return cfg
 
 
@@ -495,9 +397,7 @@ def installed_themes():
 def catalogue():
     """The adi1090x themes, by name (fetched when chosen)."""
     for name, path in sorted(upstream_themes().items(), key=lambda kv: kv[1]):
-        yield item(name, name, " · ".join(x for x in (path.rpartition("/")[0],
-                                                      "tuned" if config_path(name).exists() else "")
-                                          if x))
+        yield item(name, name, path.rpartition("/")[0])
 
 
 def find_theme(arg):
@@ -543,17 +443,16 @@ def default_theme():
 
 def colours(a):
     """--colours: each image group of each theme, under the names -m accepts
-    ("group.name" when a theme has several groups). A theme without a config is
-    detected but its config is not saved."""
+    ("group.name" when a theme has several groups)."""
     out = []
     for arg in themes_of(a):
         theme = Theme(find_theme(arg))
-        cfg, saved = config_of(theme, a)
+        cfg = detect(theme, a.separation)
         apply_maps(cfg, a.map)
         several = len(cfg["groups"]) > 1
         for g, grp in cfg["groups"].items():
             n = len(theme.groups.get(g, []))
-            note = f"{n} image{'s' if n != 1 else ''}" + ("" if saved else ", freshly detected")
+            note = f"{n} image{'s' if n != 1 else ''}"
             out.append(colour_report(theme.name, "keys", grp["colors"], group=g,
                                      background=background_of(grp), note=note, prefix=several))
     return out
@@ -561,14 +460,13 @@ def colours(a):
 
 def outputs(a):
     """Per theme, flavour and accent (when a colour goes to it): the theme folder and
-    its -status variant, or the before/after image with --preview. A theme without a
-    config is detected, its config is not saved."""
+    its -status variant, or the before/after image with --preview."""
     out = []
     for arg in themes_of(a):
         theme = Theme(find_theme(arg))
         if not theme.groups:
             continue
-        cfg, saved = config_of(theme, a)
+        cfg = detect(theme, a.separation)
         apply_maps(cfg, a.map)
         used = any(uses_accent(grp["colors"]) for grp in cfg["groups"].values())
         status = not a.no_status and theme.adi_template
@@ -593,19 +491,7 @@ def build(a):
         if not theme.groups:
             print(f"{theme.title}: no PNG images, nothing to recolour")
             continue
-        if must_detect(theme, a):
-            print(f"Detecting colours of {theme.title} ...", flush=True)
-            old = config_dir("plymouth") / f"{theme.name}.toml"
-            kept = old.exists()       # it may have been edited by hand
-            if kept:
-                shutil.copyfile(old, old.with_suffix(".toml.bak"))
-            save_config(theme, detect(theme, a.separation))
-            print(f"  -> {config_path(theme.name)}"
-                  + (f" (the previous one kept as {old.name}.bak)" if kept else ""))
-        elif shipped(theme.name) and a.separation != DEFAULT_SEPARATION:
-            print(f"  note: --separation is ignored: {theme.title} has a hand-made config "
-                  f"(--redetect detects its colours)")
-        cfg = load_config(theme, a.separation)
+        cfg = detect(theme, a.separation)
         apply_maps(cfg, a.map)
         print_mapping(theme, cfg)
 
@@ -623,8 +509,8 @@ def build(a):
             base = rgb(flv, "base")
             for acc in (a.accent if accent_used else [None]):
                 out_name = output_name(flv, theme.slug, acc, a.suffix)
-                # bar colour: option > config > accent > most common colour target
-                bar = a.bar or cfg["bar"] or acc or (main_colours[0] if main_colours else "blue")
+                # bar colour: option > accent > most common colour target
+                bar = a.bar or acc or (main_colours[0] if main_colours else "blue")
                 bar = acc if bar == "accent" else bar
                 plan = {}
                 for g, grp in cfg["groups"].items():

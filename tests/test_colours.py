@@ -2,12 +2,10 @@
 import contextlib
 import io
 import json
-import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
@@ -29,10 +27,9 @@ class Colours(unittest.TestCase):
     def test_writes_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
-            with mock.patch.dict(os.environ, {"CATPPUCCINIZER_CONFIGS": str(d / "configs")}):
-                items = json.loads(run("plymouth", FIXTURES / "glow_mini", "--colours", "--json",
-                                       "-o", d / "out"))
-            self.assertEqual(sorted(p.name for p in d.iterdir()), [])   # no config, no output
+            items = json.loads(run("plymouth", FIXTURES / "glow_mini", "--colours", "--json",
+                                   "-o", d / "out"))
+            self.assertEqual(sorted(p.name for p in d.iterdir()), [])   # no output
         names = [c["name"] for it in items for c in it["colours"]]
         self.assertIn("throbber.white", names)      # the names -m accepts, with their group
 

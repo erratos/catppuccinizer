@@ -1,24 +1,15 @@
-"""Where things live: user configuration, cache, restore state, and sudo-aware file ownership."""
+"""Where things live: cache, restore state, and sudo-aware file ownership."""
 import os
 import stat
 from pathlib import Path
 
 
 def user_home():
-    """The user's home, also under sudo (the invoking user's, not root's): the tuned
-    configs and downloads stay the same whether a command runs with sudo or not."""
+    """The user's home, also under sudo (the invoking user's, not root's): the
+    downloads stay the same whether a command runs with sudo or not."""
     if os.geteuid() == 0 and os.environ.get("SUDO_USER"):
         return Path(os.path.expanduser(f"~{os.environ['SUDO_USER']}"))
     return Path.home()
-
-
-def config_dir(target):
-    """User configuration of a target: $CATPPUCCINIZER_CONFIGS/<target> or
-    $XDG_CONFIG_HOME/catppuccinizer/<target> (~/.config/catppuccinizer/<target>)."""
-    base = os.environ.get("CATPPUCCINIZER_CONFIGS")
-    if not base:
-        base = Path(os.environ.get("XDG_CONFIG_HOME", user_home() / ".config")) / "catppuccinizer"
-    return Path(base) / target
 
 
 def cache_dir():

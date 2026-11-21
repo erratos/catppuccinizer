@@ -88,10 +88,9 @@ detected separately; `group.name=target` remaps a colour in one group only.
 The two-step colours of the `.plymouth` file (background, progress bar) are
 rewritten too.
 
-## Hand-tuned themes
+## Published themes
 
-`hexa_retro` and `infinite_seal` have hand-tuned configs shipped with the tool.
-The results are published, with previews, in
+`hexa_retro` and `infinite_seal` recoloured are published, with previews, in
 [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
 
 ```bash
@@ -112,28 +111,20 @@ rewritten for the new theme name. Themes using `UseFirmwareBackground=true`
 
 ## Colour detection and mapping
 
-The first time a theme is used, its colours are detected and saved to
-`~/.config/catppuccinizer/plymouth/<theme>.toml`, **per group of images**: each
-numbered sequence (`animation-*`, `throbber-*`, `progress-*`…) and `ui` for the
-single images.
+The colours are detected at each run (well under a second per theme),
+**per group of images**: each numbered sequence (`animation-*`, `throbber-*`,
+`progress-*`…) and `ui` for the single images. Nothing is saved: `-m` changes
+the result.
 
 - a sequence with **a single colour** (white, cyan, orange…) is mapped to
   `accent`; a single-colour `ui` group goes to `text`;
 - otherwise whites/grays go to `text` and each hue to the closest Catppuccin
   colour (red, peach, yellow, green, teal, sky, sapphire, blue, mauve, pink).
 
-`--colours` lists it, saving nothing (a theme without a config is detected for
-the listing, not saved). `--redetect` ignores the saved config and detects the
-colours again: with a build it saves the new config, with `--colours` it only
-lists the fresh detection.
-
-When a part of the animation fades away or takes another colour,
-`--separation` (0 to 1, default 0.5) [keeps faint colours apart](colours.md#separating-colours):
-the saved config records the value it was detected with, and another value
-detects the colours again (a build saves them, keeping the previous config as
-`<theme>.toml.bak`, in case you edited it). The configs shipped with the tool
-are hand-made: they are kept, unless `--redetect`. `--preview` shows, for each
-group, what the detection sees (one plain colour per source colour).
+`--colours` lists them. When a part of the animation fades away or takes
+another colour, `--separation` (0 to 1, default 0.5)
+[keeps faint colours apart](colours.md#separating-colours); `--preview` shows,
+for each group, what the detection sees (one plain colour per source colour).
 
 To change it, use the colour names listed by `--colours`, prefixed by the group
 when the theme has several (`ui.white`), or a `#rrggbb` source colour:
@@ -144,9 +135,7 @@ catppuccinize plymouth owl -m white=accent -a mauve
 catppuccinize plymouth rings_2 -m '#32bcff=sky' --preview               # quick before/after image
 ```
 
-`-m` applies to one run; edit `~/.config/catppuccinizer/plymouth/<theme>.toml`
-for a permanent change (it overrides the defaults shipped with the tool). See
-[Colours and mapping](colours.md) for the list of targets.
+See [Colours and mapping](colours.md) for the list of targets.
 
 ## `-status` variants
 
@@ -165,7 +154,7 @@ password prompts and messages.
 
 Building writes into the output folder only. The steps that change the system
 are separate options; they need a single theme, flavour and accent, and root
-(`sudo catppuccinize …`: your tuned configs and downloaded themes are still
+(`sudo catppuccinize …`: your downloaded themes are still
 taken from your home). Add `--dry-run` to any of them to only list what they
 would copy, write and run.
 
@@ -265,10 +254,9 @@ for it.
 | `-s, --suffix` | | extra suffix for the theme names |
 | `--bar` | auto | progress bar colour (`-status` variants, two-step bar) |
 | `--no-status` | | skip the `-status` variants |
-| `--redetect` | | detect the colours again instead of using the saved config (a build saves it) |
-| `--separation` | `0.5` | when the colours are detected: 0 = merge close colours, 1 = keep faint (and darker) ones apart; another value than the saved config's detects again |
+| `--separation` | `0.5` | 0 = merge close colours, 1 = keep faint (and darker) ones apart |
 | `--preview` | | only render one before/after/separation image per theme in `<out>/previews/` |
-| `--list` | | list the installed themes (`*` = the default one) and the adi1090x themes (*tuned* = has a config) |
+| `--list` | | list the installed themes (`*` = the default one) and the adi1090x themes |
 | `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |
 | `-o, --out` | `themes/` | output folder |

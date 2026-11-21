@@ -4,7 +4,6 @@ exists is marked."""
 import contextlib
 import io
 import json
-import os
 import shutil
 import sys
 import tempfile
@@ -38,13 +37,11 @@ class Names(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = Path(tempfile.mkdtemp(prefix="catppuccinizer-test-"))
-        os.environ["CATPPUCCINIZER_CONFIGS"] = str(cls.tmp / "configs")
         make_images(cls.tmp / "img")
         make_splash(cls.tmp / "splash")
 
     @classmethod
     def tearDownClass(cls):
-        os.environ.pop("CATPPUCCINIZER_CONFIGS", None)
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def check(self, *argv, contents=True):

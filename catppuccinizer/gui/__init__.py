@@ -56,7 +56,7 @@ MAX_FILE = 200 << 20       # bytes of a file served whole (/api/file)
 SYSTEM_FS = ("/proc", "/sys", "/dev", "/run")      # never served, even when readable
 # what /api/open hands to xdg-open: folders, images and plain text outputs, never
 # something xdg-open could run (a script, a .desktop file)
-OPENABLE = IMAGE_EXTS | {".conf", ".txt", ".json", ".toml", ".cube"}
+OPENABLE = IMAGE_EXTS | {".conf", ".txt", ".json", ".cube"}
 # the subprocess: the installed package, or this checkout when run from the sources
 BOOT = (f"import sys; sys.dont_write_bytecode = True; sys.path.insert(0, {str(PKG_PARENT)!r}); "
         "from catppuccinizer.cli import main; main()")

@@ -97,7 +97,6 @@ class Chaining(unittest.TestCase):
 class DryRun(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="catppuccinizer-test-"))
-        os.environ["CATPPUCCINIZER_CONFIGS"] = str(self.tmp / "configs")
         os.environ["CATPPUCCINIZER_STATE"] = str(self.tmp / "state")
 
     def tearDown(self):

@@ -177,7 +177,6 @@ HAS_LUTGEN = has_lutgen()
 
 def run_all():
     tmp = Path(tempfile.mkdtemp(prefix="catppuccinizer-test-"))
-    os.environ["CATPPUCCINIZER_CONFIGS"] = str(tmp / "configs")
     out = {}
     try:
         cli("plymouth", FIXTURES / "hexa_mini", "-f", "mocha", "macchiato", "-a", "mauve",
@@ -185,7 +184,6 @@ def run_all():
         cli("plymouth", FIXTURES / "glow_mini", "-f", "latte", "-a", "teal", "mauve",
             "-m", "throbber.white=accent", "-o", tmp / "plymouth")
         out["plymouth"] = tree(tmp / "plymouth", tmp)
-        out["configs"] = tree(tmp / "configs", tmp)
 
         make_images(tmp / "img")
         cli("image", tmp / "img", "-f", "mocha", "frappe", "-a", "mauve", "-o", tmp / "image")
@@ -261,7 +259,6 @@ class Regression(unittest.TestCase):
 
     def test_plymouth(self):
         self.check("plymouth")
-        self.check("configs")
 
     def test_image(self):
         self.check("image")

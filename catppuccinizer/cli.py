@@ -11,7 +11,7 @@ from .core import options
 from .core.mapping import format_colour_report
 from .core.naming import dedupe, format_planned
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
-from .core.paths import cache_dir, config_dir, give_back
+from .core.paths import cache_dir, give_back
 from .core.system import System
 from .core.target import discover
 
@@ -78,8 +78,8 @@ def run(t, a):
         print(f"restore{dry}")
         return t.restore(a, system)
     built = t.build(a)
-    # under sudo, what build wrote (output, configs, downloads) belongs to the invoking user
-    give_back(a.out, config_dir(t.name), cache_dir())
+    # under sudo, what build wrote (output, downloads) belongs to the invoking user
+    give_back(a.out, cache_dir())
     if built is None or a.preview:
         return
     asked = [s for s in t.steps if getattr(a, s) or (s == "install" and getattr(a, "apply", False))]

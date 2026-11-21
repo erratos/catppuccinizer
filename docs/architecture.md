@@ -21,12 +21,12 @@ catppuccinizer/
     clut.py           3D LUTs: trilinear application, resampling, Hald CLUT and .cube files
     lutgen.py         --lutgen-* options, runs the external lutgen binary
     formats.py        colours written as text (QML, SVG/SVGZ), animations (GIF, WebP)
-    paths.py          user config / cache / restore state, sudo-aware home and ownership
+    paths.py          cache / restore state, sudo-aware home and ownership
     naming.py         output names (catppuccin-<flavor>-<source>[-<accent>][-<suffix>])
     target.py         Target base class + discovery
     sources.py        ready-made sources (catalogue, --list): sections, items, wallpapers
   targets/
-    plymouth/         Plymouth themes (+ adi1090x fetcher, shipped configs, scripts)
+    plymouth/         Plymouth themes (+ adi1090x fetcher, scripts)
     image.py          images (wallpapers, logos…)
     limine.py         Limine boot menu
     ksplash.py        KDE Plasma splash screen
@@ -63,7 +63,7 @@ tests/
 | `formats.collect_text_colours(files)` / `recolour_text_file(f, lookup)` | colours inside QML / SVG / SVGZ |
 | `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
 | `recolor.recolor_frames(frames, ...)` | keys method over a stream of frames, in parallel |
-| `paths.config_dir(target)` / `cache_dir()` / `give_back(path)` | where to store things (the invoking user's home under sudo), sudo ownership |
+| `paths.cache_dir()` / `give_back(path)` | where to store things (the invoking user's home under sudo), sudo ownership |
 | `paths.state_file(target, system)` | where a step keeps what `restore` needs (the theme in use before…) |
 | `system.System` | `copy_tree`, `copy_file`, `write_text(…, backup=True)`, `remove`, `run`, `load_state` / `save_state`: every change a step makes, printed (only listed with `--dry-run`) |
 | `system.place(base, name)` / `naming.check_name(name)` | a system path built from a theme or package name, checked first (no `/`, `..`, leading `-`) |
@@ -193,7 +193,7 @@ is printed, and with `--dry-run` only listed. Reading the system (the current
 theme, `limine.conf`) is done directly, also in a dry run, which therefore
 keeps the step's rights. What `restore` needs (the theme in use before `apply`)
 goes into `paths.state_file()` with `system.save_state()`. When a step needs
-root, the whole command runs with sudo (`sudo="run"`): configs and downloads
+root, the whole command runs with sudo (`sudo="run"`): downloads
 still come from the invoking user's home, and what build wrote is handed back
 to them.
 
@@ -250,7 +250,6 @@ output folder goes through `core.system` (the `System` object of the steps).
 | Where | What | Step | Rights |
 |---|---|---|---|
 | output folder (`-o`) | the results | build | the user; under sudo, handed back to them |
-| `~/.config/catppuccinizer/` | tuned Plymouth configs | build | the user |
 | `~/.cache/catppuccinizer/` | adi1090x themes (git), GUI uploads | build, GUI | the user |
 | `/usr/share/plymouth/themes/<name>/` | Plymouth themes | install | root, files 644, folders 755 |
 | `/var/lib/catppuccinizer/<target>.json` | what `restore` needs (system-wide steps) | install, apply | root, 644 |

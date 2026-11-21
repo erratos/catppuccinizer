@@ -5,14 +5,12 @@ the default changes nothing."""
 import contextlib
 import io
 import json
-import os
 import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest import mock
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -24,7 +22,6 @@ sys.dont_write_bytecode = True
 from catppuccinizer.cli import main  # noqa: E402
 from catppuccinizer.core import detect, recolor  # noqa: E402
 from catppuccinizer.core.palette import hex2rgb, rgb  # noqa: E402
-from catppuccinizer.targets.plymouth import target as plymouth  # noqa: E402
 
 SKY, SUN, WHITE, HILL = (240, 120, 30), (250, 210, 60), (255, 255, 255), (90, 30, 10)
 
@@ -144,53 +141,6 @@ class Separation(unittest.TestCase):
         self.assertEqual(sep["image"].when, {"method": ["auto", "keys"]})
         self.assertIsNone(sep["plymouth"].when)          # always keys
         self.assertIsNone(sep["ksplash"].when)           # its animations always use keys
-
-
-class PlymouthConfig(unittest.TestCase):
-    """A saved detection records its --separation; another value detects again
-    (and keeps the previous config); a shipped config is hand-made and kept."""
-
-    def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="catppuccinizer-test-"))
-        self.env = mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.tmp)})
-        self.env.start()
-        self.theme = SimpleNamespace(name="mytheme")
-
-    def tearDown(self):
-        self.env.stop()
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def saved(self, text):
-        path = self.tmp / "catppuccinizer/plymouth/mytheme.toml"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
-
-    def must(self, separation, redetect=False):
-        return plymouth.must_detect(self.theme, SimpleNamespace(separation=separation,
-                                                                redetect=redetect))
-
-    def test_no_config(self):
-        self.assertTrue(self.must(0.5))
-
-    def test_config_without_separation_is_the_default(self):
-        self.saved("[groups]\n")
-        self.assertFalse(self.must(0.5))
-        self.assertTrue(self.must(0.8))
-        self.assertTrue(self.must(0.5, redetect=True))
-
-    def test_recorded_separation(self):
-        self.saved("separation = 0.8\n[groups]\n")
-        self.assertFalse(self.must(0.8))
-        self.assertTrue(self.must(0.5))
-
-    def test_shipped_config_is_kept(self):
-        shipped = next(plymouth.DEFAULT_CONFIGS.glob("*.toml")).stem
-        theme = SimpleNamespace(name=shipped)
-        a = SimpleNamespace(separation=0.9, redetect=False)
-        self.assertTrue(plymouth.shipped(shipped))
-        self.assertFalse(plymouth.must_detect(theme, a))
-        a.redetect = True
-        self.assertTrue(plymouth.must_detect(theme, a))
 
 
 if __name__ == "__main__":

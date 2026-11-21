@@ -28,8 +28,8 @@ ten minutes after the page is closed. `--port N` picks the port,
    - Plymouth: left empty, the theme in use is recoloured. The catalogue shows
      the installed themes first (the one in use marked *in use*), then an extra
      catalogue, the 80 adi1090x themes (fetched with git when chosen, or those
-     of your [local copy](plymouth.md#using-a-local-copy-of-the-adi1090x-themes);
-     *tuned* ones have a hand-made colour config); or browse to any theme folder;
+     of your [local copy](plymouth.md#using-a-local-copy-of-the-adi1090x-themes));
+     or browse to any theme folder;
    - KDE splash: the catalogue lists the splash screens installed for you and
      for the system, the selected one marked *in use*;
    - Limine: the wallpaper is optional: left empty, only the menu colours
@@ -133,7 +133,7 @@ What the page can reach:
 | Request | Allowed |
 |---|---|
 | files and thumbnails | images only (by extension), readable by you, not in `/proc`, `/sys`, `/dev`, `/run`, up to 200 MB; a link is judged by the file it points to |
-| open (`xdg-open`) | folders, images and plain text outputs (`.conf`, `.txt`, `.json`, `.toml`, `.cube`), never a script or a `.desktop` file |
+| open (`xdg-open`) | folders, images and plain text outputs (`.conf`, `.txt`, `.json`, `.cube`), never a script or a `.desktop` file |
 | folder listing | any folder you can read (the file browser) |
 | upload | images up to 200 MB, in `~/.cache/catppuccinizer/gui-uploads/<random>/` (only for you, `700`), the name reduced to letters, digits, `.`, `_`, `-` |
 | run, command, colours | a known target and its declared options only; values are text, numbers or on/off, without control characters, and never start with `-` (no value can pass for an option) |

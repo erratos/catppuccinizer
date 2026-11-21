@@ -68,7 +68,7 @@ effect:
 
 | Target | Method (default) | Why | Accent (`-a`) used | `--map` (`-m`) used |
 |---|---|---|---|---|
-| `plymouth` | always `keys` (no `--method`) | boot themes are flat art; colours come from the shipped config, or are detected once and saved | when a colour goes to `accent` (single-colour themes by default, and the shipped configs); the progress bar follows it, unless `--bar` or the config sets one | yes |
+| `plymouth` | always `keys` (no `--method`) | boot themes are flat art; colours are detected at each run | when a colour goes to `accent` (single-colour themes by default); the progress bar follows it, unless `--bar` | yes |
 | `image` | `auto`: `keys` or `lut` | `keys` when the detected colours rebuild the image (fit error under 6), a plain background covers at least 35 % of it and its edges are crisp; `lut` otherwise. `auto` never picks `lutgen` | `keys`: when a colour goes to `accent` (typically a single-colour design). `lut`, `lutgen`: never | `keys` only |
 | `image` (SVG) | vector, colours replaced in the file | nothing is rasterised | when a colour goes to `accent` (the most used saturated colour, by default) | yes |
 | `limine` | menu: fixed colours; wallpaper: `auto`, like `image` | | always, for the menu (branding and highlighted help); the wallpaper as for `image` | wallpaper, with `keys` |
@@ -147,7 +147,7 @@ original image of a preview.
 ## Manual mapping
 
 To see the names first, `--colours` lists the colours `-m` can remap and
-exits, without writing anything (no output folder, no saved config):
+exits, without writing anything (no output folder):
 
 ```bash
 catppuccinize plymouth /usr/share/plymouth/themes/glow --colours

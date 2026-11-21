@@ -311,10 +311,6 @@
    }
   ]
  },
- "configs": {
-  "plymouth/glow_mini.toml": "1d70fdc0c5331ab9",
-  "plymouth/hexa_mini.toml": "3cef9f5ffa72b84f"
- },
  "image": {
   "catppuccin-frappe-blobs.png": "243ea686e79fdac4",
   "catppuccin-frappe-flat.png": "94267ff813df9d67",
