@@ -1,5 +1,6 @@
-"""Plymouth target: recolour any Plymouth theme folder (script, two-step,
-fade-throbber, ...) or any of the 80 adi1090x themes, fetched by name.
+"""Plymouth target: recolour a Plymouth theme: the one in use by default, any
+installed theme by name, any theme folder (script, two-step, fade-throbber, ...),
+or one of the 80 themes of the adi1090x catalogue, fetched by name.
 
 Colours are detected per group of images (each numbered sequence, plus "ui"
 for single images) and saved in ~/.config/catppuccinizer/plymouth/<theme>.toml
@@ -33,7 +34,7 @@ from ...core.paths import config_dir, state_file
 from ...core.sources import item, section, tidy
 from ...core.recolor import recolor_image, recolor_job
 from ...core.naming import check_name
-from ...core.system import place, source_file, which
+from ...core.system import System, place, source_file, which
 from ...core.target import Target
 from .upstream import SRC_ENV, local_src, resolve_theme, upstream_themes
 
@@ -42,12 +43,11 @@ DEFAULT_CONFIGS = HERE / "configs"
 SCRIPTS = HERE / "scripts"
 
 INSTALL_DIR = "/usr/share/plymouth/themes"
-DEFAULT_THEMES = ["hexa_retro", "infinite_seal"]
 
 
 class PlymouthTarget(Target):
     name = "plymouth"
-    help = "recolour Plymouth themes (folders or adi1090x names)"
+    help = "recolour Plymouth themes (installed, folders, or the adi1090x catalogue)"
 
     def options(self):
         return OPTIONS
@@ -106,14 +106,17 @@ class PlymouthTarget(Target):
 
     def sources(self):
         src = local_src()
-        return [section(f"Installed ({INSTALL_DIR})", installed_themes),
-                section("adi1090x themes" + (f" ({tidy(src)}, ${SRC_ENV})" if src else ""),
+        return [section(f"Installed themes ({INSTALL_DIR})", installed_themes),
+                section("Extra catalogue: adi1090x themes, "
+                        + (f"from {tidy(src)} (${SRC_ENV})" if src else "downloaded when chosen"),
                         catalogue)]
 
 
 OPTIONS = [
-    Option("themes", label="Themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME", accept="dir",
-           help="theme folder, or adi1090x theme name (default: hexa_retro infinite_seal)"),
+    Option("themes", label="Themes", nargs="*", default=[], metavar="THEME", accept="dir",
+           empty="the theme in use is recoloured",
+           help="installed theme name, theme folder, or adi1090x theme name "
+                "(default: the theme in use)"),
     Option("--bar", label="Progress bar colour", metavar="COLOUR", kind="colour",
            help="progress bar colour: -status variants, and two-step themes' own bar"),
     Option("--no-status", label="No -status variant", switch=True, help="skip the -status variants"),
@@ -137,7 +140,9 @@ OPTIONS = [
 
 
 def check_args(a):
-    if (a.install or a.apply or a.test) and (len(a.themes) > 1 or len(a.flavor) > 1
+    if not a.restore:       # no theme given: the one in use must be known (and not ours)
+        themes_of(a)
+    if (a.install or a.apply or a.test) and (len(themes_of(a)) > 1 or len(a.flavor) > 1
                                              or len(a.accent) > 1):
         raise SystemExit("--install / --apply / --test need a single theme, flavour and accent "
                          "(THEME -f FLAVOR -a ACCENT)")
@@ -458,6 +463,37 @@ def catalogue():
                                           if x))
 
 
+def find_theme(arg):
+    """Folder of a theme given as a folder, the name of an installed theme
+    (/usr/share/plymouth/themes/<name>), or an adi1090x name (fetched on demand)."""
+    if "/" not in arg and not Path(arg).expanduser().is_dir():
+        d = Path(INSTALL_DIR) / arg
+        if (d / f"{arg}.plymouth").is_file() or any(d.glob("*.plymouth")):
+            return d
+    return resolve_theme(arg)
+
+
+def themes_of(a):
+    """The themes given, or the theme in use; when that one is a catppuccinizer
+    result, the theme it replaced (recolouring a recolour makes no sense)."""
+    if a.themes:
+        return a.themes
+    name, note = default_theme(), ""
+    if not name:
+        raise SystemExit("No theme given, and the theme in use is not known: give one "
+                         "(an installed theme name, a folder; see --list)")
+    state = System.load_state(state_file("plymouth", system=True))
+    if name in state.get("installed", []) or name.startswith("catppuccin-"):
+        if not state.get("previous"):
+            raise SystemExit(f"The theme in use, {name}, is a catppuccinizer result: give the "
+                             "theme to recolour (see --list)")
+        name, note = check_name(state["previous"], "theme name"), f" (before {name})"
+    if not hasattr(a, "_announced"):
+        print(f"Theme in use: {name}{note}")
+        a._announced = True
+    return [name]
+
+
 def default_theme():
     """The default Plymouth theme ("" when unknown)."""
     try:
@@ -473,8 +509,8 @@ def colours(a):
     ("group.name" when a theme has several groups). A theme without a config is
     detected but its config is not saved."""
     out = []
-    for arg in a.themes:
-        theme = Theme(resolve_theme(arg))
+    for arg in themes_of(a):
+        theme = Theme(find_theme(arg))
         saved = config_path(theme.name).exists() and not a.redetect
         cfg = load_config(theme) if saved else detect(theme)
         apply_maps(cfg, a.map)
@@ -492,8 +528,8 @@ def outputs(a):
     its -status variant, or the before/after image with --preview. A theme without a
     config is detected, its config is not saved."""
     out = []
-    for arg in a.themes:
-        theme = Theme(resolve_theme(arg))
+    for arg in themes_of(a):
+        theme = Theme(find_theme(arg))
         if not theme.groups:
             continue
         saved = config_path(theme.name).exists() and not a.redetect
@@ -517,8 +553,8 @@ def build(a):
     """The themes; for the system steps, the folder to install (the -status variant
     if any) of the first one (they need a single theme)."""
     jobs, status, copies = [], [], []
-    for arg in a.themes:
-        theme = Theme(resolve_theme(arg))
+    for arg in themes_of(a):
+        theme = Theme(find_theme(arg))
         if not theme.groups:
             print(f"{theme.title}: no PNG images, nothing to recolour")
             continue

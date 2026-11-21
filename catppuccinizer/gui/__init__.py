@@ -345,10 +345,11 @@ class App:
         a, err = check_argv(argv, self.parser)
         if err:
             return {"error": err}
-        items, err = listing_output(argv)
+        items, err = listing_output(argv, bool(body.get("sudo")))
         if err:
             return {"error": err}
-        return {"items": items, "facts": analysis(items), "command": command_line(argv)}
+        return {"items": items, "facts": analysis(items),
+                "command": command_line(argv, bool(body.get("sudo")))}
 
     def names(self, body):
         """What Build would write, before running it: `catppuccinize ... --names --json`
@@ -366,22 +367,28 @@ class App:
         a, err = check_argv(argv, self.parser)
         if err:
             return {"error": err}
-        items, err = listing_output(argv)
+        items, err = listing_output(argv, bool(body.get("sudo")))
         if err:
             return {"error": err}
-        return {"items": items, "out": str(a.out), "command": command_line(argv)}
+        return {"items": items, "out": str(a.out), "command": command_line(argv, bool(body.get("sudo")))}
 
     def busy(self):
         return any(j.code is None and j.proc for j in self.jobs.values())
 
 
-def listing_output(argv):
+def listing_output(argv, sudo=False):
     """(JSON printed by `catppuccinize argv`, None) or (None, error message): the
-    analysis runs in a subprocess, as the command line does it."""
+    analysis runs in a subprocess, as the command line does it; with sudo when asked
+    (a source only root can read: Limine's wallpaper on the ESP)."""
+    cmd = [sys.executable, "-B", "-c", BOOT, *argv]
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    if sudo:
+        if not askpass():
+            return None, "no graphical sudo prompt (ksshaskpass, ssh-askpass): run the command in a terminal"
+        cmd, env["SUDO_ASKPASS"] = ["sudo", "-A", "--", *cmd], askpass()
     try:
-        r = subprocess.run([sys.executable, "-B", "-c", BOOT, *argv], capture_output=True,
-                           text=True, timeout=600, stdin=subprocess.DEVNULL,
-                           env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                           stdin=subprocess.DEVNULL, env=env, start_new_session=True)
     except subprocess.TimeoutExpired:
         return None, "the analysis took more than 10 minutes"
     if r.returncode:

@@ -27,7 +27,7 @@ class LocalSource(unittest.TestCase):
         self.addCleanup(fetch.stop)
 
     def test_catalogue_and_lookup_agree(self):
-        adi = next(sec for sec in TARGET.sources() if sec["section"].startswith("adi1090x"))
+        adi = next(sec for sec in TARGET.sources() if "adi1090x" in sec["section"])
         names = {s["value"] for s in adi["items"]}
         self.assertEqual(names, {"glow_mini", "hexa_mini"})
         for name in names:

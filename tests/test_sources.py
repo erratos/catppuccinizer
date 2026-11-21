@@ -115,6 +115,32 @@ class Installed(Tmp):
         self.assertEqual([i["current"] for i in items], [False, True])
         self.assertEqual(items[0]["thumb"], str(self.tmp / "glow_mini"))
 
+    def test_plymouth_theme_in_use(self):
+        """No theme given: the theme in use; installed themes by name; a catppuccinizer
+        result in use: the theme it replaced, or a clear message."""
+        import argparse
+        import json
+        shutil.copytree(FIXTURES / "glow_mini", self.tmp / "glow_mini")
+        os.environ["CATPPUCCINIZER_STATE"] = str(self.tmp / "state")
+        self.addCleanup(os.environ.pop, "CATPPUCCINIZER_STATE", None)
+        a = argparse.Namespace(themes=[])
+        with mock.patch.object(plymouth, "INSTALL_DIR", str(self.tmp)), \
+                mock.patch.object(plymouth, "default_theme", return_value="glow_mini"), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(plymouth.themes_of(a), ["glow_mini"])
+            self.assertEqual(plymouth.find_theme("glow_mini"), self.tmp / "glow_mini")
+        self.assertIn("Theme in use: glow_mini", out.getvalue())
+        self.assertEqual(plymouth.themes_of(argparse.Namespace(themes=["x"])), ["x"])
+        (self.tmp / "state").mkdir()
+        with mock.patch.object(plymouth, "default_theme", return_value="catppuccin-mocha-glow"):
+            with self.assertRaises(SystemExit) as e:
+                plymouth.themes_of(argparse.Namespace(themes=[]))
+            self.assertIn("catppuccinizer result", str(e.exception))
+            (self.tmp / "state/plymouth.json").write_text(json.dumps(
+                {"installed": ["catppuccin-mocha-glow"], "previous": "bgrt"}))
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(plymouth.themes_of(argparse.Namespace(themes=[])), ["bgrt"])
+
     def test_ksplash(self):
         make_splash(self.tmp / "test.splash")
         (self.tmp / "other").mkdir()                         # not a splash screen

@@ -295,12 +295,12 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
       <!-- the buttons come first: what changes length below (command, errors) cannot move them -->
       <div class="actions first" id="mainbtns">
         <button class="btn big" id="previewbtn" title="Only render before/after images (--preview)">Preview</button>
-        <button class="btn primary big" id="runbtn" title="Write the result into the output folder, without sudo and without installing anything">Build</button>
+        <button class="btn primary big" id="runbtn" title="Write the result into the output folder, without installing anything">Build</button>
+        <label class="check" id="sudobox" title="Run Preview and Build, and the analysis of the source colours, with sudo: to read files only root can read (Limine: the wallpaper on the ESP). The steps marked sudo always use it."><input type="checkbox" id="sudo"> with sudo</label>
       </div>
       <div class="actions hidden" id="steps"></div>
       <div class="actions hidden" id="stepopts">
         <label class="check" id="drybox" title="Build as usual, then only list what the system steps would change (--dry-run); a step marked sudo still asks for the password, to read the system"><input type="checkbox" id="dryrun"> Dry run</label>
-        <label class="check" id="sudobox" title="Run every command with sudo (a password prompt opens); the steps marked sudo always do"><input type="checkbox" id="sudo"> Always with sudo</label>
         <span class="sp"></span><span id="stepsq"></span>
       </div>
       <div id="stepshelp"></div>
@@ -676,7 +676,7 @@ function analysisValues() {
   }
   return v;
 }
-const analysisKey = () => S.target + " " + JSON.stringify(analysisValues());
+const analysisKey = () => S.target + " " + JSON.stringify(analysisValues()) + ($("sudo").checked ? " sudo" : "");
 const colourResult = () => S.colourCache.get(analysisKey());
 const sourceChosen = () => cur().options.some((o) => o.role === "source" && vals()[o.dest] !== undefined);
 let colourTimer = null;
@@ -690,7 +690,7 @@ async function analyseColours() {
   const key = analysisKey(), seq = ++S.colourSeq, target = S.target;
   S.colourLoading = key; renderColours();
   let r;
-  try { r = await api("/api/colours", { target, values: analysisValues() }); }
+  try { r = await api("/api/colours", { target, values: analysisValues(), sudo: $("sudo").checked }); }
   catch (e) { r = { error: String(e.message || e) }; }
   S.colourCache.set(key, r);
   if (seq !== S.colourSeq || target !== S.target) return;
@@ -900,7 +900,7 @@ function refreshVisibility() {
     if (String(allOff) !== d.dataset.off) { d.dataset.off = String(allOff); d.open = !allOff; }
     d.querySelector("summary .why").textContent = allOff ? ` — ${opts[0].title}` : "";
   });
-  // sudo: the steps marked sudo always run with it (dry run too); "Always with sudo" for the rest
+  // sudo: the steps marked sudo always run with it (dry run too); "with sudo" for Preview / Build
   $("sudo").checked = !!S.sudo[S.target];
   $("dryrun").checked = !!S.dry[S.target];
   const w = $("sudowarn");
@@ -917,8 +917,9 @@ function action(step) {
   const values = sendVals(), o = step && step !== "preview" ? opt(step) : null;
   if (step === "preview") values.preview = true;
   if (o) { values[step] = (o.kind === "optional" && stepArg(step)) || true; if (S.dry[S.target]) values.dry_run = true; }
-  // a dry run changes nothing but keeps the step's rights: it may have to read the system (the ESP)
-  const sudo = $("sudo").checked || (!!o && o.sudo === "run");
+  // a step keeps its own rights, a dry run too (it may have to read the system: the ESP);
+  // Preview and Build use sudo when asked ("with sudo", next to them)
+  const sudo = o ? o.sudo === "run" : $("sudo").checked;
   return { target: S.target, values, sudo };
 }
 const stepArg = (dest) => S.stepArgs[S.target]?.[dest];
@@ -953,7 +954,7 @@ async function updateCommand() {
   c.replaceChildren(...parts.map((p, i) => i === 0 || (i === 1 && parts[0] === "sudo") || (p === "catppuccinize") ? h("b", {}, p + " ") : (/^-/.test(p) ? h("span", { style: { color: "var(--blue)" } }, p + " ") : p + " ")));
   $("dest").textContent = !r.out ? "" : S.hover === "restore" ? "Restore only undoes Install / Apply: it builds nothing."
     : S.hover ? `${label(opt(S.hover))} builds into ${tidy(r.out)} first.`
-    : `Build writes into ${tidy(r.out)}: no sudo, nothing installed.`;
+    : `Build writes into ${tidy(r.out)}${$("sudo").checked ? " (with sudo, handed back to you)" : ""}: nothing installed.`;
   $("err").classList.toggle("hidden", !r.error);
   $("err").replaceChildren("⚠ ", r.error || "");
   if (!S.hover) { S.btnErr.build = r.error || null; updateButtons(); scheduleNames(); }
@@ -988,7 +989,7 @@ function paintButtons() {
 // What Build would write (catppuccinize ... --names --json, through /api/names), shown
 // under the command: worked out again when an option changes, those that exist marked
 let namesTimer = null;
-const namesKey = () => S.target + " " + JSON.stringify(action(null).values);
+const namesKey = () => S.target + " " + JSON.stringify(action(null).values) + ($("sudo").checked ? " sudo" : "");
 function scheduleNames() {
   clearTimeout(namesTimer);
   const box = $("names");
@@ -1002,7 +1003,7 @@ function scheduleNames() {
 async function loadNames() {
   const key = namesKey(), seq = ++S.namesSeq;
   let r;
-  try { r = await api("/api/names", { target: S.target, values: action(null).values }); }
+  try { r = await api("/api/names", { target: S.target, values: action(null).values, sudo: $("sudo").checked }); }
   catch (e) { r = { error: String(e.message || e) }; }
   if (seq !== S.namesSeq) return;              // an option changed meanwhile: a newer answer comes
   S.names = { key, ...r };
@@ -1139,7 +1140,7 @@ async function openCatalog(o, add) {
   const sel = new Set();
   $("cattitle").textContent = `${cur().name}: ${nice(o)}`;
   $("catsearch").value = "";
-  $("catlist").replaceChildren(h("div", { class: "empty" }, "Loading… (the first time, the adi1090x themes are fetched with git)"));
+  $("catlist").replaceChildren(h("div", { class: "empty" }, "Loading… (an extra catalogue may be downloaded the first time)"));
   $("cathint").textContent = o.multiple ? "Click to select one or more, then “Use selection”." : "Click one to use it.";
   $("catok").classList.toggle("hidden", !o.multiple);
   $("catalog").showModal();
@@ -1191,7 +1192,7 @@ $("previewbtn").onclick = () => run("preview");
 $("dryrun").onchange = (e) => { S.dry[S.target] = e.target.checked; refreshVisibility(); scheduleCommand(); };
 $("stopbtn").onclick = () => S.job && api("/api/stop", { id: S.job.id });
 $("openout").onclick = () => S.lastOut && api("/api/open", { path: S.lastOut });
-$("sudo").onchange = (e) => { S.sudo[S.target] = e.target.checked; refreshVisibility(); scheduleCommand(); };
+$("sudo").onchange = (e) => { S.sudo[S.target] = e.target.checked; refreshVisibility(); scheduleCommand(); scheduleColours(); };
 setInterval(() => api("/api/ping").catch(() => setStatus("fail", "The catppuccinize gui server stopped")), 30000);
 
 (async function init() {

@@ -22,7 +22,7 @@ class Naming(unittest.TestCase):
         self.assertEqual(slug("***", "splash"), "splash")
 
     def test_suffix_everywhere(self):
-        for target in ("image x.png", "plymouth", "limine", "ksplash", "lut"):
+        for target in ("image x.png", "plymouth glow", "limine", "ksplash", "lut"):
             self.assertEqual(parse([*target.split(), "-s", "v2"]).suffix, "v2")
 
     def test_suffix_characters(self):

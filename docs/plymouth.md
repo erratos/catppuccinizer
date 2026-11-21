@@ -2,13 +2,16 @@
 
 [← Back to the README](../README.md) · [Getting started](getting-started.md)
 
-Recolours any Plymouth boot splash theme folder (`script`, `two-step`,
-`fade-throbber`…), or any of the 80 animations of
+Recolours a Plymouth boot splash theme: the one in use by default, any
+installed theme by name, any theme folder (`script`, `two-step`,
+`fade-throbber`…), or, as an extra catalogue, any of the 80 animations of
 [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes), fetched
 by name (needs `git`, or a [local copy](#using-a-local-copy-of-the-adi1090x-themes)).
 
 ```bash
-catppuccinize plymouth --list                          # installed themes, adi1090x themes by name
+catppuccinize plymouth -a mauve                        # the theme in use
+catppuccinize plymouth spinner -a mauve                # an installed theme, by name
+catppuccinize plymouth --list                          # installed themes, then the adi1090x ones
 catppuccinize plymouth rings_2 -a mauve                # build it into themes/
 sudo catppuccinize plymouth rings_2 -a mauve --test    # build it and show it, no reboot
 sudo catppuccinize plymouth rings_2 -a mauve --apply   # install, make it the default
@@ -87,9 +90,8 @@ rewritten too.
 
 ## Hand-tuned themes
 
-`hexa_retro` and `infinite_seal` have hand-tuned configs shipped with the tool;
-`catppuccinize plymouth` without a theme builds both (Mocha, all accents). The
-results are published, with previews, in
+`hexa_retro` and `infinite_seal` have hand-tuned configs shipped with the tool.
+The results are published, with previews, in
 [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
 
 ```bash
@@ -248,7 +250,7 @@ for it.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `THEME …` | `hexa_retro infinite_seal` | theme folder(s) or adi1090x theme name(s) |
+| `THEME …` | the theme in use | installed theme name(s), theme folder(s) or adi1090x theme name(s); when the theme in use is a catppuccinizer result, the one it replaced |
 | `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` |
 | `-a, --accent` | `all` | accent(s) for colours mapped to `accent`, or `all` |
 | `-m, --map` | | `[GROUP.]NAME=TARGET …` overrides for this run |

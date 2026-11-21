@@ -25,11 +25,11 @@ ten minutes after the page is closed. `--port N` picks the port,
      the page, or type a path; *Choose from catalogue…* shows the wallpapers
      installed in `/usr/share/wallpapers`, `/usr/share/backgrounds` and
      `~/.local/share/wallpapers` (a KDE wallpaper package: its largest image);
-   - Plymouth: the catalogue shows the installed themes (the default one marked
-     *in use*) and the 80 adi1090x themes (fetched with git the first time, or
-     those of your
-     [local copy](plymouth.md#using-a-local-copy-of-the-adi1090x-themes);
-     *tuned* ones have a hand-made colour config), or browse to any theme folder;
+   - Plymouth: left empty, the theme in use is recoloured. The catalogue shows
+     the installed themes first (the one in use marked *in use*), then an extra
+     catalogue, the 80 adi1090x themes (fetched with git when chosen, or those
+     of your [local copy](plymouth.md#using-a-local-copy-of-the-adi1090x-themes);
+     *tuned* ones have a hand-made colour config); or browse to any theme folder;
    - KDE splash: the catalogue lists the splash screens installed for you and
      for the system, the selected one marked *in use*;
    - Limine: the wallpaper is optional: left empty, only the menu colours
@@ -104,7 +104,10 @@ many seconds, 10 by default).
 - A button marked **sudo** runs the command with sudo: the password is asked by
   a graphical prompt (`ksshaskpass`, `ssh-askpass`…, through `SUDO_ASKPASS`).
   Without one, copy its command (hover the button) and run it in a terminal.
-  *Always with sudo* runs the other buttons with sudo too.
+- **with sudo**, next to *Build*: runs *Preview* and *Build*, and the analysis
+  of the source colours, with sudo, to read files only root can read (Limine's
+  wallpaper on an ESP only root can read). What they write is handed back to
+  you.
 
 ## Security
 
