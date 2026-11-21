@@ -27,13 +27,13 @@ class LutTarget(Target):
 
     def options(self):
         return [
-            Option("--format", nargs="+", choices=["hald", "cube"], default=["hald", "cube"],
+            Option("--format", label="Formats", nargs="+", choices=["hald", "cube"], default=["hald", "cube"],
                    help="file format(s) (default: both)"),
-            Option("--hald-level", type=int, default=8, range=(2, 16),
+            Option("--hald-level", label="Hald level", type=int, default=8, range=(2, 16),
                    when={"format": ["hald"]},
                    help="Hald CLUT level: level^3 pixels square, level^2 points per axis "
                         "(default: 8, 512x512)"),
-            Option("--cube-size", type=int, default=33, range=(2, 256), metavar="N",
+            Option("--cube-size", label="Cube size", type=int, default=33, range=(2, 256), metavar="N",
                    when={"format": ["cube"]},
                    help=".cube points per axis (default: 33)"),
             *recolor.method_options(recolor.LUT_METHODS, help="lut = the built-in table, "

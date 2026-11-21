@@ -98,13 +98,13 @@ WALLPAPER = ["wallpaper"]     # a wallpaper to recolour
 MENU_ONLY = ("only the menu colours change (text, highlight, frame): the wallpaper set in "
              "limine.conf is kept as it is")
 OPTIONS = [
-    Option("--wallpaper", type=Path, metavar="IMAGE", accept="image", source=True,
+    Option("--wallpaper", label="Wallpaper", type=Path, metavar="IMAGE", accept="image", source=True,
            empty=MENU_ONLY,
            help="image to recolour and use as the Limine wallpaper, or 'current' for the "
                 "one limine.conf sets (empty: only the menu colours change)"),
     # how the wallpaper is recoloured and shown: only when there is one to recolour
     *recolor.method_options(needs=WALLPAPER),
-    Option("--style", choices=["stretched", "centered", "tiled"], needs=WALLPAPER,
+    Option("--style", label="Wallpaper style", choices=["stretched", "centered", "tiled"], needs=WALLPAPER,
            help="wallpaper_style (default: the current one, or stretched)"),
     step("install", sudo="run", help=f"copy the wallpaper to <ESP>/{WALL_DIR}/ (sudo)"),
     step("apply", sudo="run",
@@ -116,9 +116,9 @@ OPTIONS = [
          help="remove the theme from limine.conf and its wallpapers from the ESP (sudo)",
          explain="Here: exactly the block is removed and the options it had commented out "
                  "come back, so changes made since (new kernel entries) are kept."),
-    Option("--conf", type=Path, accept="file", stage="apply",
+    Option("--conf", label="limine.conf file", type=Path, accept="file", stage="apply",
            help="limine.conf to edit (default: searched on the ESP)"),
-    Option("--esp", type=Path, accept="dir", stage="apply",
+    Option("--esp", label="ESP folder", type=Path, accept="dir", stage="apply",
            help="ESP mount point (default: ESP_PATH of /etc/default/limine, or /boot)"),
 ]
 

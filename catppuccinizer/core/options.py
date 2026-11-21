@@ -3,6 +3,8 @@
 An Option holds what argparse needs (flags, type, choices, default, nargs…) and
 what a front-end needs to show it:
 
+- label: the name a front-end shows (the GUI: "Keep lightness" for --keep-lum);
+  by default the dest, spaced and capitalised;
 - help: one line; explain: a longer text (the GUI's "?" panel); image: an
   illustration, a file of catppuccinizer/assets/ ("options-method.jpg") or an
   absolute path (a target from another package): see image_file();
@@ -62,7 +64,7 @@ class Option:
         self._given = kw                       # for replace()
         self._init(*flags, **kw)
 
-    def _init(self, *flags, help, dest=None, type=None, choices=None, default=None,
+    def _init(self, *flags, help, label=None, dest=None, type=None, choices=None, default=None,
               nargs=None, metavar=None, const=None, switch=False, extend=False,
               required=None, kind=None, range=None, accept=None, source=None, group=None,
               explain=None, image=None, scope="target", stage="build", sudo=None,
@@ -74,6 +76,7 @@ class Option:
         long = next((f for f in flags if f.startswith("--")), flags[-1])
         self.dest = dest or (flags[0] if self.positional else long.lstrip("-").replace("-", "_"))
         self.help, self.explain, self.image = help, explain, image
+        self.label = label or self.dest.replace("_", " ").capitalize()
         self.type, self.choices, self.default = type, choices, default
         self.nargs, self.const, self.switch, self.extend = nargs, const, switch, extend
         self.range = tuple(range) if range else None
@@ -148,7 +151,7 @@ class Option:
     def schema(self):
         """What the GUI needs, as JSON."""
         return {
-            "dest": self.dest, "flags": [] if self.positional else list(self.flags),
+            "dest": self.dest, "label": self.label, "flags": [] if self.positional else list(self.flags),
             "kind": self.kind, "positional": self.positional, "nargs": self.nargs,
             "multiple": self.multiple, "required": self.is_required,
             "choices": _plain(list(self.choices)) if self.choices else None,
@@ -286,7 +289,8 @@ def step(name, help, sudo=None, explain=None, **kw):
         raise ValueError(f"unknown step {name}")
     kw = {"switch": True, **kw} if "nargs" not in kw else kw
     text = STEP_EXPLAIN[name] + (" " + explain if explain else "")
-    return Option(f"--{name}", help=help, stage=name, sudo=sudo, explain=text, **kw)
+    return Option(f"--{name}", help=help, label=name.capitalize(), stage=name, sudo=sudo,
+                  explain=text, **kw)
 
 
 def is_step(o):
@@ -295,13 +299,13 @@ def is_step(o):
 
 # ---------------------------------------------------------- common options
 COMMON = [
-    Option("-f", "--flavor", nargs="+", default=["mocha"], metavar="FLAVOR", kind="flavor",
+    Option("-f", "--flavor", label="Flavour", nargs="+", default=["mocha"], metavar="FLAVOR", kind="flavor",
            scope="common", image="options-flavors.jpg",
            help="one or more flavors, or 'all' (default: mocha)",
            explain="Latte is the light flavour; Frappé, Macchiato and Mocha are darker and "
                    "softer, in that order. Each flavour gives its own result, named after it "
                    "(catppuccin-mocha-…); 'all' picks the four."),
-    Option("-a", "--accent", nargs="+", metavar="ACCENT", kind="accent", scope="common",
+    Option("-a", "--accent", label="Accent", nargs="+", metavar="ACCENT", kind="accent", scope="common",
            help="accent(s) for colours mapped to 'accent', or 'all'",
            explain="Catppuccin has 14 accents (mauve, peach, blue…). A colour mapped to "
                    "'accent' takes the one you pick: the main colour of a monochrome design, "
@@ -309,7 +313,7 @@ COMMON = [
                    "uses no accent (a photo recoloured with a LUT) is written once per "
                    "flavour, without the accent in its name, and a note says the accent was "
                    "ignored."),
-    Option("-m", "--map", nargs="+", extend=True, default=[], metavar="NAME=TARGET", kind="map",
+    Option("-m", "--map", label="Colour remapping", nargs="+", extend=True, default=[], metavar="NAME=TARGET", kind="map",
            scope="common", when={"analysis.remappable": [True]},
            help="override the colour mapping: white=mauve, ui.white=text, '#ffad03=peach'",
            explain="Each source colour is sent to a Catppuccin colour automatically: grays to "
@@ -319,18 +323,18 @@ COMMON = [
                    "a theme that has several (ui.white), or a '#rrggbb' value; TARGET is a "
                    "Catppuccin colour (text, surface1, peach…) or 'accent'. Only the keys "
                    "method has source colours: a LUT has nothing to remap."),
-    Option("--preview", switch=True, scope="common", stage="preview",
+    Option("--preview", label="Preview only", switch=True, scope="common", stage="preview",
            help="only render before/after images into <out>/previews/",
            explain="Instead of the result, one image per result with the original on the "
                    "left and the recoloured version on the right, in <out>/previews/: a "
                    "quick way to compare flavours, accents or settings before building."),
-    Option("-o", "--out", type=Path, accept="dir", scope="common", help="output folder"),
-    Option("-s", "--suffix", default="", type=suffix_type, metavar="SUFFIX", scope="common",
+    Option("-o", "--out", label="Output folder", type=Path, accept="dir", scope="common", help="output folder"),
+    Option("-s", "--suffix", label="Name suffix", default="", type=suffix_type, metavar="SUFFIX", scope="common",
            help="extra word at the end of the output names (lowercase letters, digits and '-')"),
 ]
 
 # added to the targets that have system steps
-DRY_RUN = Option("--dry-run", switch=True, scope="common", stage="install",
+DRY_RUN = Option("--dry-run", label="Dry run", switch=True, scope="common", stage="install",
                  explain="Nothing is copied, written or removed, no command is run: each "
                          "change is listed instead ('would copy …'). The system is still "
                          "read (the theme in use, limine.conf), so a step that needs root "

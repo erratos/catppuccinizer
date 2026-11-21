@@ -53,7 +53,7 @@ class ImageTarget(Target):
     default_out = "images"
 
     def options(self):
-        return [Option("images", nargs="+", metavar="IMAGE", accept="images",
+        return [Option("images", label="Images", nargs="+", metavar="IMAGE", accept="images",
                        help="image file(s) or folder(s)"),
                 *recolor.method_options()]
 

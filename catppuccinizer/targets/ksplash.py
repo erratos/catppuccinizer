@@ -49,7 +49,7 @@ class KSplashTarget(Target):
 
     def options(self):
         return [
-            Option("theme", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
+            Option("theme", label="Splash screen", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
                    accept="dir", help="look-and-feel id or folder (default: org.kde.breeze.desktop)"),
             *recolor.method_options(),
             step("install", help=f"copy the result to {USER_DIR}"),

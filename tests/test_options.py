@@ -95,6 +95,18 @@ class Declarations(unittest.TestCase):
                     else:
                         self.assertIn(key, dests)
 
+    def test_labels(self):
+        """Every option the GUI shows has a label written for it (not the dest)."""
+        for name, t in TARGETS.items():
+            for o in t.all_options():
+                if o.gui:
+                    with self.subTest(target=name, option=o.dest):
+                        self.assertIn("label", o._given)
+                        self.assertTrue(o.label[0].isupper() or o.label.startswith("limine"), o.label)
+        lim = {o.dest: o for o in TARGETS["limine"].all_options()}
+        self.assertEqual((lim["keep_lum"].label, lim["apply"].label), ("Keep lightness", "Apply"))
+        self.assertEqual(Option("--some-thing", help="x").label, "Some thing")    # the fallback
+
     def test_needs_and_unless(self):
         """needs / unless name existing options; the command line refuses an unless and
         notes a missing need; the GUI leaves out what does not count."""

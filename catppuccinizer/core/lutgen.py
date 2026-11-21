@@ -37,12 +37,15 @@ PARAMS = {
     "iterations": (int, "N", "sampling: noise iterations per colour, slower = smoother (default 512)"),
     "seed":       (int, "SEED", "sampling: noise seed (default 42080085)"),
 }
+LABELS = {"radius": "Blur radius", "shape": "RBF shape", "nearest": "Nearest colours",
+          "power": "Distance power", "mean": "Noise mean", "std_dev": "Noise spread",
+          "iterations": "Noise iterations", "seed": "Noise seed"}
 GROUP = "lutgen method (--method lutgen, needs the lutgen binary)"
 BLEND = ("The blending knob of an algorithm: with blur, a small --lutgen-radius gives hard "
          "transitions (close to nearest) and a large one washes colours out; with rbf, "
          "--lutgen-shape works the other way round.")
 OPTIONS = [
-    Option("--lutgen-algo", choices=list(ALGORITHMS), default="blur", scope="method:lutgen",
+    Option("--lutgen-algo", label="Algorithm", choices=list(ALGORITHMS), default="blur", scope="method:lutgen",
            group=GROUP, image="options-lutgen-algo.jpg",
            help="interpolation: blur (lutgen default), rbf (Gaussian RBF), "
                 "shepard (inverse distance), sampling (Gaussian sampling, slow), "
@@ -50,14 +53,14 @@ OPTIONS = [
            explain="blur, rbf, shepard and sampling give similar soft results with small "
                    "differences in how colours blend; nearest does not interpolate at all: "
                    "every colour snaps to one palette colour (flat, posterised look)."),
-    Option("--lutgen-level", type=int, default=10, range=(2, 16), scope="method:lutgen",
+    Option("--lutgen-level", label="Table level", type=int, default=10, range=(2, 16), scope="method:lutgen",
            group=GROUP, help="Hald CLUT level: cube of level^2 points per axis (default: 10)"),
-    Option("--lutgen-preserve", switch=True, scope="method:lutgen", group=GROUP,
+    Option("--lutgen-preserve", label="Keep original lightness", switch=True, scope="method:lutgen", group=GROUP,
            image="options-lutgen-lum.jpg",
            help="keep the original lightness after interpolation",
            explain="After a colour is replaced, its original lightness is put back: more "
                    "contrast, while the hues still come from the palette."),
-    Option("--lutgen-lum", type=float, metavar="FACTOR", scope="method:lutgen", group=GROUP,
+    Option("--lutgen-lum", label="Lightness weight", type=float, metavar="FACTOR", scope="method:lutgen", group=GROUP,
            image="options-lutgen-lum.jpg",
            explain="lutgen matches each colour to the palette by distance; this weights the "
                    "lightness in that distance. Below 1, colours find more colourful "
@@ -66,6 +69,7 @@ OPTIONS = [
            help="lightness weight when matching: <1 prefers colourful matches, "
                 ">1 neutral ones; usually with --lutgen-preserve (default 1)"),
     *(Option(f"--lutgen-{name.replace('_', '-')}", type=typ, metavar=metavar, help=help_,
+             label=LABELS[name],
              scope="method:lutgen", group=GROUP,
              when={"method": ["lutgen"],
                    "lutgen_algo": [a for a, (_, allowed) in ALGORITHMS.items() if name in allowed]},

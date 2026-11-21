@@ -188,6 +188,9 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .btn .badge { margin-left: 6px; vertical-align: 1px; }
 .actions.first { margin-top: 0; }
 .hint.dest { margin: 10px 0 8px; overflow-wrap: anywhere; }
+.stepgroup { display: inline-flex; gap: 8px; align-items: center; }
+.steparg { display: inline-flex; gap: 6px; align-items: center; color: var(--subtext0); font-size: 13px; margin-left: -2px; }
+.steparg input { width: 64px; }
 .emptynote { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: var(--subtext1);
              background: color-mix(in srgb, var(--accent) 10%, var(--crust)); border-left: 3px solid var(--accent); }
 .names { margin-top: 10px; font-size: 12.5px; color: var(--subtext0); }
@@ -363,7 +366,7 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
 const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
             colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0, helpOpen: new Set(),
-            btnErr: {} };
+            btnErr: {}, stepArgs: {} };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -397,11 +400,8 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem("catppuccinizer." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem("catppuccinizer." + k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
-function nice(o) {
-  if (o.positional) return (o.metavar || o.dest).toLowerCase().replace(/_/g, " ");
-  const f = o.flags.find((x) => x.startsWith("--")) || o.flags[0];
-  return f.replace(/^--/, "").replace(/^lutgen-/, "").replace(/-/g, " ");
-}
+// the name shown for an option: its label (core.options.Option.label)
+const nice = (o) => o.label;
 // The "?" of an option that has a longer text or an illustration (Option.explain, image):
 // a button, and the panel it opens (open ones stay open when the form is drawn again).
 // content: what the panel shows instead of the option's own text and picture.
@@ -513,7 +513,6 @@ const analysisOnly = (when) => Object.fromEntries(Object.entries(when || {}).fil
 // common options with their own place in the page; the others go to the Options card
 const COMMON_WIDGETS = new Set(["flavor", "accent", "map", "preview", "out", "suffix", "dry_run"]);
 // the system steps: one button each, in this order (core.options.STEPS)
-const STEP_LABELS = { install: "Install", apply: "Apply", test: "Test", restore: "Restore" };
 const steps = () => cur().options.filter((o) => o.role === "step");
 // the options of the steps that touch the system, and of the analysis, get their own groups
 const STAGE_GROUPS = { analyse: "Analyse (writes no output)", install: "System steps", apply: "System steps",
@@ -917,19 +916,26 @@ function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updat
 function action(step) {
   const values = sendVals(), o = step && step !== "preview" ? opt(step) : null;
   if (step === "preview") values.preview = true;
-  if (o) { values[step] = true; if (S.dry[S.target]) values.dry_run = true; }
+  if (o) { values[step] = (o.kind === "optional" && stepArg(step)) || true; if (S.dry[S.target]) values.dry_run = true; }
   // a dry run changes nothing but keeps the step's rights: it may have to read the system (the ESP)
   const sudo = $("sudo").checked || (!!o && o.sudo === "run");
   return { target: S.target, values, sudo };
 }
-const label = (o) => STEP_LABELS[o.dest] || nice(o).replace(/^./, (c) => c.toUpperCase());
+const stepArg = (dest) => S.stepArgs[S.target]?.[dest];
+const label = (o) => o.label;
 function renderSteps() {
   const list = steps();
   $("steps").classList.toggle("hidden", !list.length);
   $("stepopts").classList.toggle("hidden", !list.length);
-  $("steps").replaceChildren(...list.map((o) => h("button", { class: "btn" + (o.dest === "restore" ? " danger" : ""), "data-step": o.dest, title: o.help,
+  $("steps").replaceChildren(...list.map((o) => h("span", { class: "stepgroup" }, h("button", { class: "btn" + (o.dest === "restore" ? " danger" : ""), "data-step": o.dest, title: o.help,
     onclick: () => run(o.dest), onmouseenter: () => { S.hover = o.dest; updateCommand(); }, onmouseleave: () => { S.hover = null; updateCommand(); } },
-    label(o), o.sudo === "run" ? h("span", { class: "badge" }, "sudo") : null)));
+    label(o), o.sudo === "run" ? h("span", { class: "badge" }, "sudo") : null),
+    // a step that takes an optional value (--test [SECONDS]): its value next to the button
+    o.kind === "optional" ? h("label", { class: "steparg", title: o.help },
+      h("input", { type: "number", min: 1, step: 1, value: stepArg(o.dest) ?? "", placeholder: o.const ?? "",
+        oninput: (e) => { (S.stepArgs[S.target] ||= {})[o.dest] = e.target.value === "" ? undefined : Number(e.target.value);
+          store.set("stepArgs", S.stepArgs); scheduleCommand(); } }),
+      (o.metavar || "value").toLowerCase()) : null)));
   // "?": what each step does here (the steps' explain), and the dry run
   const dry = opt("dry_run");
   const [q, panel] = list.length ? helpParts({ dest: "__steps", flags: ["the system steps"] }, () => [
@@ -1145,7 +1151,7 @@ async function openCatalog(o, add) {
   const button = (s) => {
     const img = s.thumb ? h("img", { src: thumb(s.thumb, 240), loading: "lazy", alt: "" }) : null;
     if (img) img.onerror = () => img.remove();
-    return h("button", { class: sel.has(s.value) ? "on" : "", title: s.value,
+    return h("button", { class: sel.has(s.value) ? "on" : "", title: [s.value, s.note].filter(Boolean).join("\n"),
       onclick: (e) => {
         if (!o.multiple) { $("catalog").close(); add([s.value]); return; }
         sel.has(s.value) ? sel.delete(s.value) : sel.add(s.value); e.currentTarget.classList.toggle("on");
@@ -1193,6 +1199,7 @@ setInterval(() => api("/api/ping").catch(() => setStatus("fail", "The catppuccin
   catch (e) { document.body.replaceChildren(h("p", { style: { padding: "40px", fontFamily: "sans-serif" } }, e.message)); return; }
   $("ver").textContent = "v" + S.schema.version;
   S.values = store.get("values", {}) || {};
+  S.stepArgs = store.get("stepArgs", {}) || {};
   const names = S.schema.targets.map((t) => t.name);
   S.target = names.includes(store.get("target")) ? store.get("target") : (names.includes("image") ? "image" : names[0]);
   for (const t of names) if (typeof S.values[t] !== "object" || Array.isArray(S.values[t])) S.values[t] = {};

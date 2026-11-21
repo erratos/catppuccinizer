@@ -94,7 +94,9 @@ Targets that can change the system (Plymouth, Limine, KDE splash) get one
 button per step under *Preview* and *Build*: **Install**, **Apply** (installs
 first), **Test**, **Restore** ([what each one does](architecture.md#steps)).
 Each button builds, then runs its step; *Restore* only undoes. Their settings
-(`--esp`, `--conf`…) are in the *System steps* group of the options.
+(`--esp`, `--conf`…) are in the *System steps* group of the options; a step
+that takes a value has its field next to its button (Plymouth's **Test**: how
+many seconds, 10 by default).
 
 - **Dry run**: the step only lists the files it would copy, change or remove
   and the commands it would run; nothing is changed. A step marked **sudo**
@@ -147,8 +149,11 @@ GUI without GUI code:
   leaving a source empty does (Limine: only the menu colours change).
   A `when` on an analysis fact (`-m` only when something can be remapped)
   hides the option instead;
+- `label` is the name shown for an option ("Keep lightness" for
+  `--keep-lum`);
 - a step option (`options.step()`) becomes a button, `sudo="run"` marks it
-  **sudo** and runs it with sudo; options of the `install` / `apply` / `test` /
+  **sudo** and runs it with sudo, an optional value (`nargs="?"`, `--test
+  [SECONDS]`) a field next to it; options of the `install` / `apply` / `test` /
   `restore` stages go to the *System steps* group, the other ones of `analyse`
   to *Analyse*;
 - `Target.outputs()` fills the list of what Build would write;

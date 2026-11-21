@@ -112,12 +112,12 @@ class PlymouthTarget(Target):
 
 
 OPTIONS = [
-    Option("themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME", accept="dir",
+    Option("themes", label="Themes", nargs="*", default=DEFAULT_THEMES, metavar="THEME", accept="dir",
            help="theme folder, or adi1090x theme name (default: hexa_retro infinite_seal)"),
-    Option("--bar", metavar="COLOUR", kind="colour",
+    Option("--bar", label="Progress bar colour", metavar="COLOUR", kind="colour",
            help="progress bar colour: -status variants, and two-step themes' own bar"),
-    Option("--no-status", switch=True, help="skip the -status variants"),
-    Option("--redetect", switch=True,
+    Option("--no-status", label="No -status variant", switch=True, help="skip the -status variants"),
+    Option("--redetect", label="Detect the colours again", switch=True,
            help="detect the colours again instead of using the theme's saved config "
                 "(a build saves the new one)"),
     step("install", sudo="run",

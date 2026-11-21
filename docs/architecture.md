@@ -208,6 +208,7 @@ option), then:
 
 | Field | Meaning |
 |---|---|
+| `label` | the name the GUI shows ("Keep lightness"); without it, the dest spaced and capitalised (`tests/test_options.py` asks one of every built-in option) |
 | `help` | one line (`--help`, the GUI) |
 | `explain`, `image` | a longer text and an illustration, shown by the GUI's **?** next to the option; `image` is a file of `catppuccinizer/assets/` (`"options-method.jpg"`, package data, made by `tools/doc_previews.py`) or an absolute path for a target from another package |
 | `scope` | `common`, `method` / `method:<name>` (core) or `target` (default) |
