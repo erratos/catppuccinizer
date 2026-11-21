@@ -32,7 +32,7 @@ Breeze (/usr/share/plasma/look-and-feel/org.kde.breeze.desktop)
 | SVG / SVGZ | `fill`, `stroke`, `stop-color`, `color` (incl. Plasma colour-scheme stylesheets) |
 | PNG / JPEG | like the [image](images.md) target (keys for flat art, LUT for photos) |
 | animated GIF or WebP | every frame, with one mapping detected over the animation |
-| `contents/previews/splash.png` | the thumbnail shown in System Settings: when it is a still of the animation, it takes the animation's colours and `-m`, so it matches the splash |
+| `contents/previews/splash.png` | the thumbnail shown in System Settings: when it is a still of the animation, it takes the animation's colours and `-m`, so it matches the splash (and `--colours` does not list it on its own) |
 
 QML/SVG colours: grays go to the neutral ramp (`base` … `text`, by lightness),
 the most used saturated colour becomes the **accent**, the others the closest

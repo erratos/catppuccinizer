@@ -231,7 +231,9 @@ def analyse(a, pkg, tmp):
 
 
 def colours(a):
-    """--colours: the QML / SVG colours, then each image and animation."""
+    """--colours: the QML / SVG colours, then each image and animation. The preview
+    (contents/previews/splash.png) is left out when it takes an animation's colours:
+    it follows that animation, -m included, so it has nothing of its own to remap."""
     pkg = resolve(a.theme)
     tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
     try:
@@ -244,9 +246,9 @@ def colours(a):
         if method == "anim":
             out.append(colour_report(name, "keys", grp["colors"], background=background_of(grp),
                                      note=f"animation, {extra[0]} frames"))
-        else:
-            note = "colours of the animation" if f == pkg / "contents/previews/splash.png" else None
-            out.append(recolor.colour_report(name, method, grp, note=note))
+        elif not (f == pkg / "contents/previews/splash.png"
+                  and any(g is grp for m, g, _ in rasters.values() if m == "anim")):
+            out.append(recolor.colour_report(name, method, grp))
     return out
 
 

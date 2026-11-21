@@ -231,22 +231,6 @@
     "note": "animation, 3 frames",
     "remap": true,
     "source": "contents/splash/images/spin.gif"
-   },
-   {
-    "background": "#000000",
-    "colours": [
-     {
-      "name": "green",
-      "share": 1.0,
-      "source": "#78f064",
-      "target": "lavender"
-     }
-    ],
-    "group": null,
-    "method": "keys",
-    "note": "colours of the animation",
-    "remap": true,
-    "source": "contents/previews/splash.png"
    }
   ],
   "limine": [
