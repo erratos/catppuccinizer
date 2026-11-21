@@ -70,7 +70,15 @@ main { max-width: 1440px; margin: 0 auto; padding: 20px; display: grid; gap: 20p
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500;
 }
 .btn:hover { border-color: var(--overlay0); background: var(--surface1); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:disabled, .btn.off { opacity: .45; cursor: not-allowed; }
+.btn.off:hover { border-color: var(--surface1); filter: none; }
+/* an option that does not count now (core.options.active): greyed, its controls covered so
+   that hovering anywhere on it shows why (title); its "?" stays usable */
+.off { position: relative; }
+.opt.off, .source.off { opacity: .5; }
+.opt.off::after, .source.off::after { content: ""; position: absolute; inset: 0; cursor: not-allowed; }
+.off .qbtn { position: relative; z-index: 1; }
+.group > summary .why { font-weight: 400; color: var(--overlay1); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--subtext0); }
@@ -352,7 +360,8 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
 const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
-            colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0, helpOpen: new Set() };
+            colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0, helpOpen: new Set(),
+            btnErr: {} };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -480,6 +489,25 @@ function whenMet(when, useAnalysis = true) {
   });
 }
 const shown = (o) => whenMet(o.when);
+// Why an option does not count now, or null: its `when` (another option's value), its
+// `unless` (an option it cannot go with) or its `needs` (an option of which one must be
+// given), as core.options.active decides. Facts of the analysis still hide instead.
+const flagOf = (d) => { const x = opt(d); return x ? (x.flags.find((f) => f.startsWith("--")) || x.flags[0] || x.dest) : d; };
+function givenVal(d) {
+  const v = vals()[d];
+  return v !== undefined && v !== null && v !== false && v !== "" && !(Array.isArray(v) && !v.length)
+    && JSON.stringify(v) !== JSON.stringify(opt(d)?.default);
+}
+function offReason(o) {
+  for (const [k, allowed] of Object.entries(o.when || {})) {
+    if (!k.startsWith("analysis.") && !whenMet({ [k]: allowed })) return `Only with ${flagOf(k)} ${allowed.join(" or ")}`;
+  }
+  const clash = (o.unless || []).find(givenVal);
+  if (clash) return `Not with ${flagOf(clash)}: it is one or the other (clear ${flagOf(clash)} to use this one)`;
+  if (o.needs && !o.needs.some(givenVal)) return `No effect without ${o.needs.map(flagOf).join(" or ")}: choose one first`;
+  return null;
+}
+const analysisOnly = (when) => Object.fromEntries(Object.entries(when || {}).filter(([k]) => k.startsWith("analysis.")));
 // common options with their own place in the page; the others go to the Options card
 const COMMON_WIDGETS = new Set(["flavor", "accent", "map", "preview", "out", "suffix", "dry_run"]);
 // the system steps: one button each, in this order (core.options.STEPS)
@@ -529,7 +557,7 @@ function browseAccept(o, fallback = "any") {
 }
 const takesImages = (o) => o.accept === "image" || o.accept === "images";
 function sourceField(o) {
-  const t = cur(), wrap = h("div", { class: "source" });
+  const t = cur(), wrap = h("div", { class: "source", "data-dest": o.dest });
   const V = () => { const v = vals()[o.dest]; return v === undefined ? [] : [v].flat(); };
   const draw = () => {
     const list = V();
@@ -755,7 +783,7 @@ function optionsCard(options) {
   const out = [h("div", { class: "opts" }, plain.map(optionField))];
   for (const [title, list] of Object.entries(groups)) {
     const d = h("details", { class: "group", open: true },
-      h("summary", {}, title), h("div", { class: "opts" }, list.map(optionField)));
+      h("summary", {}, title, h("span", { class: "why" })), h("div", { class: "opts" }, list.map(optionField)));
     out.push(d);
   }
   return out;
@@ -763,7 +791,7 @@ function optionsCard(options) {
 
 function optionField(o) {
   const V = vals(), v = V[o.dest];
-  const box = h("div", { class: "opt" + (v !== undefined ? " set" : ""), "data-dest": o.dest, "data-when": o.when ? JSON.stringify(o.when) : null });
+  const box = h("div", { class: "opt" + (v !== undefined ? " set" : ""), "data-dest": o.dest });
   // an open explanation takes the whole row: its picture is a wide comparison grid
   const [qbtn, explain] = helpParts(o, null, (open) => box.classList.toggle("wide", open || o.kind === "path"));
   const head = h("div", { class: "head" }, h("div", {}, h("div", { class: "name" }, nice(o), qbtn), h("div", { class: "flag" }, o.flags.join(", "))));
@@ -851,9 +879,24 @@ function updateAccentHint() {
 }
 function refreshVisibility() {
   updateAccentHint();
-  document.querySelectorAll("[data-when]").forEach((el) => el.classList.toggle("hidden", !whenMet(JSON.parse(el.dataset.when))));
-  // a group of options with none shown (the --lutgen-* ones without --method lutgen)
-  document.querySelectorAll("details.group").forEach((d) => d.classList.toggle("hidden", ![...d.querySelectorAll(".opt")].some((e) => !e.classList.contains("hidden"))));
+  document.querySelectorAll("#form [data-dest]").forEach((el) => {
+    const o = opt(el.dataset.dest);
+    if (!o) return;
+    const why = offReason(o);
+    el.classList.toggle("hidden", !whenMet(analysisOnly(o.when)));
+    el.classList.toggle("off", !!why);
+    el.title = why || "";
+    el.querySelectorAll("input, select, textarea, button:not(.qbtn)").forEach((c) => { c.disabled = !!why; });
+  });
+  // a group whose options all wait for another one (the --lutgen-* ones without --method
+  // lutgen): folded, with the reason after its title; unfolded when they count again
+  document.querySelectorAll("details.group").forEach((d) => {
+    const opts = [...d.querySelectorAll(".opt")].filter((e) => !e.classList.contains("hidden"));
+    d.classList.toggle("hidden", !opts.length);
+    const allOff = opts.length > 0 && opts.every((e) => e.classList.contains("off"));
+    if (String(allOff) !== d.dataset.off) { d.dataset.off = String(allOff); d.open = !allOff; }
+    d.querySelector("summary .why").textContent = allOff ? ` — ${opts[0].title}` : "";
+  });
   // sudo: the steps marked sudo always run with it (dry run too); "Always with sudo" for the rest
   $("sudo").checked = !!S.sudo[S.target];
   $("dryrun").checked = !!S.dry[S.target];
@@ -890,6 +933,7 @@ function renderSteps() {
     dry ? h("p", {}, h("b", {}, "Dry run"), " — ", dry.explain || dry.help) : null]) : [null, null];
   $("stepsq").replaceChildren(...[q].filter(Boolean));
   $("stepshelp").replaceChildren(...[panel].filter(Boolean));
+  paintButtons();
 }
 async function updateCommand() {
   const r = await api("/api/command", action(S.hover));
@@ -902,11 +946,32 @@ async function updateCommand() {
     : `Build writes into ${tidy(r.out)}: no sudo, nothing installed.`;
   $("err").classList.toggle("hidden", !r.error);
   $("err").replaceChildren("⚠ ", r.error || "");
+  if (!S.hover) { S.btnErr.build = r.error || null; updateButtons(); scheduleNames(); }
+}
+// Preview and the step buttons: each one asks the command line what its own command
+// would say (--preview without a Limine wallpaper, --install with several accents…);
+// one that cannot run is greyed, its tooltip says why, a click shows it. They stay
+// hoverable (no `disabled`), so the tooltip shows everywhere.
+async function updateButtons() {
+  const acts = [...(opt("preview") ? ["preview"] : []), ...steps().map((o) => o.dest)];
+  const answers = await Promise.all(acts.map((a) => api("/api/command", action(a)).catch(() => ({}))));
+  if (S.hover) return;
+  acts.forEach((a, i) => { S.btnErr[a] = answers[i].error || null; });
+  paintButtons();
+}
+function paintButtons() {
   const busy = S.job && !S.job.done;
-  $("runbtn").disabled = !!r.error || busy;
-  $("previewbtn").disabled = !!r.error || busy;
-  document.querySelectorAll("#steps button").forEach((b) => { b.disabled = busy || (!!r.error && !S.hover); });
-  if (!S.hover) scheduleNames();
+  const paint = (b, key) => {
+    if (!b) return;
+    const err = S.btnErr[key], off = busy || !!err;
+    b.dataset.help ??= b.title;
+    b.classList.toggle("off", off);
+    b.setAttribute("aria-disabled", String(off));
+    b.title = busy ? "A run is in progress" : err ? `Not now: ${err}` : b.dataset.help;
+  };
+  paint($("runbtn"), "build");
+  paint($("previewbtn"), "preview");
+  document.querySelectorAll("#steps button").forEach((b) => paint(b, b.dataset.step));
 }
 
 // ------------------------------------------------------------ output names
@@ -949,6 +1014,9 @@ function renderNames() {
 
 // --------------------------------------------------------------------- run
 async function run(step) {
+  if (S.job && !S.job.done) return toast("A run is in progress");
+  const err = S.btnErr[step || "build"];
+  if (err) return toast(err);
   const r = await api("/api/run", action(step));
   if (r.error) { toast(r.error); return; }
   S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.accentIgnored = false;

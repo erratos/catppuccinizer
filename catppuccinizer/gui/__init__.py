@@ -41,7 +41,7 @@ from PIL import Image
 from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.paths import cache_dir
-from ..core.options import STEPS, analysis, condition_met, image_file
+from ..core.options import STEPS, active, analysis, image_file
 from ..core.recolor import LUT_METHODS
 from ..core.target import discover
 
@@ -139,15 +139,14 @@ def check_values(values, options):
 
 def build_argv(target, values, options):
     """Command-line arguments for a target from the form values {dest: value};
-    options whose `when` is not met (--lutgen-* without --method lutgen) are left out."""
+    options that do not count (core.options.active: --lutgen-* without --method
+    lutgen, Limine's --style without a wallpaper) are left out."""
     # sources first (catppuccinize image wall.jpg -f mocha): an option taking several
     # values (-f latte mocha) would otherwise swallow them
-    current = {o["dest"]: o["default"] for o in options}
-    current.update({k: v for k, v in values.items() if v is not None})
     argv, positionals = [], []
     for o in options:
         v = values.get(o["dest"])
-        if v is None or v == "" or v == [] or v is False or not condition_met(o["when"], current):
+        if v is None or v == "" or v == [] or v is False or not active(o, values, options):
             continue
         if o["positional"]:
             positionals += [str(x) for x in (v if isinstance(v, list) else [v])]

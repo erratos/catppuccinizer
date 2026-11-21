@@ -99,8 +99,8 @@ is refused, to be fixed by hand.
 | `-f, --flavor`, `-a, --accent` | flavour and accent of the menu (see [Colours and mapping](colours.md)) |
 | `--wallpaper IMAGE` | image to recolour and use as the Limine wallpaper |
 | `--recolor-wallpaper` | recolour the wallpaper(s) already set in `limine.conf` |
-| `--style` | `stretched`, `centered` or `tiled` |
-| `--preview` | also render before/after images of the wallpaper in `<out>/previews/` |
+| `--style` | `stretched`, `centered` or `tiled` (with `--wallpaper` or `--recolor-wallpaper`) |
+| `--preview` | also render before/after images of the wallpaper in `<out>/previews/` (needs `--wallpaper` or `--recolor-wallpaper`) |
 | `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP) and the installed wallpapers |
 | `--names` | only list the folders and files the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | only list the wallpaper colours `-m` can remap (the menu has none); `--json` for JSON |
@@ -110,5 +110,5 @@ is refused, to be fixed by hand.
 | `--restore` | remove the theme from `limine.conf` and its wallpapers (sudo) |
 | `--dry-run` | with the steps above: only list what they would change |
 | `--conf`, `--esp` | `limine.conf` to edit, ESP mount point (searched by default) |
-| `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) |
+| `--method`, `--keep-lum`, `--smooth`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) (with `--wallpaper` or `--recolor-wallpaper`) |
 | `-o, --out` | output folder (default `themes/`) |

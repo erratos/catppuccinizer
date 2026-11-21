@@ -49,11 +49,16 @@ ten minutes after the page is closed. `--port N` picks the port,
 4. **Options**: every option of the target, with its help; **?** next to an
    option opens a longer explanation and, for the colour options, a comparison
    picture (click it to enlarge). The flavours, the accents, the remapping and
-   the system steps have one too. Options that only
-   apply to a method or a setting show up when it is chosen: `--keep-lum` and
-   `--smooth` with `auto` / `lut`, the `--lutgen-*` ones with `lutgen` (and
-   each algorithm's own knobs with that algorithm), `--hald-level` /
-   `--cube-size` with their format.
+   the system steps have one too. An option that has no effect with the
+   current choices is greyed, and hovering it says why: `--keep-lum` and
+   `--smooth` need `auto` / `lut`, the `--lutgen-*` ones `lutgen` (and each
+   algorithm's own knobs that algorithm; the whole group stays folded until
+   then), `--hald-level` / `--cube-size` their format; for Limine, the
+   recolouring options and `--style` need a wallpaper (`--wallpaper` or
+   *recolour the wallpaper already set*), and those two exclude each other.
+   Preview, Build and the system steps are greyed the same way when their
+   command would fail (several accents for Install, no wallpaper for a
+   Limine preview…): the tooltip gives the command line's own message.
 5. **Preview** renders the before/after images (`--preview`); **Build** writes
    the result into the output folder, without sudo and without installing
    anything (the line under the buttons says where). The *Output* card sets
@@ -134,10 +139,12 @@ GUI without GUI code:
   `images`, `dir`, `file`), and `image` / `images` sources accept dropped files;
 - `choices` become buttons, a `range` a slider, `kind="colour"` a palette
   colour list;
-- `when` shows an option only when it matters: `--lutgen-*` with
-  `--method lutgen`, `--lutgen-radius` with `--lutgen-algo blur`, `-m` only
-  for targets that have colours to remap; options whose `when` is not met are
-  left out of the command;
+- `when`, `needs` and `unless` grey an option out while it has no effect, with
+  the reason as its tooltip: `--lutgen-*` without `--method lutgen`, Limine's
+  `--style` without a wallpaper (`needs`), `--wallpaper` with
+  `--recolor-wallpaper` (`unless`); such options are left out of the command.
+  A `when` on an analysis fact (`-m` only when something can be remapped)
+  hides the option instead;
 - a step option (`options.step()`) becomes a button, `sudo="run"` marks it
   **sudo** and runs it with sudo; options of the `install` / `apply` / `test` /
   `restore` stages go to the *System steps* group, the other ones of `analyse`

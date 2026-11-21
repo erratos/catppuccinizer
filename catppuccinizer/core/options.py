@@ -20,6 +20,11 @@ what a front-end needs to show it:
   analysed) does not hide the option, and an option taking several values
   matches when one of them is allowed. Options of scope "method:<name>" get
   {"method": [<name>]} by default;
+- needs: options of which one must be given for this one to have an effect
+  (Limine's --style: ["wallpaper", "recolor_wallpaper"]); the command line notes
+  it, the GUI disables the option and says why;
+- unless: options it cannot go with (--wallpaper / --recolor-wallpaper): the
+  command line refuses both, the GUI disables the other one;
 - source: what the target works on (positional arguments by default), shown
   first by the GUI; accept: what a path is ("image", "images" = image files or
   folders, "dir", "file");
@@ -59,7 +64,7 @@ class Option:
               nargs=None, metavar=None, const=None, switch=False, extend=False,
               required=None, kind=None, range=None, accept=None, source=None, group=None,
               explain=None, image=None, scope="target", stage="build", sudo=None,
-              when=None, gui=True, action=None):
+              when=None, needs=None, unless=None, gui=True, action=None):
         if not flags:
             raise ValueError("an option needs at least one flag or a name")
         self.flags = tuple(flags)
@@ -75,6 +80,7 @@ class Option:
         self.accept, self.group, self.scope, self.stage, self.sudo = accept, group, scope, stage, sudo
         self.source = self.positional if source is None else source
         self.gui, self.action = gui, action
+        self.needs, self.unless = list(needs or []) or None, list(unless or []) or None
         if when is None and scope.startswith("method:"):
             when = {"method": [scope.partition(":")[2]]}
         self.when = {k: list(v) if isinstance(v, (list, tuple)) else [v]
@@ -146,7 +152,8 @@ class Option:
             "default": _plain(False if self.switch else self.default), "const": _plain(self.const),
             "metavar": self.metavar, "help": self.help, "explain": self.explain,
             "image": self.image, "range": list(self.range) if self.range else None,
-            "group": self.group, "when": self.when, "scope": self.scope, "stage": self.stage,
+            "group": self.group, "when": self.when, "needs": self.needs, "unless": self.unless,
+            "scope": self.scope, "stage": self.stage,
             "sudo": self.sudo, "accept": self.accept,
             "role": ("source" if self.source else "step" if is_step(self)
                      else "common" if self.scope == "common" else "option"),
@@ -199,12 +206,40 @@ def add_to(parser, options):
     return parser
 
 
+def given(value, default):
+    """Whether an option was given a value of its own (not left at its default)."""
+    return value not in (None, False, "", []) and value != default
+
+
+def active(o, values, options):
+    """Whether the option o counts with these values {dest: value} (o and options:
+    Option.schema() dicts): its `when` met, one of its `needs` given, none of its
+    `unless` given. The GUI leaves the others out of the command."""
+    by = {x["dest"]: x for x in options}
+    current = {d: x["default"] for d, x in by.items()} | {k: v for k, v in values.items() if v is not None}
+    def on(d):
+        return d in by and given(values.get(d), by[d]["default"])
+    return (condition_met(o["when"], current) and not any(on(d) for d in o["unless"] or [])
+            and (not o["needs"] or any(on(d) for d in o["needs"])))
+
+
 def check(args, options):
-    """Checks argparse cannot do: ranges."""
+    """Checks argparse cannot do: ranges; unless (refused); needs (a note)."""
+    by = {o.dest: o for o in options}
+    def on(d):
+        return d in by and given(getattr(args, d, None), by[d].default)
     for o in options:
         v = getattr(args, o.dest, None)
         if o.range and v is not None and not o.range[0] <= v <= o.range[1]:
             raise SystemExit(f"{o.flags[-1]} must be between {o.range[0]} and {o.range[1]}")
+        if not on(o.dest):
+            continue
+        for d in o.unless or []:
+            if on(d):
+                raise SystemExit(f"use either {o.flags[-1]} or {by[d].flags[-1]}")
+        if o.needs and not any(on(d) for d in o.needs):
+            print(f"note: {o.flags[-1]} has no effect without "
+                  + " or ".join(by[d].flags[-1] for d in o.needs if d in by))
 
 
 def defaults(options, **values):

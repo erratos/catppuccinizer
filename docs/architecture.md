@@ -214,6 +214,8 @@ option), then:
 | `stage` | `analyse`, `preview`, `build` (default), `install`, `apply`, `test`, `restore` |
 | `sudo` | `"run"`: the command must run as root |
 | `when` | when it matters: `{"method": ["lutgen"]}` (another option's value) or `{"analysis.remappable": [True]}` (a fact from `--colours`); `method:<name>` options get `{"method": [<name>]}` |
+| `needs` | options of which one must be given for this one to have an effect (`["wallpaper", "recolor_wallpaper"]`): the command line notes it, the GUI greys the option and says why; `recolor.method_options(needs=…)` puts it on every method option |
+| `unless` | options it cannot go with: the command line refuses both (`use either …`), the GUI greys the other one |
 | `source` | what is recoloured (positional arguments by default): the GUI's *Source* card |
 | `accept` | for a path: `image`, `images` (files or folders), `dir`, `file` |
 | `range` | `(low, high)`: checked after parsing, shown as a slider |

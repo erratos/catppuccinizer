@@ -1,6 +1,8 @@
 """Declared options (core.options): every option of every target is complete and
 coherent, and the rules shared by the command line and the GUI."""
 import argparse
+import contextlib
+import io
 import sys
 import unittest
 from pathlib import Path
@@ -92,6 +94,40 @@ class Declarations(unittest.TestCase):
                         self.assertIn(key.partition(".")[2], facts)
                     else:
                         self.assertIn(key, dests)
+
+    def test_needs_and_unless(self):
+        """needs / unless name existing options; the command line refuses an unless and
+        notes a missing need; the GUI leaves out what does not count."""
+        for name, t in TARGETS.items():
+            dests = {x.dest for x in t.all_options()}
+            for o in t.all_options():
+                for d in (o.needs or []) + (o.unless or []):
+                    with self.subTest(target=name, option=o.dest, ref=d):
+                        self.assertIn(d, dests)
+        lim = {o.dest: o for o in TARGETS["limine"].options()}
+        self.assertEqual(lim["wallpaper"].unless, ["recolor_wallpaper"])
+        self.assertEqual(lim["style"].needs, ["wallpaper", "recolor_wallpaper"])
+        self.assertEqual(lim["keep_lum"].needs, ["wallpaper", "recolor_wallpaper"])
+        self.assertIsNone({o.dest: o for o in TARGETS["image"].options()}["keep_lum"].needs)
+        with self.assertRaises(SystemExit) as e:
+            parse(["limine", "--wallpaper", "x.png", "--recolor-wallpaper"])
+        self.assertEqual(str(e.exception), "use either --wallpaper or --recolor-wallpaper")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            parse(["limine", "--style", "tiled"])
+        self.assertIn("note: --style has no effect without --wallpaper or --recolor-wallpaper",
+                      out.getvalue())
+        with self.assertRaises(SystemExit) as e:
+            parse(["limine", "--preview"])
+        self.assertIn("--preview shows the wallpaper", str(e.exception))
+        schema = [o.schema() for o in TARGETS["limine"].all_options()]
+        by = {o["dest"]: o for o in schema}
+        self.assertFalse(options.active(by["style"], {"style": "tiled"}, schema))
+        self.assertTrue(options.active(by["style"], {"style": "tiled", "recolor_wallpaper": True}, schema))
+        self.assertFalse(options.active(by["wallpaper"], {"wallpaper": "w.png", "recolor_wallpaper": True},
+                                        schema))
+        self.assertFalse(options.active(by["keep_lum"], {"recolor_wallpaper": True, "method": "keys"},
+                                        schema))                          # its own `when`
 
     def test_targets_declare_only_their_own(self):
         common = {o.dest for o in [*options.COMMON, options.LIST, options.COLOURS, options.NAMES,

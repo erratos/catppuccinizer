@@ -91,14 +91,17 @@ class LimineTarget(Target):
         return outputs(a)
 
 
+WALLPAPER = ["wallpaper", "recolor_wallpaper"]      # a wallpaper to recolour
 OPTIONS = [
     Option("--wallpaper", type=Path, metavar="IMAGE", accept="image", source=True,
+           unless=["recolor_wallpaper"],
            help="image to recolour and use as the Limine wallpaper (optional: without it, "
                 "the current wallpaper is kept)"),
-    Option("--recolor-wallpaper", switch=True,
+    Option("--recolor-wallpaper", switch=True, unless=["wallpaper"],
            help="recolour the wallpaper(s) already set in limine.conf"),
-    *recolor.method_options(),
-    Option("--style", choices=["stretched", "centered", "tiled"],
+    # how the wallpaper is recoloured and shown: only when there is one to recolour
+    *recolor.method_options(needs=WALLPAPER),
+    Option("--style", choices=["stretched", "centered", "tiled"], needs=WALLPAPER,
            help="wallpaper_style (default: the current one, or stretched)"),
     step("install", sudo="run", help=f"copy the wallpaper to <ESP>/{WALL_DIR}/ (sudo)"),
     step("apply", sudo="run",
@@ -121,8 +124,9 @@ def check_args(a):
     if (a.install or a.apply) and (len(a.flavor) > 1 or len(a.accent) > 1):
         raise SystemExit("--install / --apply need a single flavour and a single accent "
                          "(-f FLAVOR -a ACCENT)")
-    if a.wallpaper and a.recolor_wallpaper:
-        raise SystemExit("use either --wallpaper or --recolor-wallpaper")
+    if a.preview and not (a.wallpaper or a.recolor_wallpaper):
+        raise SystemExit("--preview shows the wallpaper before and after: give --wallpaper or "
+                         "--recolor-wallpaper")
     if a.wallpaper and not a.wallpaper.is_file():
         raise SystemExit(f"Not found: {a.wallpaper}")
 

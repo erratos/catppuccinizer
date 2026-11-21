@@ -32,17 +32,19 @@ LUT_METHODS = ("lut", "lutgen")   # whole-image colour tables: no source colours
 OPTIMIZE_MAX_PIXELS = 2_000_000   # larger PNGs are saved without optimize (much faster)
 
 
-def method_options(methods=None, help=None):
+def method_options(methods=None, help=None, needs=None):
     """The options of the recolouring methods (--method, --keep-lum, --smooth,
     --lutgen-*), for a target that recolours images with them. methods: the ones
     it accepts, the first is the default (lut target: LUT_METHODS), with the help
-    of --method that goes with them."""
+    of --method that goes with them. needs: options of which one must be given for
+    the methods to matter (Limine: a wallpaper to recolour)."""
     method = METHOD if methods is None else METHOD.replace(
         choices=list(methods), default=methods[0], help=help or METHOD.help,
         **(LUT_ONLY if set(methods) <= set(LUT_METHODS) else {}))
     methods = method.choices
-    return [method, *(LUT_OPTIONS if "lut" in methods else []),
-            *(lutgen.OPTIONS if "lutgen" in methods else [])]
+    out = [method, *(LUT_OPTIONS if "lut" in methods else []),
+           *(lutgen.OPTIONS if "lutgen" in methods else [])]
+    return [o.replace(needs=needs) for o in out] if needs else out
 
 
 METHOD = Option("--method", choices=["auto", "keys", *LUT_METHODS], default="auto", scope="method",
