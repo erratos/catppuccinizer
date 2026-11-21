@@ -274,8 +274,12 @@ def set_settings(system, values):
 
 
 def accent_used(vcolors, rasters):
-    return uses_accent(vcolors) or any(
-        m not in recolor.LUT_METHODS and uses_accent(g["colors"]) for m, g, _ in rasters.values())
+    return uses_accent(vcolors) or any(raster_accent(m, g) for m, g, _ in rasters.values())
+
+
+def raster_accent(method, grp):
+    """Whether an image (or an animation: keys) uses the accent."""
+    return not recolor.accent_ignored_reason("keys" if method == "anim" else method, grp)
 
 
 def package_id(flv, slug, acc, a):
@@ -340,8 +344,7 @@ def build(a):
                 rel = src.relative_to(splash) if src.is_relative_to(splash) else None
                 out = dst / "contents/splash" / rel if rel else dst / "contents/previews/splash.png"
                 # an image that ignores the accent is the same in every accent's package
-                key = (src, flv, None if method in recolor.LUT_METHODS
-                       or not uses_accent(grp["colors"]) else acc)
+                key = (src, flv, acc if raster_accent(method, grp) else None)
                 if key in done:
                     shutil.copyfile(done[key], out)
                     continue

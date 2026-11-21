@@ -874,12 +874,13 @@ function updateAccentHint() {
   const el = $("accenthint"), t = cur();
   if (!el) return;
   const m = opt("method") && (vals().method ?? opt("method").default);
-  const lut = S.schema.lut_methods.includes(m);
+  const lut = S.schema.no_accent_methods.includes(m);
   let text = "Used by the colours mapped to “accent”. Click again to go back to the default.";
   if (lut && t.accent_also) text = `Ignored by the ${m} method for images; still used by ${t.accent_also}.`;
-  else if (lut) text = `Ignored: the ${m} method does not use the accent (one result per flavour).`;
+  else if (lut) text = `Ignored: the ${m} method does not use the accent (one result per flavour). lut-accent gives it to the image's main colour.`;
   else if (m === "auto" && t.accent_also) text = `Used by ${t.accent_also}, and by image colours mapped to “accent” (not by images that auto sends to the LUT).`;
-  else if (m === "auto") text = "Used by the colours mapped to “accent”. Images that auto sends to the LUT ignore it: the output says so.";
+  else if (m === "auto") text = "Used by the colours mapped to “accent”. Images that auto sends to the LUT ignore it: the output says so (lut-accent gives it to their main colour).";
+  else if (m === "lut-accent") text = "Given to the main colour of each image (and the hues around it). One result per accent.";
   el.textContent = text;
   el.classList.toggle("ignored", lut);
   $("accents")?.classList.toggle("unused", lut && !t.accent_also);

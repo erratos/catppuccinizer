@@ -36,7 +36,7 @@ class LutTarget(Target):
             Option("--cube-size", label="Cube size", type=int, default=33, range=(2, 256), metavar="N",
                    when={"format": ["cube"]},
                    help=".cube points per axis (default: 33)"),
-            *recolor.method_options(recolor.LUT_METHODS, help="lut = the built-in table, "
+            *recolor.method_options(recolor.NO_ACCENT_METHODS, help="lut = the built-in table, "
                                     "lutgen = a table made by lutgen (default: lut)"),
         ]
 

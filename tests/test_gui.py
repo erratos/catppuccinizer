@@ -64,7 +64,7 @@ class Gui(unittest.TestCase):
         self.assertEqual((lim["apply"]["sudo"], lim["apply"]["stage"]), ("run", "apply"))
         self.assertEqual(lim["wallpaper"]["role"], "source")
         self.assertEqual(lim["esp"]["accept"], "dir")
-        self.assertEqual(s["lut_methods"], ["lut", "lutgen"])
+        self.assertEqual(s["no_accent_methods"], ["lut", "lutgen"])
         plymouth = next(t for t in s["targets"] if t["name"] == "plymouth")
         self.assertTrue(plymouth["has_sources"])
         ply = {o["dest"]: o for o in plymouth["options"]}

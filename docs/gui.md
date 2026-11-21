@@ -45,7 +45,8 @@ ten minutes after the page is closed. `--port N` picks the port,
 3. **Colours**: click a flavour (Ctrl/Shift+click for several, one result
    each) and an accent. The page itself takes the colours you choose. Both are
    kept when you switch targets. When the chosen method cannot use the accent
-   (`lut`, `lutgen`), the accents are dimmed and the hint says why; with
+   (`lut`, `lutgen`), the accents are dimmed and the hint says why (`lut-accent`
+   gives it to each image's main colour); with
    `auto` it depends on each image, so the output notes it after the run
    (*the accent was ignored* next to *Done*).
 4. **Options**: every option of the target, with its help; **?** next to an

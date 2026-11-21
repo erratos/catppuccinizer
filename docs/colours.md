@@ -69,11 +69,11 @@ effect:
 | Target | Method (default) | Why | Accent (`-a`) used | `--map` (`-m`) used |
 |---|---|---|---|---|
 | `plymouth` | always `keys` (no `--method`) | boot themes are flat art; colours are detected at each run | when a colour goes to `accent` (single-colour themes by default); the progress bar follows it, unless `--bar` | yes |
-| `image` | `auto`: `keys` or `lut` | `keys` when the detected colours rebuild the image (fit error under 6), a plain background covers at least 35 % of it and its edges are crisp; `lut` otherwise. `auto` never picks `lutgen` | `keys`: when a colour goes to `accent` (typically a single-colour design). `lut`, `lutgen`: never | `keys` only |
+| `image` | `auto`: `keys` or `lut` | `keys` when the detected colours rebuild the image (fit error under 6), a plain background covers at least 35 % of it and its edges are crisp; `lut` otherwise. `auto` never picks `lut-accent` or `lutgen` | `keys`: when a colour goes to `accent` (typically a single-colour design). `lut-accent`: the dominant hue. `lut`, `lutgen`: never | `keys` only |
 | `image` (SVG) | vector, colours replaced in the file | nothing is rasterised | when a colour goes to `accent` (the most used saturated colour, by default) | yes |
 | `limine` | menu: fixed colours; wallpaper: `auto`, like `image` | | always, for the menu (branding and highlighted help); the wallpaper as for `image` | wallpaper, with `keys` |
 | `ksplash` | QML / SVG colours replaced; images `auto`, like `image`; animations `keys` | | when a QML / SVG colour or an image recoloured with `keys` goes to `accent` | everywhere, except images recoloured with a LUT |
-| `lut` | `lut` (or `lutgen`; `keys` is refused) | it writes the LUT itself | never | never |
+| `lut` | `lut` (or `lutgen`; `keys`, `lut-accent` are refused) | it writes the LUT itself, without an image to find a dominant hue in | never | never |
 
 When the accent is not used, a single result is written per flavour (no
 `-<accent>` in its name). If you passed `-a` and it has no effect, the command
@@ -81,14 +81,15 @@ says so:
 
 ```
 photo.jpg: lut (fit error 44.5, background 0%, sharpness 0.87)
-  note: accent ignored by the lut method
+  note: accent ignored by the lut method (--method lut-accent uses it)
 logo.png: keys (fit error 0.0, background 94%, sharpness 0.99)
   ...
   note: accent ignored as no colour is mapped to accent (map one with -m NAME=accent)
 ```
 
 `--map` is reported the same way (`note: --map is ignored by the lut method`).
-To force the accent onto an image, use `--method keys` and map a colour to it
+To give the accent to a photo, use `--method lut-accent` (its dominant hue
+takes the accent); on flat art, `--method keys` and map a colour to it
 (`-m white=accent`). The [graphical interface](gui.md) dims the accents when
 the chosen method cannot use them.
 

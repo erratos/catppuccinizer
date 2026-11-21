@@ -101,6 +101,9 @@ def render(src, method, flavor, a, mode="result"):
         bg = Image.new("RGBA", im.size, BG + (255,))
         bg.alpha_composite(im)
         return bg.convert("RGB")
+    if method == "lut-accent":
+        cube = recolor.lut_for(method, flavor, a, accent=a.accent[0], hue=recolor.dominant_hue(src))
+        return recolor.recolor_lut(src, cube).convert("RGB")
     return recolor.recolor_lut(src, recolor.lut_for(method, flavor, a)).convert("RGB")
 
 
@@ -150,6 +153,12 @@ GRIDS = {
         ("0.5", "default", "keys", "mocha", O(separation=0.5)),
         ("0.6", "", "keys", "mocha", O(separation=0.6)),
         ("0.8", "", "keys", "mocha", O(separation=0.8)),
+    ]),
+    "lut-accent": ("lut vs lut-accent: the dominant hue takes the accent (Mocha)", [
+        ("original", "", "original", "mocha", O()),
+        ("lut", "any accent", "lut", "mocha", O()),
+        ("lut-accent", "-a mauve", "lut-accent", "mocha", O(accent=["mauve"])),
+        ("lut-accent", "-a green", "lut-accent", "mocha", O(accent=["green"])),
     ]),
     "lut": ("Built-in lut vs lutgen (Mocha, default settings)", [
         ("original", "", "original", "mocha", O()),
@@ -207,7 +216,8 @@ def main():
         for name in names:
             title, cols = GRIDS[name]
             rows = {"method": [paths["flat"], paths["scene"]],
-                    "separation": [paths["poster"], (paths["poster"], "separation")]}
+                    "separation": [paths["poster"], (paths["poster"], "separation")],
+                    "lut-accent": [paths["scene"], paths["flat"]]}
             grid(name, title, cols, rows.get(name, [paths["scene"], paths["chart"]]))
 
 

@@ -42,7 +42,7 @@ from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.paths import cache_dir
 from ..core.options import STEPS, active, analysis, image_file
-from ..core.recolor import LUT_METHODS
+from ..core.recolor import NO_ACCENT_METHODS
 from ..core.target import discover
 
 HERE = Path(__file__).resolve().parent
@@ -87,7 +87,7 @@ def schema(targets):
         })
     return {"version": __version__, "targets": out, "cwd": str(Path.cwd()),
             "home": str(Path.home()), "flavors": FLAVORS, "flavor_titles": FLAVOR_TITLES,
-            "accents": ACCENTS, "map_targets": TARGETS, "lut_methods": list(LUT_METHODS),
+            "accents": ACCENTS, "map_targets": TARGETS, "no_accent_methods": list(NO_ACCENT_METHODS),
             "palettes": {f: {k: "#" + v for k, v in p.items()} for f, p in PALETTES.items()},
             "askpass": bool(askpass()), "places": places()}
 
