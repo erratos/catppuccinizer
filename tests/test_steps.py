@@ -137,7 +137,7 @@ class DryRun(unittest.TestCase):
         make_splash(self.tmp / "splash")
         user_dir = Path.home() / ".local/share/plasma/look-and-feel"
         before = sorted(user_dir.iterdir()) if user_dir.is_dir() else []
-        out = cli("ksplash", self.tmp / "splash", "--install", "--dry-run", "-o", self.tmp / "out")
+        out = cli("ksplash", self.tmp / "splash", "-a", "mauve", "--install", "--dry-run", "-o", self.tmp / "out")
         self.assertIn(f"-> {user_dir}/catppuccin-mocha-test-splash", out)
         self.assertIn(f"would write {self.tmp / 'state/ksplash.json'}", out)
         self.assertEqual(sorted(user_dir.iterdir()) if user_dir.is_dir() else [], before)

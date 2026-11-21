@@ -51,7 +51,6 @@ class ImageTarget(Target):
     name = "image"
     help = "recolour wallpapers and other images"
     default_out = "images"
-    default_accent = ("mauve",)
 
     def options(self):
         return [Option("images", nargs="+", metavar="IMAGE", accept="images",

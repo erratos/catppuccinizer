@@ -9,7 +9,7 @@ What the options shared by every target mean, and how colours are chosen.
 | Option | Meaning |
 |---|---|
 | `-f, --flavor` | `latte`, `frappe`, `macchiato`, `mocha` (default) or `all`; several can be given |
-| `-a, --accent` | accent colour(s) used for colours mapped to `accent`, or `all` (the 14 accents) |
+| `-a, --accent` | accent colour(s) used for colours mapped to `accent`, or `all` (the 14 accents, the default: one result per accent for what uses one; `--install` / `--apply` / `--test` need a single one) |
 | `-m, --map` | `NAME=TARGET …`: change where a source colour goes; repeated `-m` add up |
 | `--preview` | only render before/after images in `<out>/previews/`, nothing else |
 | `-o, --out` | output folder (`themes/`, `images/` or `luts/` by default) |

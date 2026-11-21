@@ -89,7 +89,6 @@ from ..core.target import Target
 class GrubTarget(Target):
     name = "grub"
     help = "recolour a GRUB theme"
-    default_accent = ("mauve",)
     accent_also = "the menu colours"   # optional: what uses -a even with --method lut
     # unused_common = ("preview",)     # optional: common options that mean nothing here
 

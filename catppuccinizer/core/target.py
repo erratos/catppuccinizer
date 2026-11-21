@@ -23,7 +23,8 @@ class Target:
     help = ""                  # one line for `catppuccinize --help`
     description = None         # long help (defaults to the module docstring)
     default_out = "themes"     # output folder, relative to the current directory
-    default_accent = ("all",)  # accents when -a is not given
+    default_accent = ("all",)  # accents when -a is not given: one result per accent, for
+                               # what uses one (the system steps need -a ACCENT)
     accent_also = None         # what uses the accent whatever --method is (limine: "the menu
                                # colours"); None: a LUT method leaves the accent unused
     unused_common = ()         # common options that mean nothing here (lut: "accent", "map",

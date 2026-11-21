@@ -44,7 +44,6 @@ SETTINGS = ("Theme", "Engine")              # [KSplash] of ksplashrc
 class KSplashTarget(Target):
     name = "ksplash"
     help = "recolour a KDE Plasma splash screen"
-    default_accent = ("mauve",)
     accent_also = "the QML / SVG colours mapped to accent"
     unused_common = ("preview",)                      # --test shows the result instead
 
@@ -66,7 +65,8 @@ class KSplashTarget(Target):
 
     def check(self, a):
         if (a.install or a.apply or a.test) and (len(a.flavor) > 1 or len(a.accent) > 1):
-            raise SystemExit("--install / --apply / --test need a single flavour and a single accent")
+            raise SystemExit("--install / --apply / --test need a single flavour and a single accent "
+                             "(-f FLAVOR -a ACCENT)")
 
     def build(self, a):
         return build(a)

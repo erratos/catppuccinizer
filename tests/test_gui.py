@@ -102,8 +102,11 @@ class Gui(unittest.TestCase):
         r = self.call("/api/command", {"target": "lut", "values": {"method": "keys"}})
         self.assertIn("invalid choice: 'keys'", r["error"])
         r = self.call("/api/command", {"target": "limine", "values": {"apply": True}, "sudo": True})
+        self.assertIn("single flavour and a single accent", r["error"])   # all 14 by default
+        r = self.call("/api/command", {"target": "limine", "values": {"apply": True, "accent": ["mauve"]},
+                                       "sudo": True})
         self.assertIsNone(r["error"])
-        self.assertEqual(r["command"], "sudo catppuccinize limine --apply")
+        self.assertEqual(r["command"], "sudo catppuccinize limine -a mauve --apply")
 
     def test_colours_before_a_run(self):
         with tempfile.TemporaryDirectory() as d:
@@ -175,7 +178,8 @@ class Gui(unittest.TestCase):
             ImageDraw.Draw(im).ellipse([20, 10, 140, 80], outline=(60, 220, 255), width=3)
             im.save(d / "flat.png")
             r = self.call("/api/run", {"target": "image", "values": {
-                "images": [str(d / "flat.png")], "out": str(d / "out"), "preview": True}})
+                "images": [str(d / "flat.png")], "out": str(d / "out"), "preview": True,
+                "accent": ["mauve"]}})                  # its one colour goes to the accent
             self.assertIsNone(r["error"])
             for _ in range(300):
                 state = self.call(f"/api/job?id={r['job']}")

@@ -139,7 +139,8 @@ OPTIONS = [
 def check_args(a):
     if (a.install or a.apply or a.test) and (len(a.themes) > 1 or len(a.flavor) > 1
                                              or len(a.accent) > 1):
-        raise SystemExit("--install / --apply / --test need a single theme, flavour and accent")
+        raise SystemExit("--install / --apply / --test need a single theme, flavour and accent "
+                         "(THEME -f FLAVOR -a ACCENT)")
     if a.bar and a.bar not in PALETTES["mocha"]:
         raise SystemExit(f"--bar: unknown colour '{a.bar}'")
 

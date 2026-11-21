@@ -188,9 +188,9 @@ def run_all():
         out["configs"] = tree(tmp / "configs", tmp)
 
         make_images(tmp / "img")
-        cli("image", tmp / "img", "-f", "mocha", "frappe", "-o", tmp / "image")
-        cli("image", tmp / "img/flat.png", "-m", "pink=peach", "-s", "mapped", "-o", tmp / "image")
-        cli("image", tmp / "img/mark.svg", "-m", "blue=lavender", "-s", "mapped", "-o", tmp / "image")
+        cli("image", tmp / "img", "-f", "mocha", "frappe", "-a", "mauve", "-o", tmp / "image")
+        cli("image", tmp / "img/flat.png", "-a", "mauve", "-m", "pink=peach", "-s", "mapped", "-o", tmp / "image")
+        cli("image", tmp / "img/mark.svg", "-a", "mauve", "-m", "blue=lavender", "-s", "mapped", "-o", tmp / "image")
         out["image"] = tree(tmp / "image", tmp)
 
         cli("lut", "-f", "mocha", "latte", "--hald-level", "4", "--cube-size", "9", "-o", tmp / "lut")
@@ -231,7 +231,7 @@ def run_all():
 
         make_splash(tmp / "splash-src")
         cli("ksplash", tmp / "splash-src", "-a", "peach", "mauve", "-o", tmp / "ksplash")
-        cli("ksplash", tmp / "splash-src", "-m", "green=lavender", "-s", "lav", "-o", tmp / "ksplash")
+        cli("ksplash", tmp / "splash-src", "-a", "mauve", "-m", "green=lavender", "-s", "lav", "-o", tmp / "ksplash")
         out["ksplash"] = tree(tmp / "ksplash", tmp)
         out["colours"] = {
             "image": colours(tmp, "image", tmp / "img"),

@@ -41,7 +41,6 @@ KEYS = ["backdrop", "term_palette", "term_palette_bright",
 class LimineTarget(Target):
     name = "limine"
     help = "Catppuccin colours + wallpaper for the Limine boot menu"
-    default_accent = ("mauve",)
     accent_also = "the menu colours"
 
     def options(self):
@@ -120,7 +119,8 @@ OPTIONS = [
 
 def check_args(a):
     if (a.install or a.apply) and (len(a.flavor) > 1 or len(a.accent) > 1):
-        raise SystemExit("--install / --apply need a single flavour and a single accent")
+        raise SystemExit("--install / --apply need a single flavour and a single accent "
+                         "(-f FLAVOR -a ACCENT)")
     if a.wallpaper and a.recolor_wallpaper:
         raise SystemExit("use either --wallpaper or --recolor-wallpaper")
     if a.wallpaper and not a.wallpaper.is_file():
