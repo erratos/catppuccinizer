@@ -101,10 +101,12 @@ def resolve_target(flavor, accent, target):
 
 # ------------------------------------------------- --colours (list, write nothing)
 def colour_report(source, method, colors=None, group=None, background=None, note=None,
-                  prefix=False):
+                  prefix=False, part=None, accent=None):
     """One entry of `--colours`: the colours of a source (or of one of its image
     groups) that -m can remap, under the names -m accepts. colors=None: nothing
-    to remap (note says why). prefix: names are "group.name" (several groups)."""
+    to remap (note says why). prefix: names are "group.name" (several groups).
+    part: the part of the result it belongs to (core.parts: -a PART=ACCENT);
+    accent: whether it uses the accent (default: a colour goes to accent)."""
     total = sum(c.get("count", 0) for c in (colors or {}).values())
     entries = []
     for n, c in (colors or {}).items():
@@ -113,9 +115,11 @@ def colour_report(source, method, colors=None, group=None, background=None, note
             share = round(c.get("count", 0) / total, 3)
         entries.append({"name": f"{group}.{n}" if prefix and group else n,
                         "source": c["source"], "target": c["target"], "share": share})
+    if accent is None:
+        accent = uses_accent(colors or {})
     return {"source": str(source), "group": group, "method": method,
             "remap": colors is not None, "background": background, "note": note,
-            "colours": entries}
+            "part": part, "accent": bool(accent), "colours": entries}
 
 
 def background_of(grp):
@@ -134,6 +138,10 @@ def format_colour_report(items):
             head += f" (no remap: {it['note']})" if it["note"] else " (no remap)"
         elif it["note"]:
             head += f" ({it['note']})"
+        tags = [*([f"part {it['part']}"] if it.get("part") and it["part"] != it["group"] else []),
+                *(["uses the accent"] if it.get("accent") else [])]
+        if tags:
+            head += f"  [{', '.join(tags)}]"
         lines.append(head)
         width = max((len(c["name"]) for c in it["colours"]), default=0)
         for c in it["colours"]:

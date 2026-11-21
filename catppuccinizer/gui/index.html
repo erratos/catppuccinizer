@@ -231,6 +231,12 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .colitem { margin-bottom: 10px; }
 .colhead { color: var(--subtext1); font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .colhead .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: inset 0 0 0 1px rgba(127,127,127,.4); }
+.part { border-left: 3px solid var(--surface1); padding: 2px 0 2px 10px; margin-bottom: 12px; }
+.part.acc { border-left-color: var(--accent); }
+.parthead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px; }
+.parthead b { font-size: 14px; }
+.parthead select { padding: 2px 6px; font-size: 12px; }
+.parthead .by { color: var(--subtext0); font-size: 12px; }
 .det.set { border-color: var(--accent); }
 .det:disabled { cursor: default; opacity: .7; }
 
@@ -370,7 +376,7 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
 const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
             colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0, helpOpen: new Set(),
-            btnErr: {}, stepArgs: {} };
+            btnErr: {}, stepArgs: {}, parts: {} };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -474,6 +480,8 @@ function setVal(dest, v, rerender = false) {
 function sendVals() {
   // drop what the page does not show for this target (a shared accent for lut...)
   const v = { ...vals() }, t = cur();
+  const parts = Object.entries(S.parts[S.target] || {}).map(([part, a]) => `${part}=${a}`);
+  if (parts.length && t.default_accent.length) v.accent = [...(v.accent || []), ...parts];
   if (!t.default_accent.length) delete v.accent;
   for (const o of t.options) if ((o.when && !shown(o)) || o.role === "step" || o.dest === "dry_run") delete v[o.dest];
   return v;
@@ -710,17 +718,18 @@ function renderColours() {
   const box = $("colourlist");
   if (!box) return;
   const r = colourResult(), p = pal(uiFlavor()), rows = mapRows(), loading = S.colourLoading === analysisKey();
-  const sw = (c) => h("span", { class: "sw", style: { background: c === "accent" ? p[uiAccent()] : (p[c] || c) } });
-  const head = [h("div", { class: "label" }, h("span", {}, "Source colours"),
+  const own = S.parts[S.target] || {};
+  const sw = (c, part) => h("span", { class: "sw", style: { background: c === "accent" ? p[own[part] || uiAccent()] : (p[c] || c) } });
+  const head = [h("div", { class: "label" }, h("span", {}, "Parts and source colours"),
     h("button", { class: "btn small", disabled: loading, title: "Analyse the source again (catppuccinize … --colours)", onclick: () => { S.colourCache.delete(analysisKey()); scheduleColours(true); } },
       r ? "Analyse again" : "Analyse")),
-    h("p", { class: "hint", style: { marginTop: 0 } }, "The colours -m can change, found before any run. Click one to remap it.")];
+    h("p", { class: "hint", style: { marginTop: 0 } }, "What the result is made of, found before any run: each part, what changes it, its own accent if you want one, and the colours -m can change (click one to remap it).")];
   let body;
   if (loading) body = h("p", { class: "hint" }, "Analysing the source…");
   else if (!r) body = h("p", { class: "hint" }, sourceChosen() ? "" : "Choose a source to see its colours (or click Analyse for the default one).");
   else if (r.error) body = h("div", { class: "err" }, "⚠ ", r.error);
   else {
-    body = r.items.map((it) => h("div", { class: "colitem" },
+    const item = (it) => h("div", { class: "colitem" },
       h("div", { class: "colhead" }, h("b", {}, baseName(it.source)), it.group ? ` / ${it.group}` : "", ` · ${it.method}`,
         it.background ? [" · background ", sw(it.background)] : null,
         !it.remap ? h("span", { class: "hint", style: { margin: 0 } }, ` — no remap${it.note ? `: ${it.note}` : ""}`)
@@ -730,15 +739,56 @@ function renderColours() {
         return h("button", { class: "det" + (over ? " set" : ""), disabled: !it.remap,
           title: it.remap ? `${c.name}: ${c.source} → ${over || c.target}. Click to remap it.` : `${c.source} → ${c.target}`,
           onclick: () => S.addMap && S.addMap(c.name) },
-          sw(c.source), h("span", { class: "mono" }, c.name), " → ", sw(over || c.target), over || c.target,
+          sw(c.source), h("span", { class: "mono" }, c.name), " → ", sw(over || c.target, it.part), over || c.target,
           c.share != null ? h("span", { class: "hint", style: { margin: 0 } }, ` ${Math.round(c.share * 100)}%`) : null);
-      })) : null));
+      })) : null);
+    body = partGroups(r.items).flatMap(([part, items]) => partBox(part, items, item, own));
     if (!r.facts.remappable) body.push(h("p", { class: "hint" }, "Nothing here can be remapped with -m."));
   }
   box.replaceChildren(...head, ...[body].flat().filter(Boolean));
   const dl = $("detnames");
   if (dl) dl.replaceChildren(...knownNames().map((k) => h("option", { value: k })));
   document.querySelectorAll(".maprow input").forEach(checkName);
+}
+// The items of --colours by part (core.parts), in their order; items without a part alone.
+function partGroups(items) {
+  const groups = [];
+  for (const it of items) {
+    const g = it.part && groups.find(([p]) => p === it.part);
+    if (g) g[1].push(it); else groups.push([it.part, [it]]);
+  }
+  return groups;
+}
+// One part: its name, what changes it, its own accent (-a PART=ACCENT), then its items.
+function partBox(part, items, item, own) {
+  if (!part) return items.map(item);
+  const uses = items.some(usesAccent), set = own[part];
+  const by = ["flavour", ...(uses ? ["accent"] : []),
+              ...new Set(items.map((it) => it.method).filter((m) => m !== "fixed" && m !== "text")),
+              ...(items.some((it) => it.remap && it.colours.length) ? ["-m"] : [])];
+  const sel = h("select", { title: `-a ${part}=ACCENT: an accent for this part only`,
+      onchange: (e) => setPart(part, e.target.value) },
+    h("option", { value: "" }, `accent: as above (${(vals().accent || cur().default_accent).join(", ")})`),
+    S.schema.accents.map((a) => h("option", { value: a, selected: set === a }, `accent: ${a}`)));
+  return [h("div", { class: "part" + (uses ? " acc" : "") },
+    h("div", { class: "parthead" }, h("b", { class: "mono" }, part),
+      h("span", { class: "by" }, "changed by " + by.join(", ")),
+      uses || set ? sel : h("span", { class: "hint", style: { margin: 0 } }, "no accent in it"),
+      set && !uses ? h("span", { class: "hint", style: { margin: 0, color: "var(--yellow)" } }, "its accent is not used") : null),
+    items.map(item))];
+}
+// Whether an item uses the accent: its colours as -m leaves them (the analysis runs
+// without -m, the page draws it over), or what the analysis says (a LUT image...).
+function usesAccent(it) {
+  if (!it.remap || !it.colours.length) return it.accent;
+  const rows = mapRows();
+  return it.colours.some((c) => (rows.get(c.name.toLowerCase()) || rows.get(c.source.toLowerCase()) || c.target) === "accent");
+}
+function setPart(part, accent) {
+  const own = (S.parts[S.target] ||= {});
+  if (accent) own[part] = accent; else delete own[part];
+  store.set("parts", S.parts);
+  renderColours(); scheduleCommand();
 }
 const knownNames = () => (colourResult()?.items || []).filter((it) => it.remap).flatMap((it) => it.colours.map((c) => c.name));
 // a name -m will not find is marked (a #rrggbb source colour is always accepted)
@@ -1237,6 +1287,7 @@ setInterval(() => api("/api/ping").catch(() => setStatus("fail", "The catppuccin
   catch (e) { document.body.replaceChildren(h("p", { style: { padding: "40px", fontFamily: "sans-serif" } }, e.message)); return; }
   $("ver").textContent = "v" + S.schema.version;
   S.values = store.get("values", {}) || {};
+  S.parts = store.get("parts", {}) || {};
   S.stepArgs = store.get("stepArgs", {}) || {};
   const names = S.schema.targets.map((t) => t.name);
   S.target = names.includes(store.get("target")) ? store.get("target") : (names.includes("image") ? "image" : names[0]);

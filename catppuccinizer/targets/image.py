@@ -25,8 +25,9 @@ from ..core import recolor
 from ..core.formats import collect_text_colours, read_text, recolour_text, write_text
 from ..core.mapping import (apply_maps, colour_report, map_colour_counts, note_accent_ignored,
                             print_colours, resolve_target, uses_accent)
-from ..core.naming import output_name, planned
+from ..core.naming import output_name, planned, slug
 from ..core.options import Option
+from ..core.parts import accent_sets, check_parts
 from ..core.palette import FLAVOR_TITLES, rgb2hex
 from ..core.sources import wallpaper_sections
 from ..core.target import Target
@@ -61,39 +62,37 @@ class ImageTarget(Target):
         return wallpaper_sections()
 
     def colours(self, a):
-        files = collect(a.images)
-        a.strict_map = len(files) == 1
+        files = images(a)
         out = []
         for path in files:
             if path.suffix.lower() in VECTOR:
-                out.append(colour_report(path, "vector", vector_colours(path, a)))
+                out.append(colour_report(path, "vector", vector_colours(path, a), part=part(path)))
             else:
-                out.append(recolor.colour_report(path, *recolor.plan(path, a, verbose=False)))
+                out.append(recolor.colour_report(path, *recolor.plan(path, a, verbose=False),
+                                                 part=part(path)))
         return out
 
     def outputs(self, a):
-        files = collect(a.images)
-        a.strict_map = len(files) == 1
+        files = images(a)
         out = []
         for path in files:
             if path.suffix.lower() in VECTOR:
-                accents = a.accent if uses_accent(vector_colours(path, a)) else [None]
+                uses = uses_accent(vector_colours(path, a))
                 ext = ".png" if a.preview and shutil.which("rsvg-convert") else path.suffix
             else:
                 method, grp = recolor.plan(path, a, verbose=False)
-                accents = [None] if recolor.accent_ignored_reason(method, grp) else a.accent
+                uses = recolor.accent_ignored_reason(method, grp) is None
                 ext = ".png" if a.preview else recolor.output_suffix(method, path)
             folder = a.out / "previews" if a.preview else a.out
-            out += [planned(folder / f"{output_name(flv, path.stem, acc, a.suffix)}{ext}")
-                    for flv in a.flavor for acc in accents]
+            out += [planned(folder / f"{output_name(flv, path.stem, name, a.suffix)}{ext}")
+                    for flv in a.flavor for _, name in sets_of(a, path, uses)]
         return out
 
     def build(self, a):
-        files = collect(a.images)
+        files = images(a)
         if not files:
             raise SystemExit("No images found")
         a.out.mkdir(parents=True, exist_ok=True)
-        a.strict_map = len(files) == 1      # with several images, a name may exist in only some
         for path in files:
             if path.suffix.lower() in VECTOR:
                 self.run_vector(path, a)
@@ -102,9 +101,8 @@ class ImageTarget(Target):
             ignored = recolor.accent_ignored_reason(method, grp)
             if ignored:
                 note_accent_ignored(a, ignored)
-            accents = [None] if ignored else a.accent
             for flv in a.flavor:
-                for acc in accents:
+                for _, acc in sets_of(a, path, not ignored):
                     name = output_name(flv, path.stem, acc, a.suffix)
                     im = recolor.render(path, method, grp, flv, acc, a)
                     if a.preview:
@@ -120,11 +118,10 @@ class ImageTarget(Target):
         print(f"{path.name}: vector ({len(colors)} colours)")
         print_colours(colors, show_share=False)
         text = read_text(path)
-        accents = a.accent if uses_accent(colors) else [None]
         if not uses_accent(colors):
             note_accent_ignored(a)
         for flv in a.flavor:
-            for acc in accents:
+            for _, acc in sets_of(a, path, uses_accent(colors)):
                 lookup = {c["source"]: rgb2hex(resolve_target(flv, acc, c["target"]))
                           for c in colors.values()}
                 name = output_name(flv, path.stem, acc, a.suffix)
@@ -146,6 +143,24 @@ def vector_colours(path, a):
     cfg = {"groups": {"svg": {"colors": map_colour_counts(collect_text_colours([path]))}}}
     apply_maps(cfg, a.map, strict=a.strict_map)
     return cfg["groups"]["svg"]["colors"]
+
+
+def images(a):
+    """The image files, their parts checked (-a NAME=ACCENT: one image's accent)."""
+    files = collect(a.images)
+    a.strict_map = len(files) == 1      # with several images, a name may exist in only some
+    check_parts(a, [part(p) for p in files])
+    return files
+
+
+def part(path):
+    """The part an image is (core.parts): its file name, as in the output names."""
+    return slug(path.stem)
+
+
+def sets_of(a, path, uses):
+    """core.parts.accent_sets of one image (its accent, when it uses one)."""
+    return accent_sets(a, [part(path)] if uses else [])
 
 
 def svg_preview(src, new_text, dst):

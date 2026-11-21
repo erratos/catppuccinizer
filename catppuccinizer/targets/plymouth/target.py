@@ -28,6 +28,7 @@ from ...core.mapping import (apply_maps, background_of, colour_report, note_acce
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, color_args, hex2rgb, rgb
 from ...core.naming import output_name, planned, slug
 from ...core.options import Option, step
+from ...core.parts import accent_sets, check_parts, note_unused
 from ...core.paths import state_file
 from ...core.sources import item, section, tidy
 from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, recolor_image,
@@ -115,8 +116,6 @@ OPTIONS = [
            empty="the theme in use is recoloured",
            help="installed theme name, theme folder, or adi1090x theme name "
                 "(default: the theme in use)"),
-    Option("--bar", label="Progress bar colour", metavar="COLOUR", kind="colour",
-           help="progress bar colour: -status variants, and two-step themes' own bar"),
     Option("--no-status", label="No -status variant", switch=True, help="skip the -status variants"),
     SEPARATION.replace(when={}),
     step("install", sudo="run",
@@ -142,8 +141,6 @@ def check_args(a):
                                              or len(a.accent) > 1):
         raise SystemExit("--install / --apply / --test need a single theme, flavour and accent "
                          "(THEME -f FLAVOR -a ACCENT)")
-    if a.bar and a.bar not in PALETTES["mocha"]:
-        raise SystemExit(f"--bar: unknown colour '{a.bar}'")
 
 
 # --------------------------------------------------------------- theme model
@@ -454,8 +451,33 @@ def colours(a):
             n = len(theme.groups.get(g, []))
             note = f"{n} image{'s' if n != 1 else ''}"
             out.append(colour_report(theme.name, "keys", grp["colors"], group=g,
-                                     background=background_of(grp), note=note, prefix=several))
+                                     background=background_of(grp), note=note, prefix=several,
+                                     part=g))
+        using, _ = results(theme, cfg, a)
+        if has_bar(theme, a):
+            out.append(colour_report(theme.name, "fixed", group="bar", part="bar",
+                                     accent="bar" in using,
+                                     note="progress bar: the accent (-a bar=ACCENT for its own), "
+                                          "or the main colour when nothing uses the accent"))
     return out
+
+
+def has_bar(theme, a):
+    """Whether the result has a progress bar: the -status variant, or the two-step
+    module's own bar."""
+    return (not a.no_status and theme.adi_template) or theme.module == "two-step"
+
+
+def results(theme, cfg, a):
+    """(parts that use the accent, core.parts.accent_sets): the image groups that
+    have a colour mapped to accent (main animation first), then the progress bar
+    when it follows an accent."""
+    groups = [g for g, grp in cfg["groups"].items()
+              if g in theme.groups and uses_accent(grp["colors"])]
+    bar = has_bar(theme, a) and (groups or "bar" in a.part_accents)
+    check_parts(a, [*theme.groups, *(["bar"] if has_bar(theme, a) else [])])
+    using = [*groups, *(["bar"] if bar else [])]
+    return using, accent_sets(a, using)
 
 
 def outputs(a):
@@ -468,11 +490,11 @@ def outputs(a):
             continue
         cfg = detect(theme, a.separation)
         apply_maps(cfg, a.map)
-        used = any(uses_accent(grp["colors"]) for grp in cfg["groups"].values())
+        _, sets = results(theme, cfg, a)
         status = not a.no_status and theme.adi_template
         for flv in a.flavor:
-            for acc in (a.accent if used else [None]):
-                name = output_name(flv, theme.slug, acc, a.suffix)
+            for _, aname in sets:
+                name = output_name(flv, theme.slug, aname, a.suffix)
                 if a.preview:
                     out.append(planned(a.out / "previews" / f"{name}.png"))
                     continue
@@ -495,9 +517,10 @@ def build(a):
         apply_maps(cfg, a.map)
         print_mapping(theme, cfg)
 
-        accent_used = any(uses_accent(grp["colors"]) for grp in cfg["groups"].values())
-        if not accent_used:
+        using, sets = results(theme, cfg, a)
+        if not using:
             note_accent_ignored(a)
+        note_unused(a, using)
         main_colours = [c["target"] for grp in cfg["groups"].values()
                         for c in sorted(grp["colors"].values(), key=lambda c: -c.get("share", 0))
                         if c["target"] in ACCENTS]
@@ -507,15 +530,15 @@ def build(a):
             print("  (no -status variant: only for adi1090x-style script themes)")
         for flv in a.flavor:
             base = rgb(flv, "base")
-            for acc in (a.accent if accent_used else [None]):
-                out_name = output_name(flv, theme.slug, acc, a.suffix)
-                # bar colour: option > accent > most common colour target
-                bar = a.bar or acc or (main_colours[0] if main_colours else "blue")
-                bar = acc if bar == "accent" else bar
+            for accents, aname in sets:
+                out_name = output_name(flv, theme.slug, aname, a.suffix)
+                # bar colour: its accent, else the most common colour target
+                bar = accents.get("bar") or (main_colours[0] if main_colours else "blue")
                 plan = {}
                 for g, grp in cfg["groups"].items():
                     if g not in theme.groups:
                         continue
+                    acc = accents.get(g)
                     keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
                     targets = np.array([rgb(flv, acc if c["target"] == "accent" else c["target"])
                                         for c in grp["colors"].values()])
@@ -526,11 +549,11 @@ def build(a):
                     preview_sheet(theme, plan, cfg, base, out)
                     print(f"  preview: {out}")
                     continue
-                write_theme(theme, out_name, flv, acc, bar, a.out / out_name)
+                write_theme(theme, out_name, flv, aname, bar, a.out / out_name)
                 for g, (src_bg, keys, targets) in plan.items():
                     # a group without "accent" is the same for every accent: recoloured
                     # once, then copied into the other accents' themes
-                    gkey = (flv, g, acc if uses_accent(cfg["groups"][g]["colors"]) else None)
+                    gkey = (flv, g, accents.get(g))
                     if gkey in done:
                         copies += [(done[gkey] / p.name, a.out / out_name / p.name)
                                    for p in theme.groups[g]]

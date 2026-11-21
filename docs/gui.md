@@ -74,12 +74,17 @@ Under it, the files and folders **Build** would write are listed as you change
 the options (`catppuccinize … --names`); those already there are marked
 *replaced*.
 
-### Remapping a colour
+### Parts and remapping a colour
 
-As soon as a source is chosen, the *Colours* card lists its **source colours**,
-before any run: for each image (or Plymouth image group), the method it will
-get, then each colour -m can change, with its name, what it goes to and its
-share. It is `catppuccinize … --colours` ([Colours and mapping](colours.md#manual-mapping)),
+As soon as a source is chosen, the *Colours* card lists the **parts** of the
+result and their **source colours**, before any run. Each
+[part](colours.md#parts-an-accent-each) (Limine's menu and wallpaper, each
+Plymouth image group and its progress bar…) says what changes it (flavour,
+accent, method, `-m`) and has its own accent choice: *as above* follows the
+*Accent* picker, another one becomes `-a PART=ACCENT`. A part with nothing
+mapped to the accent says so. Under it: each image (or image group), the method
+it will get, then each colour -m can change, with its name, what it goes to and
+its share. It is `catppuccinize … --colours` ([Colours and mapping](colours.md#manual-mapping)),
 run again when the source or an option that changes the analysis (`--method`…)
 changes; *Analyse again* reruns it (e.g. after editing the files).
 

@@ -11,6 +11,7 @@ from .core import options
 from .core.mapping import format_colour_report
 from .core.naming import dedupe, format_planned
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
+from .core.parts import split_accents
 from .core.paths import cache_dir, give_back
 from .core.system import System
 from .core.target import discover
@@ -53,7 +54,8 @@ def parse(argv=None, parser=None):
             setattr(a, o.dest, False if o.switch else o.default)
     a.accent_given = bool(a.accent)   # -a asked for: say so when it has no effect
     a.flavor = expand(a.flavor, FLAVORS, "flavor")
-    a.accent = expand(a.accent or list(t.default_accent), ACCENTS, "accent")
+    plain, a.part_accents = split_accents(a.accent)       # PART=ACCENT: core.parts
+    a.accent = expand(plain or list(t.default_accent), ACCENTS, "accent")
     a.out = a.out or Path.cwd() / t.default_out
     if getattr(a, "json", False) and not (getattr(a, "colours", False) or getattr(a, "names", False)):
         raise SystemExit("--json only goes with --colours or --names")

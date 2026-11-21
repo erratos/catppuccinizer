@@ -15,6 +15,8 @@ wallpaper set in limine.conf is kept (the menu background becomes see-through
 over it). --wallpaper IMAGE recolours IMAGE and uses it instead; --wallpaper
 current recolours the wallpaper limine.conf sets (the catalogue offers it).
 """
+import contextlib
+import io
 import os
 import re
 import shutil
@@ -24,6 +26,7 @@ from ..core import recolor
 from ..core.mapping import colour_report
 from ..core.naming import output_name, planned
 from ..core.options import Option, step
+from ..core.parts import accent_sets, check_parts, note_unused, single
 from ..core.palette import FLAVOR_TITLES, PALETTES
 from ..core.sources import item, section, wallpaper_sections
 from ..core.system import place, read_text
@@ -38,6 +41,9 @@ KEYS = ["backdrop", "term_palette", "term_palette_bright",
         "term_background", "term_foreground", "term_background_bright", "term_foreground_bright",
         "interface_branding_colour", "interface_branding_color", "interface_help_colour",
         "interface_help_color", "interface_help_colour_bright", "interface_help_color_bright"]
+
+
+PARTS = ("menu", "wallpaper")            # -a menu=ACCENT wallpaper=ACCENT (core.parts)
 
 
 class LimineTarget(Target):
@@ -124,7 +130,8 @@ OPTIONS = [
 
 
 def check_args(a):
-    if (a.install or a.apply) and (len(a.flavor) > 1 or len(a.accent) > 1):
+    check_parts(a, PARTS)
+    if (a.install or a.apply) and (len(a.flavor) > 1 or not single(a, PARTS)):
         raise SystemExit("--install / --apply need a single flavour and a single accent "
                          "(-f FLAVOR -a ACCENT)")
     if a.preview and not a.wallpaper:
@@ -318,8 +325,20 @@ def current_wallpapers():
 def colours(a):
     """--colours: the menu (fixed roles, nothing to remap) and each wallpaper."""
     sources = wallpapers(a, a.esp or default_esp(), is_current(a))[3]
-    return [colour_report("menu", "fixed", note="Catppuccin roles, the accent comes from -a"),
-            *(recolor.colour_report(src, *recolor.plan(src, a, verbose=False)) for src in sources)]
+    return [colour_report("menu", "fixed", part="menu", accent=True,
+                          note="Catppuccin roles: text in the flavour's text colour, the title and "
+                               "the highlighted help in the accent"),
+            *(recolor.colour_report(src, *recolor.plan(src, a, verbose=False), part="wallpaper")
+              for src in sources)]
+
+
+def results(a, plans):
+    """core.parts.accent_sets of the menu and the wallpapers (when one uses the accent)."""
+    wall = any(recolor.accent_ignored_reason(m, g) is None for m, g in plans)
+    using = ["menu", *(["wallpaper"] if wall else [])]
+    note_unused(a, using, {"wallpaper": "as no wallpaper is given" if not plans else
+                           "as the wallpaper does not use it"})
+    return accent_sets(a, using)
 
 
 def wallpaper_stem(flv, k, n, acc, suffix):
@@ -332,12 +351,14 @@ def outputs(a):
     sources = wallpapers(a, a.esp or default_esp(), is_current(a))[3]
     plans = [recolor.plan(src, a, verbose=False) for src in sources]
     out = []
+    with contextlib.redirect_stdout(io.StringIO()):          # notes: the build says them
+        sets = results(a, plans)
     for flv in a.flavor:
-        for acc in a.accent:
-            dst = a.out / output_name(flv, "limine", acc, a.suffix)
+        for accents, aname in sets:
+            dst = a.out / output_name(flv, "limine", aname, a.suffix)
             out.append(planned(dst, folder=True))
             for k, (src, (method, grp)) in enumerate(zip(sources, plans)):
-                wacc = None if recolor.accent_ignored_reason(method, grp) else acc
+                wacc = None if recolor.accent_ignored_reason(method, grp) else accents["wallpaper"]
                 stem = wallpaper_stem(flv, k, len(sources), wacc, a.suffix)
                 out.append(planned(dst / (stem + recolor.output_suffix(method, src, opaque=True))))
                 if a.preview:
@@ -357,16 +378,18 @@ def build(a):
     built = None
     plans = [recolor.plan(src, a) for src in sources]          # analysed once per image
     done = {}       # (image, flavour, accent or None) -> files already written for it
+    sets = results(a, plans)
     for flv in a.flavor:
-        for acc in a.accent:
-            name = output_name(flv, "limine", acc, a.suffix)
+        for accents, aname in sets:
+            acc = accents["menu"]
+            name = output_name(flv, "limine", aname, a.suffix)
             dst = a.out / name
             dst.mkdir(parents=True, exist_ok=True)
             wall_files = []
             for k, (src, (method, grp)) in enumerate(zip(sources, plans)):
                 # a wallpaper that ignores the accent is the same for every accent:
                 # rendered once per flavour, named without the accent, copied
-                wacc = None if recolor.accent_ignored_reason(method, grp) else acc
+                wacc = None if recolor.accent_ignored_reason(method, grp) else accents["wallpaper"]
                 stem = wallpaper_stem(flv, k, len(sources), wacc, a.suffix)
                 key = (k, flv, wacc)
                 if key in done:
@@ -387,7 +410,7 @@ def build(a):
             lines = theme_lines(flv, acc, wall_refs, style,
                                 over_wallpaper=bool(current) and not wall_files)
             (dst / "limine-theme.conf").write_text("\n".join(lines) + "\n")
-            print(f"Catppuccin {FLAVOR_TITLES[flv]} ({acc}) -> {dst}")
+            print(f"Catppuccin {FLAVOR_TITLES[flv]} ({aname}) -> {dst}")
             if not a.apply:
                 print(f"  add {dst / 'limine-theme.conf'} to limine.conf, before the first menu entry"
                       + (f", copy {', '.join(f.name for f in wall_files)} to <ESP>/{WALL_DIR}/"

@@ -50,7 +50,8 @@ tests/
 | `mapping.apply_maps(cfg, maps, strict)` | apply `-m NAME=TARGET` to `{"groups": {name: group}}` |
 | `mapping.map_colour_counts(counts)` | map a `{#hex: count}` list (QML, SVG, CSS…) to Catppuccin roles |
 | `mapping.resolve_target(flavor, accent, target)` | target name -> RGB |
-| `mapping.colour_report(source, method, colors, ...)` / `recolor.colour_report(path, method, grp)` | one entry of `--colours` (names as `-m` accepts them, source, target, share) |
+| `mapping.colour_report(source, method, colors, ..., part, accent)` / `recolor.colour_report(path, method, grp, part=)` | one entry of `--colours` (names as `-m` accepts them, source, target, share; the part it belongs to and whether it uses the accent) |
+| `parts.accent_sets(args, using)` / `check_parts(args, known)` / `note_unused(args, using)` / `single(args, parts)` | the results to write from `-a` (`PART=ACCENT` entries: `args.part_accents`), each with its accent per part and the accent of its output name |
 | `mapping.uses_accent(colors)` / `note_accent_ignored(a, reason)` | whether a colour goes to `accent`; the note printed when `-a` was given for nothing |
 | `recolor.recolor_image(path, bg, keys, targets, base)` | keys method on one image (alpha kept) |
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
@@ -154,6 +155,14 @@ colours `-m` can remap, as `mapping.colour_report(...)` entries (or
 `recolor.colour_report(path, *recolor.plan(path, a, verbose=False))` for an
 image). It must write nothing. When a target defines it, `--colours` and
 `--json` are added to its options and the command line prints the list.
+
+Each entry may name its `part` (`-a PART=ACCENT`, see
+[Colours and mapping](colours.md#parts-an-accent-each)) and whether it uses
+the accent; the GUI groups the list by part, with an accent choice each. The
+target then loops over `parts.accent_sets(a, using)` instead of the accents:
+`using` lists the parts that use one, main first, and each result comes with
+its accent per part and the name to give `output_name()`. `check_parts(a,
+known)` refuses a part the result does not have.
 
 Optionally as well, `def outputs(self, a)` returns what `build()` would write
 with these options, in the order it writes them, as `naming.planned(path,

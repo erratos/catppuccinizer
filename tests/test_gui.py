@@ -73,7 +73,7 @@ class Gui(unittest.TestCase):
         self.assertEqual(ply["dry_run"]["role"], "common")
         self.assertNotIn("list", ply)                           # the catalogue does it
         self.assertNotIn("detect", ply)                         # --colours, for every target
-        self.assertEqual(ply["bar"]["kind"], "colour")
+        self.assertNotIn("bar", ply)                            # -a bar=ACCENT (core.parts)
         lut = next(t for t in s["targets"] if t["name"] == "lut")
         self.assertFalse(lut["has_colours"])
         self.assertEqual({o["dest"]: o for o in lut["options"]}["method"]["choices"], ["lut", "lutgen"])

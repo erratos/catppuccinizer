@@ -345,13 +345,15 @@ def render(path, method, grp, flavor, accent, a):
     return recolor_image(path, hex2rgb(grp["background"]), keys, targets, rgb(flavor, "base"))
 
 
-def colour_report(path, method, grp, note=None):
+def colour_report(path, method, grp, note=None, part=None):
     """--colours entry of an image after plan(): its colours, or why -m does
-    not apply (LUT methods use no source colours)."""
+    not apply (LUT methods use no source colours); part: core.parts."""
+    accent = accent_ignored_reason(method, grp) is None
     if method in LUT_METHODS:
-        return mapping.colour_report(path, method, note=f"the {method} method uses no source colours")
+        return mapping.colour_report(path, method, note=f"the {method} method uses no source colours",
+                                     part=part, accent=accent)
     return mapping.colour_report(path, method, grp["colors"], background=mapping.background_of(grp),
-                                 note=note)
+                                 note=note, part=part, accent=accent)
 
 
 def accent_ignored_reason(method, grp):

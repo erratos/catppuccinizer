@@ -119,7 +119,7 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `--separation` | `0.5` | keys: 0 = merge close colours, 1 = keep faint (and darker) ones apart |
 | `--keep-lum` | `0.5` | lut, lut-accent: 0 = palette lightness, 1 = original lightness |
 | `--smooth` | `0.08` | lut, lut-accent: accent blend radius; smaller = purer accents |
-| `-a` | `all` | accent(s) for colours mapped to `accent` (keys), or `all` |
+| `-a` | `all` | accent(s) for colours mapped to `accent` (keys, lut-accent), or `all`; `NAME=ACCENT` for one image (`-a mauve logo=peach`) |
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
 | `--preview` | | only render before/after images in `<out>/previews/` (`keys`: and the separation panel) |
 | `--list` | | list the wallpapers of `/usr/share/wallpapers`, `/usr/share/backgrounds`, `~/.local/share/wallpapers` |

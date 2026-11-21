@@ -2,15 +2,18 @@
  "colours": {
   "image": [
    {
+    "accent": false,
     "background": null,
     "colours": [],
     "group": null,
     "method": "lut",
     "note": "the lut method uses no source colours",
+    "part": "blobs",
     "remap": false,
     "source": "<tmp>/img/blobs.png"
    },
    {
+    "accent": false,
     "background": "#080e28",
     "colours": [
      {
@@ -29,10 +32,12 @@
     "group": null,
     "method": "keys",
     "note": null,
+    "part": "flat",
     "remap": true,
     "source": "<tmp>/img/flat.png"
    },
    {
+    "accent": false,
     "background": "transparent",
     "colours": [
      {
@@ -51,10 +56,12 @@
     "group": null,
     "method": "keys",
     "note": null,
+    "part": "logo",
     "remap": true,
     "source": "<tmp>/img/logo.png"
    },
    {
+    "accent": true,
     "background": null,
     "colours": [
      {
@@ -85,19 +92,23 @@
     "group": null,
     "method": "vector",
     "note": null,
+    "part": "mark",
     "remap": true,
     "source": "<tmp>/img/mark.svg"
    },
    {
+    "accent": false,
     "background": null,
     "colours": [],
     "group": null,
     "method": "lut",
     "note": "the lut method uses no source colours",
+    "part": "photo",
     "remap": false,
     "source": "<tmp>/img/photo.jpg"
    },
    {
+    "accent": true,
     "background": "#000000",
     "colours": [
      {
@@ -110,12 +121,14 @@
     "group": null,
     "method": "keys",
     "note": null,
+    "part": "speck",
     "remap": true,
     "source": "<tmp>/img/speck.png"
    }
   ],
   "image_mapped": [
    {
+    "accent": false,
     "background": "#080e28",
     "colours": [
      {
@@ -134,12 +147,14 @@
     "group": null,
     "method": "keys",
     "note": null,
+    "part": "flat",
     "remap": true,
     "source": "<tmp>/img/flat.png"
    }
   ],
   "ksplash": [
    {
+    "accent": true,
     "background": null,
     "colours": [
      {
@@ -188,19 +203,23 @@
     "group": null,
     "method": "text",
     "note": null,
+    "part": "vector",
     "remap": true,
     "source": "QML / SVG"
    },
    {
+    "accent": false,
     "background": null,
     "colours": [],
     "group": null,
     "method": "lut",
     "note": "the lut method uses no source colours",
+    "part": "images",
     "remap": false,
     "source": "contents/splash/images/bg.png"
    },
    {
+    "accent": false,
     "background": "#000000",
     "colours": [
      {
@@ -213,10 +232,12 @@
     "group": null,
     "method": "keys",
     "note": "animation, 4 frames",
+    "part": "animations",
     "remap": true,
     "source": "contents/splash/images/rain.webp"
    },
    {
+    "accent": true,
     "background": "transparent",
     "colours": [
      {
@@ -229,21 +250,25 @@
     "group": null,
     "method": "keys",
     "note": "animation, 3 frames",
+    "part": "animations",
     "remap": true,
     "source": "contents/splash/images/spin.gif"
    }
   ],
   "limine": [
    {
+    "accent": true,
     "background": null,
     "colours": [],
     "group": null,
     "method": "fixed",
-    "note": "Catppuccin roles, the accent comes from -a",
+    "note": "Catppuccin roles: text in the flavour's text colour, the title and the highlighted help in the accent",
+    "part": "menu",
     "remap": false,
     "source": "menu"
    },
    {
+    "accent": true,
     "background": "#000000",
     "colours": [
      {
@@ -256,12 +281,14 @@
     "group": null,
     "method": "keys",
     "note": null,
+    "part": "wallpaper",
     "remap": true,
     "source": "<tmp>/img/speck.png"
    }
   ],
   "plymouth": [
    {
+    "accent": true,
     "background": "transparent",
     "colours": [
      {
@@ -274,10 +301,12 @@
     "group": "progress",
     "method": "keys",
     "note": "3 images",
+    "part": "progress",
     "remap": true,
     "source": "glow_mini"
    },
    {
+    "accent": true,
     "background": "transparent",
     "colours": [
      {
@@ -290,10 +319,12 @@
     "group": "throbber",
     "method": "keys",
     "note": "3 images",
+    "part": "throbber",
     "remap": true,
     "source": "glow_mini"
    },
    {
+    "accent": false,
     "background": "transparent",
     "colours": [
      {
@@ -306,7 +337,19 @@
     "group": "ui",
     "method": "keys",
     "note": "4 images",
+    "part": "ui",
     "remap": true,
+    "source": "glow_mini"
+   },
+   {
+    "accent": true,
+    "background": null,
+    "colours": [],
+    "group": "bar",
+    "method": "fixed",
+    "note": "progress bar: the accent (-a bar=ACCENT for its own), or the main colour when nothing uses the accent",
+    "part": "bar",
+    "remap": false,
     "source": "glow_mini"
    }
   ]

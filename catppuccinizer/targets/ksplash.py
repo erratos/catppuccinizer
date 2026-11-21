@@ -30,6 +30,7 @@ from ..core.mapping import (apply_maps, background_of, colour_report, map_colour
                             note_accent_ignored, print_colours, resolve_target, uses_accent)
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
 from ..core.options import Option, step
+from ..core.parts import accent_sets, check_parts, note_unused, single
 from ..core.paths import state_file
 from ..core.naming import check_name
 from ..core.sources import item, section, tidy
@@ -39,6 +40,10 @@ from ..core.target import Target
 SEARCH = [Path.home() / ".local/share/plasma/look-and-feel", Path("/usr/share/plasma/look-and-feel")]
 USER_DIR = SEARCH[0]
 SETTINGS = ("Theme", "Engine")              # [KSplash] of ksplashrc
+
+
+# -a PART=ACCENT (core.parts): the QML / SVG colours, the animations, the other images
+PARTS = ("vector", "animations", "images")
 
 
 class KSplashTarget(Target):
@@ -64,7 +69,8 @@ class KSplashTarget(Target):
         ]
 
     def check(self, a):
-        if (a.install or a.apply or a.test) and (len(a.flavor) > 1 or len(a.accent) > 1):
+        check_parts(a, PARTS)
+        if (a.install or a.apply or a.test) and (len(a.flavor) > 1 or not single(a, PARTS)):
             raise SystemExit("--install / --apply / --test need a single flavour and a single accent "
                              "(-f FLAVOR -a ACCENT)")
 
@@ -241,15 +247,14 @@ def colours(a):
         vcolors, rasters = analyse(a, pkg, tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    out = [colour_report("QML / SVG", "text", vcolors)] if vcolors else []
+    out = [colour_report("QML / SVG", "text", vcolors, part="vector")] if vcolors else []
     for f, (method, grp, extra) in rasters.items():
         name = f.relative_to(pkg)
         if method == "anim":
             out.append(colour_report(name, "keys", grp["colors"], background=background_of(grp),
-                                     note=f"animation, {extra[0]} frames"))
-        elif not (f == pkg / "contents/previews/splash.png"
-                  and any(g is grp for m, g, _ in rasters.values() if m == "anim")):
-            out.append(recolor.colour_report(name, method, grp))
+                                     note=f"animation, {extra[0]} frames", part="animations"))
+        elif part_of(method, grp, rasters) == "images":
+            out.append(recolor.colour_report(name, method, grp, part="images"))
     return out
 
 
@@ -273,8 +278,20 @@ def set_settings(system, values):
                     *([value] if value else ["--delete"])])
 
 
-def accent_used(vcolors, rasters):
-    return uses_accent(vcolors) or any(raster_accent(m, g) for m, g, _ in rasters.values())
+def part_of(method, grp, rasters):
+    """The part of an image: the animations, with the preview when it is a still of
+    one (it takes its colours), else the images."""
+    if method == "anim" or any(g is grp for m, g, _ in rasters.values() if m == "anim"):
+        return "animations"
+    return "images"
+
+
+def results(a, vcolors, rasters):
+    """(parts that use the accent, core.parts.accent_sets), in PARTS order."""
+    used = {"vector"} if uses_accent(vcolors) else set()
+    used |= {part_of(m, g, rasters) for m, g, _ in rasters.values() if raster_accent(m, g)}
+    using = [p for p in PARTS if p in used]
+    return using, accent_sets(a, using)
 
 
 def raster_accent(method, grp):
@@ -292,11 +309,11 @@ def outputs(a):
     slug = naming.slug(package_name(pkg), "splash")
     tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
     try:
-        used = accent_used(*analyse(a, pkg, tmp))
+        _, sets = results(a, *analyse(a, pkg, tmp))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    return [naming.planned(a.out / package_id(flv, slug, acc, a), folder=True)
-            for flv in a.flavor for acc in (a.accent if used else [None])]
+    return [naming.planned(a.out / package_id(flv, slug, name, a), folder=True)
+            for flv in a.flavor for _, name in sets]
 
 
 def build(a):
@@ -310,15 +327,16 @@ def build(a):
     vcolors, rasters = analyse(a, pkg, tmp)
     preview_src = source_file(pkg / "contents/previews/splash.png", pkg)
 
-    used = accent_used(vcolors, rasters)
-    if not used:
+    using, sets = results(a, vcolors, rasters)
+    if not using:
         note_accent_ignored(a)
+    note_unused(a, using)
     built = []
     done = {}      # (image, flavour, accent or None) -> recoloured file, copied for other accents
     for flv in a.flavor:
-        for acc in (a.accent if used else [None]):
-            pid = package_id(flv, slug, acc, a)
-            name = (f"{title} - Catppuccin {FLAVOR_TITLES[flv]}" + (f" {acc.title()}" if acc else "")
+        for accents, aname in sets:
+            pid = package_id(flv, slug, aname, a)
+            name = (f"{title} - Catppuccin {FLAVOR_TITLES[flv]}" + (f" {aname.title()}" if aname else "")
                     + (f" ({a.suffix})" if a.suffix else ""))
             dst = a.out / pid
             if dst.exists():
@@ -335,7 +353,7 @@ def build(a):
                 pkg, pid, name, f"Catppuccin {FLAVOR_TITLES[flv]} recolour of the "
                                 f"{title} splash screen"), indent=4) + "\n")
 
-            lookup = {c["source"]: rgb2hex(resolve_target(flv, acc, c["target"]))
+            lookup = {c["source"]: rgb2hex(resolve_target(flv, accents.get("vector"), c["target"]))
                       for c in vcolors.values()}
             for f in text_files(dst / "contents/splash"):
                 recolour_text_file(f, lookup)
@@ -344,7 +362,8 @@ def build(a):
                 rel = src.relative_to(splash) if src.is_relative_to(splash) else None
                 out = dst / "contents/splash" / rel if rel else dst / "contents/previews/splash.png"
                 # an image that ignores the accent is the same in every accent's package
-                key = (src, flv, acc if raster_accent(method, grp) else None)
+                acc = accents.get(part_of(method, grp, rasters)) if raster_accent(method, grp) else None
+                key = (src, flv, acc)
                 if key in done:
                     shutil.copyfile(done[key], out)
                     continue

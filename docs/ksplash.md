@@ -38,7 +38,9 @@ QML/SVG colours: grays go to the neutral ramp (`base` … `text`, by lightness),
 the most used saturated colour becomes the **accent**, the others the closest
 Catppuccin hue; `-m` remaps any of them by name or `#rrggbb`. `--colours`
 lists them (QML / SVG colours, then each image and animation) without building
-anything; a name applies to every part that has it.
+anything; a name applies to every part that has it. The parts are `vector`
+(QML / SVG), `animations` and `images`: `-a mauve animations=peach` gives the
+animations their own accent ([parts](colours.md#parts-an-accent-each)).
 
 ## Steps
 

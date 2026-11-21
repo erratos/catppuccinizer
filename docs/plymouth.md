@@ -142,8 +142,9 @@ See [Colours and mapping](colours.md) for the list of targets.
 Themes built on adi1090x's script template also come as a `…-status`
 variant that adds, under the animation:
 
-- a thin **progress bar** (`surface0` track, accent fill) driven by the real
-  boot progress reported by Plymouth (boot only, hidden on shutdown);
+- a thin **progress bar** (`surface0` track, accent fill: `-a bar=ACCENT` for
+  its own) driven by the real boot progress reported by Plymouth (boot only,
+  hidden on shutdown);
 - the **last 4 services** started by systemd, newest in `subtext0`, older ones
   fading in `overlay1`, disappearing after 3 s of inactivity.
 
@@ -249,10 +250,9 @@ for it.
 |---|---|---|
 | `THEME …` | the theme in use | installed theme name(s), theme folder(s) or adi1090x theme name(s); when the theme in use is a catppuccinizer result, the one it replaced |
 | `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` |
-| `-a, --accent` | `all` | accent(s) for colours mapped to `accent`, or `all` |
+| `-a, --accent` | `all` | accent(s) for colours mapped to `accent`, or `all`; `GROUP=ACCENT` / `bar=ACCENT` for one [part](colours.md#parts-an-accent-each) (the progress bar: `-status` variants, two-step bar) |
 | `-m, --map` | | `[GROUP.]NAME=TARGET …` overrides for this run |
 | `-s, --suffix` | | extra suffix for the theme names |
-| `--bar` | auto | progress bar colour (`-status` variants, two-step bar) |
 | `--no-status` | | skip the `-status` variants |
 | `--separation` | `0.5` | 0 = merge close colours, 1 = keep faint (and darker) ones apart |
 | `--preview` | | only render one before/after/separation image per theme in `<out>/previews/` |

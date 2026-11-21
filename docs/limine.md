@@ -20,6 +20,13 @@ the highlight and the frame take the Catppuccin colours; the wallpaper set in
 `limine.conf` stays as it is (the menu background becomes slightly see-through
 over it). In the GUI, leave the wallpaper empty: the *Source* card says so.
 
+The result has two [parts](colours.md#parts-an-accent-each): the **menu** (the
+title and the highlighted help in the accent, the text in the flavour's
+`text`, the frame and background in its neutrals) and the **wallpaper**
+(flavour and method; the accent only when a colour goes to it with `keys`, or
+with `lut-accent`). `-a mauve wallpaper=peach` gives the wallpaper its own
+accent.
+
 `--wallpaper current` recolours the wallpaper `limine.conf` sets (the GUI's
 catalogue offers it as the *in use* one; when only root can read the ESP, it is
 read when the command runs, with sudo).
@@ -105,7 +112,7 @@ is refused, to be fixed by hand.
 
 | Option | Meaning |
 |---|---|
-| `-f, --flavor`, `-a, --accent` | flavour and accent of the menu (see [Colours and mapping](colours.md)) |
+| `-f, --flavor`, `-a, --accent` | flavour and accent; `-a menu=ACCENT` / `wallpaper=ACCENT` for one part (see [Colours and mapping](colours.md#parts-an-accent-each)) |
 | `--wallpaper IMAGE` | image to recolour and use as the Limine wallpaper |
 | `--style` | `stretched`, `centered` or `tiled` (with `--wallpaper`) |
 | `--preview` | also render before/after images of the wallpaper in `<out>/previews/` (needs `--wallpaper`) |

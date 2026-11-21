@@ -306,13 +306,16 @@ COMMON = [
                    "softer, in that order. Each flavour gives its own result, named after it "
                    "(catppuccin-mocha-…); 'all' picks the four."),
     Option("-a", "--accent", label="Accent", nargs="+", metavar="ACCENT", kind="accent", scope="common",
-           help="accent(s) for colours mapped to 'accent', or 'all'",
+           help="accent(s) for colours mapped to 'accent', or 'all'; PART=ACCENT for one "
+                "part of the result (its parts: --colours)",
            explain="Catppuccin has 14 accents (mauve, peach, blue…). A colour mapped to "
                    "'accent' takes the one you pick: the main colour of a monochrome design, "
                    "a menu highlight, a progress bar. Each accent gives its own result. What "
                    "uses no accent (a photo recoloured with a LUT) is written once per "
                    "flavour, without the accent in its name, and a note says the accent was "
-                   "ignored."),
+                   "ignored. A result is made of parts (Limine: the menu and the wallpaper; "
+                   "Plymouth: each group of images and the progress bar): PART=ACCENT gives one "
+                   "its own accent, e.g. -a mauve wallpaper=peach."),
     Option("-m", "--map", label="Colour remapping", nargs="+", extend=True, default=[], metavar="NAME=TARGET", kind="map",
            scope="common", when={"analysis.remappable": [True]},
            help="override the colour mapping: white=mauve, ui.white=text, '#ffad03=peach'",

@@ -9,11 +9,39 @@ What the options shared by every target mean, and how colours are chosen.
 | Option | Meaning |
 |---|---|
 | `-f, --flavor` | `latte`, `frappe`, `macchiato`, `mocha` (default) or `all`; several can be given |
-| `-a, --accent` | accent colour(s) used for colours mapped to `accent`, or `all` (the 14 accents, the default: one result per accent for what uses one; `--install` / `--apply` / `--test` need a single one) |
+| `-a, --accent` | accent colour(s) used for colours mapped to `accent`, or `all` (the 14 accents, the default: one result per accent for what uses one; `--install` / `--apply` / `--test` need a single one); `PART=ACCENT` for one [part](#parts-an-accent-each) |
 | `-m, --map` | `NAME=TARGET …`: change where a source colour goes; repeated `-m` add up |
 | `--preview` | only render before/after images in `<out>/previews/`, nothing else |
 | `-o, --out` | output folder (`themes/`, `images/` or `luts/` by default) |
 | `-s, --suffix` | extra word at the end of the output names (lowercase letters, digits, `-`) |
+
+## Parts: an accent each
+
+A result is made of parts, each recoloured on its own:
+
+| Target | Parts (main one first) |
+|---|---|
+| `limine` | `menu` (title and highlighted help in the accent, text in the flavour's `text`), `wallpaper` |
+| `plymouth` | each group of images (`animation`, `throbber`, `progress`… biggest first, `ui`), `bar` (the progress bar, when the theme has one) |
+| `ksplash` | `vector` (QML / SVG colours), `animations` (with the preview when it is a still of one), `images` |
+| `image` | each image, by its file name (`photo` for `photo.jpg`) |
+
+`--colours` lists them, each with what uses the accent. A part takes the
+accents given plainly (one result each); `PART=ACCENT` gives it its own,
+the same in every result:
+
+```bash
+catppuccinize limine --wallpaper wall.png -a mauve wallpaper=peach      # mauve menu, peach wallpaper
+catppuccinize limine --wallpaper wall.png -a mauve blue wallpaper=peach  # two results, both peach walls
+catppuccinize plymouth glow -a mauve throbber=green bar=red
+```
+
+The output name carries the accent of the main part that uses one, then
+`-<part>-<accent>` for each other part whose accent differs:
+`catppuccin-mocha-limine-mauve-wallpaper-peach`. A part that does not use the
+accent (a wallpaper recoloured with `lut`) keeps no accent of its own, and the
+command says so. The progress bar of Plymouth follows the accent; with
+nothing mapped to the accent it takes the theme's main colour.
 
 ## Output names
 
@@ -68,7 +96,7 @@ effect:
 
 | Target | Method (default) | Why | Accent (`-a`) used | `--map` (`-m`) used |
 |---|---|---|---|---|
-| `plymouth` | always `keys` (no `--method`) | boot themes are flat art; colours are detected at each run | when a colour goes to `accent` (single-colour themes by default); the progress bar follows it, unless `--bar` | yes |
+| `plymouth` | always `keys` (no `--method`) | boot themes are flat art; colours are detected at each run | when a colour goes to `accent` (single-colour themes by default); the progress bar follows it (`-a bar=ACCENT` for its own) | yes |
 | `image` | `auto`: `keys` or `lut` | `keys` when the detected colours rebuild the image (fit error under 6), a plain background covers at least 35 % of it and its edges are crisp; `lut` otherwise. `auto` never picks `lut-accent` or `lutgen` | `keys`: when a colour goes to `accent` (typically a single-colour design). `lut-accent`: the dominant hue. `lut`, `lutgen`: never | `keys` only |
 | `image` (SVG) | vector, colours replaced in the file | nothing is rasterised | when a colour goes to `accent` (the most used saturated colour, by default) | yes |
 | `limine` | menu: fixed colours; wallpaper: `auto`, like `image` | | always, for the menu (branding and highlighted help); the wallpaper as for `image` | wallpaper, with `keys` |
@@ -142,7 +170,7 @@ colour of its own.
 catppuccinize image poster.png --method keys -m '#fad23c=yellow'
 ```
 
-In the [graphical interface](gui.md#remapping-a-colour), click it in the
+In the [graphical interface](gui.md#parts-and-remapping-a-colour), click it in the
 original image of a preview.
 
 ## Manual mapping
