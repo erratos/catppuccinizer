@@ -272,10 +272,15 @@ LIST = Option("--list", switch=True, action=ListSources, scope="common", stage="
                    "and exit")
 
 # added to the targets that define colours() (core.target.Target.colours)
-COLOURS = [
-    Option("--colours", switch=True, scope="common", stage="analyse", gui=False,
-           help="only list the colours -m can remap (name, source colour, current target, "
-                "share) and exit; nothing is written"),
-    Option("--json", switch=True, scope="common", stage="analyse", gui=False,
-           when={"colours": [True]}, help="with --colours: print JSON"),
-]
+COLOURS = Option("--colours", switch=True, scope="common", stage="analyse", gui=False,
+                 help="only list the colours -m can remap (name, source colour, current target, "
+                      "share) and exit; nothing is written")
+
+# added to the targets that define outputs() (core.target.Target.outputs)
+NAMES = Option("--names", switch=True, scope="common", stage="analyse", gui=False,
+               help="only list the files and folders the build would write (those that "
+                    "exist would be replaced) and exit; nothing is written")
+
+# added with --colours or --names
+JSON = Option("--json", switch=True, scope="common", stage="analyse", gui=False,
+              help="with --colours or --names: print JSON")

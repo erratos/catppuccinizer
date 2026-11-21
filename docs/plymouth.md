@@ -258,6 +258,7 @@ for it.
 | `--redetect` | | detect the colours again instead of using the saved config (a build saves it) |
 | `--preview` | | only render one before/after image per theme in `<out>/previews/` |
 | `--list` | | list the installed themes (`*` = the default one) and the adi1090x themes (*tuned* = has a config) |
+| `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |
 | `-o, --out` | `themes/` | output folder |
 | `--install` | | copy the result (its `-status` variant if any) to `/usr/share/plymouth/themes/` (sudo) |

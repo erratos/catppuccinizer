@@ -77,7 +77,8 @@ class Declarations(unittest.TestCase):
                         self.assertIn(key, dests)
 
     def test_targets_declare_only_their_own(self):
-        common = {o.dest for o in options.COMMON + options.COLOURS}
+        common = {o.dest for o in [*options.COMMON, options.LIST, options.COLOURS, options.NAMES,
+                                   options.JSON, options.DRY_RUN]}
         for name, t in TARGETS.items():
             for o in t.options():
                 with self.subTest(target=name, option=o.dest):

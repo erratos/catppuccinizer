@@ -12,6 +12,7 @@
 import argparse
 import re
 import unicodedata
+from pathlib import Path
 
 SAFE = re.compile(r"[a-z0-9-]+")
 
@@ -46,3 +47,28 @@ def check_name(name, what="name"):
         raise SystemExit(f"Invalid {what}: {name!r} (letters, digits, '.', '_', '+', '-'; "
                          "no '/' or '..')")
     return name
+
+
+# ------------------------------------------------------------ planned outputs
+# Target.outputs(): what a build would write, before writing anything (--names, the GUI)
+def planned(path, folder=False):
+    """One output a build would write: {"path", "name", "folder", "exists"}; exists:
+    already there, so the build would replace it."""
+    path = Path(path)
+    return {"path": str(path), "name": path.name, "folder": folder, "exists": path.exists()}
+
+
+def dedupe(items):
+    """planned() entries in order, each path once (several accents sharing a file)."""
+    seen = set()
+    return [it for it in items if not (it["path"] in seen or seen.add(it["path"]))]
+
+
+def format_planned(items):
+    """The text of --names: one path per line, '(replaced)' after those that exist."""
+    if not items:
+        return "Nothing would be written."
+    lines = [f"  {it['path']}{'/' if it['folder'] else ''}{'  (exists: replaced)' if it['exists'] else ''}"
+             for it in items]
+    n = sum(it["exists"] for it in items)
+    return "\n".join(lines + ([f"{n} of {len(items)} already exist and would be replaced."] if n else []))

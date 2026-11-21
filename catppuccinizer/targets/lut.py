@@ -13,7 +13,7 @@ the same options (--keep-lum, --smooth, --lutgen-*).
 """
 from ..core import clut, recolor
 from ..core.mapping import note_accent_ignored
-from ..core.naming import output_name
+from ..core.naming import output_name, planned
 from ..core.options import Option
 from ..core.palette import FLAVOR_TITLES
 from ..core.target import Target
@@ -45,6 +45,11 @@ class LutTarget(Target):
         if a.preview or a.map:
             print("note: --preview and -m are ignored by the lut target")
         note_accent_ignored(a, "by the lut target (a LUT has no accent)", indent="")
+
+    def outputs(self, a):
+        return [planned(a.out / name) for flv in a.flavor for name in (
+            *([f"{output_name(flv, a.method + '-hald', suffix=a.suffix)}.png"] if "hald" in a.format else []),
+            *([f"{output_name(flv, a.method, suffix=a.suffix)}.cube"] if "cube" in a.format else []))]
 
     def build(self, a):
         a.out.mkdir(parents=True, exist_ok=True)

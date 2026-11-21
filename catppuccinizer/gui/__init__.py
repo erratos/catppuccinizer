@@ -75,7 +75,7 @@ def schema(targets):
             "description": t.doc or "", "default_out": t.default_out,
             "default_accent": list(t.default_accent), "accent_also": t.accent_also,
             "has_sources": t.has_sources,
-            "has_colours": t.has_colours,
+            "has_colours": t.has_colours, "has_outputs": t.has_outputs,
             "options": [o.schema() for o in t.all_options() if o.gui],
         })
     return {"version": __version__, "targets": out, "cwd": str(Path.cwd()),
@@ -336,23 +336,52 @@ class App:
         a, err = check_argv(argv, self.parser)
         if err:
             return {"error": err}
-        try:
-            r = subprocess.run([sys.executable, "-B", "-c", BOOT, *argv], capture_output=True,
-                               text=True, timeout=600, stdin=subprocess.DEVNULL,
-                               env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
-        except subprocess.TimeoutExpired:
-            return {"error": "the analysis took more than 10 minutes"}
-        if r.returncode:
-            lines = (r.stderr or r.stdout).strip().splitlines()
-            return {"error": lines[-1] if lines else f"the analysis failed ({r.returncode})"}
-        try:
-            items = json.loads(r.stdout)
-        except ValueError:
-            return {"error": "unreadable analysis output"}
+        items, err = listing_output(argv)
+        if err:
+            return {"error": err}
         return {"items": items, "facts": analysis(items), "command": command_line(argv)}
+
+    def names(self, body):
+        """What Build would write, before running it: `catppuccinize ... --names --json`
+        in a subprocess, with the form values but the system steps; entries that
+        exist are marked (the build replaces them)."""
+        name = body.get("target")
+        t = self.targets.get(name)
+        if t is None or not t.has_outputs:
+            return {"error": f"{name}: no output names to list"}
+        values = body.get("values") or {}
+        if err := check_values(values, self.options[name]):
+            return {"error": err}
+        values = {k: v for k, v in values.items() if k not in STEPS and k != "dry_run"}
+        argv = [*build_argv(name, values, self.options[name]), "--names", "--json"]
+        a, err = check_argv(argv, self.parser)
+        if err:
+            return {"error": err}
+        items, err = listing_output(argv)
+        if err:
+            return {"error": err}
+        return {"items": items, "out": str(a.out), "command": command_line(argv)}
 
     def busy(self):
         return any(j.code is None and j.proc for j in self.jobs.values())
+
+
+def listing_output(argv):
+    """(JSON printed by `catppuccinize argv`, None) or (None, error message): the
+    analysis runs in a subprocess, as the command line does it."""
+    try:
+        r = subprocess.run([sys.executable, "-B", "-c", BOOT, *argv], capture_output=True,
+                           text=True, timeout=600, stdin=subprocess.DEVNULL,
+                           env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    except subprocess.TimeoutExpired:
+        return None, "the analysis took more than 10 minutes"
+    if r.returncode:
+        lines = (r.stderr or r.stdout).strip().splitlines()
+        return None, lines[-1] if lines else f"the analysis failed ({r.returncode})"
+    try:
+        return json.loads(r.stdout), None
+    except ValueError:
+        return None, "unreadable analysis output"
 
 
 def listing(path, show_hidden=False):
@@ -580,6 +609,8 @@ def make_handler(app):
                 return self.send(200, app.command(data))
             if u.path == "/api/colours":
                 return self.send(200, app.colours(data))
+            if u.path == "/api/names":
+                return self.send(200, app.names(data))
             if u.path == "/api/run":
                 return self.send(200, app.run(data))
             if u.path == "/api/stop":

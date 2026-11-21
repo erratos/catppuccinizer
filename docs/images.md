@@ -95,6 +95,7 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
 | `--preview` | | only render before/after images in `<out>/previews/` |
 | `--list` | | list the wallpapers of `/usr/share/wallpapers`, `/usr/share/backgrounds`, `~/.local/share/wallpapers` |
+| `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap, and the method each image would get ([details](colours.md#manual-mapping)); `--json` for JSON |
 | `-s, --suffix` | | extra word at the end of the file names |
 | `-o, --out` | `images/` | output folder |

@@ -39,6 +39,7 @@ tests/
   test_gui.py         forms, command lines, access control of the GUI
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     catalogue sections, installed themes and wallpapers, --list
+  test_outputs.py     --names of every target against what the build writes
 ```
 
 ## Core API (what targets use)
@@ -69,6 +70,8 @@ tests/
 | `system.which(name)` / `read_text(path)` | a command's absolute path (as root: system folders only); a text file as it is, for a byte-exact rewrite |
 | `options.step(name, help, sudo)` | the option of a system step: `--install`, `--apply`, `--test`, `--restore` |
 | `naming.output_name(flavor, source, accent, suffix)` / `slug(text)` | the name of every output: `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]` |
+| `naming.planned(path, folder)` | one entry of `outputs()` / `--names` (`exists`: the build would replace it) |
+| `recolor.output_suffix(method, src)` | the extension a recoloured image gets (a LUT keeps an opaque JPEG / WebP) |
 
 ## Writing a target
 
@@ -150,6 +153,13 @@ colours `-m` can remap, as `mapping.colour_report(...)` entries (or
 image). It must write nothing. When a target defines it, `--colours` and
 `--json` are added to its options and the command line prints the list.
 
+Optionally as well, `def outputs(self, a)` returns what `build()` would write
+with these options, in the order it writes them, as `naming.planned(path,
+folder)` entries (files and folders; the files inside a written folder may be
+listed too). It may analyse (whether the accent is used decides the names) but
+writes nothing. It adds `--names` (and `--json`) and fills the GUI's list under
+the command; `tests/test_outputs.py` checks it against a real build.
+
 Then add `"grub"` to `BUILTIN` in `core/target.py`, or, from another package,
 declare an entry point and install it next to catppuccinizer:
 
@@ -188,7 +198,8 @@ to them.
 ### Options
 
 `options()` returns the target's own options only; the common ones (`-f -a -m
---preview -o -s`, and `--colours --json` when `colours()` is defined) are
+--preview -o -s`; `--list`, `--colours`, `--names`, `--json` when `sources()`,
+`colours()`, `outputs()` are defined) are
 declared once in `core/options.py`, the method ones in `core/recolor.py` and
 `core/lutgen.py`. An `Option` takes the flags and the argparse fields (`type`,
 `choices`, `default`, `nargs`, `metavar`, `const`; `switch=True` for an on/off

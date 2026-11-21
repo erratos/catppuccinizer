@@ -10,6 +10,7 @@
 import os
 from concurrent.futures import ProcessPoolExecutor
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -293,9 +294,22 @@ def accent_ignored_reason(method, grp):
     return None if uses_accent(grp["colors"]) else NO_ACCENT
 
 
+def output_suffix(method, src, opaque=None):
+    """Extension of a recoloured image: a photo recoloured with a LUT keeps its JPEG /
+    WebP format when it is opaque, the rest is PNG. opaque: whether the rendered
+    image has no alpha (None: read from the source's header)."""
+    ext = Path(src).suffix.lower()
+    if method not in LUT_METHODS or ext not in (".jpg", ".jpeg", ".webp"):
+        return ".png"
+    if opaque is None:
+        with Image.open(src) as im:
+            opaque = "A" not in im.mode and "transparency" not in im.info
+    return ext if opaque else ".png"
+
+
 def save_image(im, dst, method, src):
-    ext = src.suffix.lower()
-    if method in LUT_METHODS and ext in (".jpg", ".jpeg", ".webp") and im.mode == "RGB":
+    ext = output_suffix(method, src, opaque=im.mode == "RGB")
+    if ext != ".png":
         dst = dst.with_suffix(ext)
         im.save(dst, quality=95)
     else:

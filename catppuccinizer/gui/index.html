@@ -172,6 +172,12 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .btn .badge { margin-left: 6px; vertical-align: 1px; }
 .actions.first { margin-top: 0; }
 .hint.dest { margin: 10px 0 8px; overflow-wrap: anywhere; }
+.names { margin-top: 10px; font-size: 12.5px; color: var(--subtext0); }
+.names.loading ul { opacity: .5; }
+.names .sum { margin: 0 0 4px; color: var(--overlay2); }
+.names ul { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 12px; max-height: 220px; overflow: auto; }
+.names li { padding: 1px 0; overflow-wrap: anywhere; }
+.names li .badge { margin-left: 6px; background: color-mix(in srgb, var(--yellow) 22%, transparent); color: var(--yellow); }
 .check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; color: var(--subtext1); font-size: 13px; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--subtext0); margin: 12px 0 6px; }
@@ -278,6 +284,7 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
       <p class="hint dest" id="dest"></p>
       <div class="cmd" id="cmd"><span id="cmdtext"></span><button class="btn ghost small copy" id="copy" title="Copy the command">Copy</button></div>
       <div class="err hidden" id="err"></div>
+      <div class="names hidden" id="names"></div>
       <div class="warn hidden" id="sudowarn"></div>
     </section>
     <section class="card">
@@ -335,7 +342,7 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
 const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
-            colourCache: new Map(), colourSeq: 0, colourLoading: null };
+            colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0 };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -848,6 +855,45 @@ async function updateCommand() {
   $("runbtn").disabled = !!r.error || busy;
   $("previewbtn").disabled = !!r.error || busy;
   document.querySelectorAll("#steps button").forEach((b) => { b.disabled = busy || (!!r.error && !S.hover); });
+  if (!S.hover) scheduleNames();
+}
+
+// ------------------------------------------------------------ output names
+// What Build would write (catppuccinize ... --names --json, through /api/names), shown
+// under the command: worked out again when an option changes, those that exist marked
+let namesTimer = null;
+const namesKey = () => S.target + " " + JSON.stringify(action(null).values);
+function scheduleNames() {
+  clearTimeout(namesTimer);
+  const box = $("names");
+  if (!cur().has_outputs || !S.cmd || S.cmd.error) { box.classList.add("hidden"); S.names = null; return; }
+  if (S.names && S.names.key === namesKey() && !S.names.stale) return;
+  box.classList.add("loading");
+  if (!S.names) box.replaceChildren(h("p", { class: "sum" }, "Working out the output names…"));
+  box.classList.remove("hidden");
+  namesTimer = setTimeout(loadNames, 400);
+}
+async function loadNames() {
+  const key = namesKey(), seq = ++S.namesSeq;
+  let r;
+  try { r = await api("/api/names", { target: S.target, values: action(null).values }); }
+  catch (e) { r = { error: String(e.message || e) }; }
+  if (seq !== S.namesSeq) return;              // an option changed meanwhile: a newer answer comes
+  S.names = { key, ...r };
+  renderNames();
+}
+function renderNames() {
+  const box = $("names"), r = S.names;
+  box.classList.remove("loading");
+  if (!r) return;
+  if (r.error) { box.replaceChildren(h("p", { class: "sum" }, "Output names: " + r.error)); return; }
+  const base = r.out.replace(/\/$/, "") + "/", n = r.items.length, replaced = r.items.filter((it) => it.exists).length;
+  const rel = (p) => (p.startsWith(base) ? p.slice(base.length) : tidy(p));
+  box.replaceChildren(
+    h("p", { class: "sum" }, n ? `Build writes ${n} ${n > 1 ? "items" : "item"} into ${tidy(r.out)}` : "Build writes nothing",
+      replaced ? h("span", { style: { color: "var(--yellow)" } }, ` · ${replaced} already there, replaced`) : null),
+    n ? h("ul", {}, r.items.map((it) => h("li", { title: it.path }, (it.folder ? "📁 " : "📄 ") + rel(it.path) + (it.folder ? "/" : ""),
+      it.exists ? h("span", { class: "badge" }, "replaced") : null))) : null);
 }
 
 // --------------------------------------------------------------------- run
@@ -871,6 +917,7 @@ async function poll() {
   if (atEnd) log.scrollTop = log.scrollHeight;
   if (!r.done) { setTimeout(poll, 350); return; }
   S.job.done = true;
+  if (S.names) { S.names.stale = true; scheduleNames(); }   // what exists has changed
   $("stopbtn").classList.add("hidden");
   $("prog").style.width = r.code === 0 ? "100%" : $("prog").style.width;
   setStatus(r.code === 0 ? "ok" : "fail", r.code === 0 ? `Done — ${r.outputs.length} item(s) written`

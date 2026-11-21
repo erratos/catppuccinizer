@@ -30,15 +30,17 @@ class Target:
     def options(self):
         """The target's own options, as core.options.Option (scope "target"), plus
         core.recolor.method_options() when it recolours images with the methods.
-        The common ones (-f -a -m --preview -o -s, --list, --colours) are added by
-        all_options()."""
+        The common ones (-f -a -m --preview -o -s, --list, --colours, --names) are
+        added by all_options()."""
         return []
 
     def all_options(self):
         """Every option of the subcommand, in order: common, the target's, --list,
-        --colours, --dry-run (when it has system steps)."""
+        --colours, --names, --json, --dry-run (when it has system steps)."""
+        listing = [*([opts.COLOURS] if self.has_colours else []),
+                   *([opts.NAMES] if self.has_outputs else [])]
         return [*opts.COMMON, *self.options(), *([opts.LIST] if self.has_sources else []),
-                *(opts.COLOURS if self.has_colours else []),
+                *listing, *([opts.JSON] if listing else []),
                 *([opts.DRY_RUN] if self.steps else [])]
 
     @property
@@ -50,6 +52,11 @@ class Target:
     def has_sources(self):
         """Whether the target defines sources() (--list, the GUI's catalogue)."""
         return type(self).sources is not Target.sources
+
+    @property
+    def has_outputs(self):
+        """Whether the target defines outputs() (--names, the GUI's output preview)."""
+        return type(self).outputs is not Target.outputs
 
     @property
     def has_colours(self):
@@ -73,6 +80,13 @@ class Target:
         """`--colours`: the source colours -m can remap, analysed but nothing
         written, as a list of core.mapping.colour_report() entries. Targets
         without source colours (lut) leave it out: the option is not offered."""
+        raise NotImplementedError
+
+    def outputs(self, args):
+        """`--names`: what build() would write with these options (files and folders,
+        including those inside a written folder), as core.naming.planned() entries,
+        in the order build() writes them. It analyses what it must (whether the
+        accent is used), like colours(), but writes nothing."""
         raise NotImplementedError
 
     # ------------------------------------------------------------- steps

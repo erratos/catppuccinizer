@@ -123,6 +123,25 @@ class Gui(unittest.TestCase):
         self.assertIn("error", self.call("/api/colours", {"target": "lut", "values": {}}))
         self.assertIn("required", self.call("/api/colours", {"target": "image", "values": {}})["error"])
 
+    def test_names_before_a_run(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            Image.new("RGB", (64, 36), (8, 14, 40)).save(d / "flat.png")
+            (d / "out").mkdir()
+            (d / "out/catppuccin-latte-flat.png").write_bytes(b"x")       # replaced
+            r = self.call("/api/names", {"target": "image", "values": {
+                "images": [str(d / "flat.png")], "out": str(d / "out"), "flavor": ["latte", "mocha"],
+                "install": True}})                                       # steps left out
+            self.assertNotIn("error", r)
+            self.assertEqual(r["out"], str(d / "out"))
+            self.assertEqual([(Path(it["path"]).name, it["exists"]) for it in r["items"]],
+                             [("catppuccin-latte-flat.png", True), ("catppuccin-mocha-flat.png", False)])
+            self.assertIn("--names --json", r["command"])
+            self.assertEqual(sorted(p.name for p in (d / "out").iterdir()), ["catppuccin-latte-flat.png"])
+        self.assertIn("error", self.call("/api/names", {"target": "nope"}))
+        self.assertIn("required", self.call("/api/names", {"target": "image", "values": {}})["error"])
+        self.assertTrue(next(t for t in self.call("/api/schema")["targets"] if t["name"] == "lut")["has_outputs"])
+
     def test_access_control(self):
         with self.assertRaises(urllib.error.HTTPError) as e:
             self.call("/api/schema", token=False)

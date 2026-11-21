@@ -59,6 +59,9 @@ ten minutes after the page is closed. `--port N` picks the port,
 The *Command* box always shows the exact `catppuccinize …` line the page runs,
 with the error the command line would give when something is missing (hover a
 step button to see its own command). Copy it to script the same thing later.
+Under it, the files and folders **Build** would write are listed as you change
+the options (`catppuccinize … --names`); those already there are marked
+*replaced*.
 
 ### Remapping a colour
 
@@ -135,6 +138,7 @@ GUI without GUI code:
   **sudo** and runs it with sudo; options of the `install` / `apply` / `test` /
   `restore` stages go to the *System steps* group, the other ones of `analyse`
   to *Analyse*;
+- `Target.outputs()` fills the list of what Build would write;
 - `Target.colours()` fills the *Source colours* list and its `when`
   facts (`analysis.remappable`: the remap editor is shown only when something
   can be remapped);

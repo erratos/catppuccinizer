@@ -25,7 +25,7 @@ from ..core import recolor
 from ..core.formats import collect_text_colours, read_text, recolour_text, write_text
 from ..core.mapping import (apply_maps, colour_report, map_colour_counts, note_accent_ignored,
                             print_colours, resolve_target, uses_accent)
-from ..core.naming import output_name
+from ..core.naming import output_name, planned
 from ..core.options import Option
 from ..core.palette import FLAVOR_TITLES, rgb2hex
 from ..core.sources import wallpaper_sections
@@ -70,6 +70,23 @@ class ImageTarget(Target):
                 out.append(colour_report(path, "vector", vector_colours(path, a)))
             else:
                 out.append(recolor.colour_report(path, *recolor.plan(path, a, verbose=False)))
+        return out
+
+    def outputs(self, a):
+        files = collect(a.images)
+        a.strict_map = len(files) == 1
+        out = []
+        for path in files:
+            if path.suffix.lower() in VECTOR:
+                accents = a.accent if uses_accent(vector_colours(path, a)) else [None]
+                ext = ".png" if a.preview and shutil.which("rsvg-convert") else path.suffix
+            else:
+                method, grp = recolor.plan(path, a, verbose=False)
+                accents = [None] if recolor.accent_ignored_reason(method, grp) else a.accent
+                ext = ".png" if a.preview else recolor.output_suffix(method, path)
+            folder = a.out / "previews" if a.preview else a.out
+            out += [planned(folder / f"{output_name(flv, path.stem, acc, a.suffix)}{ext}")
+                    for flv in a.flavor for acc in accents]
         return out
 
     def build(self, a):

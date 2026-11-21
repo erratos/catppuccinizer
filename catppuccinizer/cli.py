@@ -9,6 +9,7 @@ from pathlib import Path
 from . import __version__
 from .core import options
 from .core.mapping import format_colour_report
+from .core.naming import dedupe, format_planned
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
 from .core.paths import cache_dir, config_dir, give_back
 from .core.system import System
@@ -51,8 +52,10 @@ def parse(argv=None, parser=None):
     a.flavor = expand(a.flavor, FLAVORS, "flavor")
     a.accent = expand(a.accent or list(t.default_accent), ACCENTS, "accent")
     a.out = a.out or Path.cwd() / t.default_out
-    if getattr(a, "json", False) and not a.colours:
-        raise SystemExit("--json only goes with --colours")
+    if getattr(a, "json", False) and not (getattr(a, "colours", False) or getattr(a, "names", False)):
+        raise SystemExit("--json only goes with --colours or --names")
+    if getattr(a, "colours", False) and getattr(a, "names", False):
+        raise SystemExit("use either --colours or --names")
     asked = [s for s in t.steps if getattr(a, s)]
     if getattr(a, "dry_run", False) and not asked:
         raise SystemExit("--dry-run goes with " + " / ".join(f"--{s}" for s in t.steps))
@@ -93,6 +96,11 @@ def main(argv=None):
             with contextlib.redirect_stdout(sys.stderr):    # notes, fetching: not the list
                 items = a.target.colours(a)
             print(json.dumps(items, indent=2) if a.json else format_colour_report(items))
+            return
+        if getattr(a, "names", False):
+            with contextlib.redirect_stdout(sys.stderr):
+                items = dedupe(a.target.outputs(a))
+            print(json.dumps(items, indent=2) if a.json else format_planned(items))
             return
         run(a.target, a)
     except KeyboardInterrupt:

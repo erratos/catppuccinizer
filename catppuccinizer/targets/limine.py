@@ -20,7 +20,7 @@ from pathlib import Path
 
 from ..core import recolor
 from ..core.mapping import colour_report
-from ..core.naming import output_name
+from ..core.naming import output_name, planned
 from ..core.options import Option, step
 from ..core.palette import FLAVOR_TITLES, PALETTES
 from ..core.sources import item, section, wallpaper_sections
@@ -87,6 +87,9 @@ class LimineTarget(Target):
 
     def sources(self):
         return [section("Set in limine.conf", current_wallpapers), *wallpaper_sections()]
+
+    def outputs(self, a):
+        return outputs(a)
 
 
 OPTIONS = [
@@ -299,6 +302,30 @@ def colours(a):
             *(recolor.colour_report(src, *recolor.plan(src, a, verbose=False)) for src in sources)]
 
 
+def wallpaper_stem(flv, k, n, acc, suffix):
+    return output_name(flv, "wallpaper" + (f"-{k + 1}" if n > 1 else ""), acc, suffix)
+
+
+def outputs(a):
+    """Per flavour and accent: the folder, its wallpapers and limine-theme.conf; the
+    before/after images with --preview."""
+    sources = wallpapers(a, a.esp or default_esp(), a.recolor_wallpaper)[3]
+    plans = [recolor.plan(src, a, verbose=False) for src in sources]
+    out = []
+    for flv in a.flavor:
+        for acc in a.accent:
+            dst = a.out / output_name(flv, "limine", acc, a.suffix)
+            out.append(planned(dst, folder=True))
+            for k, (src, (method, grp)) in enumerate(zip(sources, plans)):
+                wacc = None if recolor.accent_ignored_reason(method, grp) else acc
+                stem = wallpaper_stem(flv, k, len(sources), wacc, a.suffix)
+                out.append(planned(dst / (stem + recolor.output_suffix(method, src, opaque=True))))
+                if a.preview:
+                    out.append(planned(a.out / "previews" / f"{stem}.png"))
+            out.append(planned(dst / "limine-theme.conf"))
+    return out
+
+
 def build(a):
     """The snippet and wallpapers of each flavour and accent; for the system steps,
     those of the last one (they need a single flavour and accent)."""
@@ -317,8 +344,7 @@ def build(a):
                 # a wallpaper that ignores the accent is the same for every accent:
                 # rendered once per flavour, named without the accent, copied
                 wacc = None if recolor.accent_ignored_reason(method, grp) else acc
-                stem = output_name(flv, "wallpaper" + (f"-{k + 1}" if len(sources) > 1 else ""),
-                                   wacc, a.suffix)
+                stem = wallpaper_stem(flv, k, len(sources), wacc, a.suffix)
                 key = (k, flv, wacc)
                 if key in done:
                     for f in done[key]:

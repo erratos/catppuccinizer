@@ -30,6 +30,16 @@ recoloured with the `lut` method gives one file per flavour. Examples:
 `catppuccin-mocha-wall.jpg`, `catppuccin-mocha-rings-2-mauve/`,
 `catppuccin-mocha-limine-peach/`, `catppuccin-mocha-lut.cube`.
 
+`--names` lists what a command would write, without writing anything, and
+marks what already exists (a build replaces it); `--json` for JSON:
+
+```bash
+catppuccinize image ~/Pictures/walls -f latte mocha --names
+```
+
+It analyses what it must to know whether the accent is used (like
+`--colours`). The GUI shows the same list under the *Command* box.
+
 ## Flavours
 
 ![flavours](../assets/options-flavors.jpg)

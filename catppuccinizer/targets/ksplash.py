@@ -98,6 +98,9 @@ class KSplashTarget(Target):
     def colours(self, a):
         return colours(a)
 
+    def outputs(self, a):
+        return outputs(a)
+
     def sources(self):
         try:
             active = read_setting("Theme")
@@ -259,6 +262,28 @@ def set_settings(system, values):
                     *([value] if value else ["--delete"])])
 
 
+def accent_used(vcolors, rasters):
+    return uses_accent(vcolors) or any(
+        m not in recolor.LUT_METHODS and uses_accent(g["colors"]) for m, g, _ in rasters.values())
+
+
+def package_id(flv, slug, acc, a):
+    return naming.output_name(flv, slug, acc, a.suffix)
+
+
+def outputs(a):
+    """One look-and-feel package per flavour (and accent, when something uses it)."""
+    pkg = resolve(a.theme)
+    slug = naming.slug(package_name(pkg), "splash")
+    tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
+    try:
+        used = accent_used(*analyse(a, pkg, tmp))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return [naming.planned(a.out / package_id(flv, slug, acc, a), folder=True)
+            for flv in a.flavor for acc in (a.accent if used else [None])]
+
+
 def build(a):
     if a.preview:
         print("note: --preview is not available for splash screens, use --test to see the result")
@@ -272,15 +297,14 @@ def build(a):
     vcolors, rasters = analyse(a, pkg, tmp)
     preview_src = source_file(pkg / "contents/previews/splash.png", pkg)
 
-    accent_used = uses_accent(vcolors) or any(
-        m not in recolor.LUT_METHODS and uses_accent(g["colors"]) for m, g, _ in rasters.values())
-    if not accent_used:
+    used = accent_used(vcolors, rasters)
+    if not used:
         note_accent_ignored(a)
     built = []
     done = {}      # (image, flavour, accent or None) -> recoloured file, copied for other accents
     for flv in a.flavor:
-        for acc in (a.accent if accent_used else [None]):
-            pid = naming.output_name(flv, slug, acc, a.suffix)
+        for acc in (a.accent if used else [None]):
+            pid = package_id(flv, slug, acc, a)
             name = (f"{title} - Catppuccin {FLAVOR_TITLES[flv]}" + (f" {acc.title()}" if acc else "")
                     + (f" ({a.suffix})" if a.suffix else ""))
             dst = a.out / pid

@@ -27,7 +27,7 @@ from ...core.detect import UI_GROUP, detect_group
 from ...core.mapping import (apply_maps, background_of, colour_report, note_accent_ignored,
                              print_colours, uses_accent)
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, TARGETS, color_args, hex2rgb, rgb
-from ...core.naming import output_name, slug
+from ...core.naming import output_name, planned, slug
 from ...core.options import Option, step
 from ...core.paths import config_dir, state_file
 from ...core.sources import item, section, tidy
@@ -100,6 +100,9 @@ class PlymouthTarget(Target):
 
     def colours(self, a):
         return colours(a)
+
+    def outputs(self, a):
+        return outputs(a)
 
     def sources(self):
         src = local_src()
@@ -475,6 +478,32 @@ def colours(a):
             note = f"{n} image{'s' if n != 1 else ''}" + ("" if saved else ", freshly detected")
             out.append(colour_report(theme.name, "keys", grp["colors"], group=g,
                                      background=background_of(grp), note=note, prefix=several))
+    return out
+
+
+def outputs(a):
+    """Per theme, flavour and accent (when a colour goes to it): the theme folder and
+    its -status variant, or the before/after image with --preview. A theme without a
+    config is detected, its config is not saved."""
+    out = []
+    for arg in a.themes:
+        theme = Theme(resolve_theme(arg))
+        if not theme.groups:
+            continue
+        saved = config_path(theme.name).exists() and not a.redetect
+        cfg = load_config(theme) if saved else detect(theme)
+        apply_maps(cfg, a.map)
+        used = any(uses_accent(grp["colors"]) for grp in cfg["groups"].values())
+        status = not a.no_status and theme.adi_template
+        for flv in a.flavor:
+            for acc in (a.accent if used else [None]):
+                name = output_name(flv, theme.slug, acc, a.suffix)
+                if a.preview:
+                    out.append(planned(a.out / "previews" / f"{name}.png"))
+                    continue
+                out.append(planned(a.out / name, folder=True))
+                if status:
+                    out.append(planned(a.out / f"{name}-status", folder=True))
     return out
 
 
