@@ -51,7 +51,7 @@ A new look-and-feel package (`themes/catppuccin-<flavor>-<name>[-<accent>][-<suf
 containing only the splash screen. As a derived work, its `metadata.json` keeps
 the original authors, licence and website (catppuccinizer is added as an
 author), and the original licence file is copied when there is one.
-`--preview` is not available: use `--test`.
+There is no `--preview`: use `--test`.
 
 ### Install
 

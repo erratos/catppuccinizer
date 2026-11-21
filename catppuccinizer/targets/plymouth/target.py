@@ -587,7 +587,7 @@ def build(a):
     for args, with_st in status:
         if with_st:
             write_status_variant(*args)
-        print(f"  {args[0].name}" + (f"  (+ {args[0].name}-status)" if with_st else ""))
+        print(f"  -> {args[0]}" + (f"  (+ {args[0].name}-status)" if with_st else ""))
 
     folder, with_st = status[0][0][0], status[0][1]
     return folder.parent / f"{folder.name}-status" if with_st else folder

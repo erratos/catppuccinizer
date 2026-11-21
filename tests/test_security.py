@@ -478,7 +478,17 @@ class GuiRequests(unittest.TestCase):
         self.assertIn("between 0 and 1", r["error"])           # the command line's own check
 
     def test_bodies(self):
-        self.assertEqual(self.request("/api/command", raw=b"x" * (gui.MAX_JSON + 1))[0], 413)
+        # announced, not sent: the server answers before reading (sending it all could
+        # hit the closed connection)
+        c = http.client.HTTPConnection("127.0.0.1", self.app.port, timeout=30)
+        c.putrequest("POST", "/api/command")
+        c.putheader("X-Token", self.app.token)
+        c.putheader("Content-Length", str(gui.MAX_JSON + 1))
+        c.endheaders()
+        r = c.getresponse()
+        self.assertEqual(r.status, 413)
+        r.read()
+        c.close()
         self.assertEqual(self.request("/api/command", raw=b"[1, 2]")[0], 400)
         self.assertEqual(self.request("/api/command", raw=b"{nope")[0], 400)
         self.assertEqual(self.request("/api/job?id=x&since=-3")[0], 404)

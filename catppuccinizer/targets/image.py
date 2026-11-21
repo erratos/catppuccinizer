@@ -118,7 +118,7 @@ class ImageTarget(Target):
 
     def run_vector(self, path, a):
         colors = vector_colours(path, a)
-        print(f"{path}: vector ({len(colors)} colours)")
+        print(f"{path.name}: vector ({len(colors)} colours)")
         print_colours(colors, show_share=False)
         text = read_text(path)
         accents = a.accent if uses_accent(colors) else [None]

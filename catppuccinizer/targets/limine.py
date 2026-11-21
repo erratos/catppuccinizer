@@ -94,7 +94,8 @@ class LimineTarget(Target):
 
 OPTIONS = [
     Option("--wallpaper", type=Path, metavar="IMAGE", accept="image", source=True,
-           help="image to recolour and use as the Limine wallpaper"),
+           help="image to recolour and use as the Limine wallpaper (optional: without it, "
+                "the current wallpaper is kept)"),
     Option("--recolor-wallpaper", switch=True,
            help="recolour the wallpaper(s) already set in limine.conf"),
     *recolor.method_options(),
@@ -370,7 +371,7 @@ def build(a):
             (dst / "limine-theme.conf").write_text("\n".join(lines) + "\n")
             print(f"Catppuccin {FLAVOR_TITLES[flv]} ({acc}) -> {dst}")
             if not a.apply:
-                print(f"  paste {dst / 'limine-theme.conf'} at the top of limine.conf"
+                print(f"  add {dst / 'limine-theme.conf'} to limine.conf, before the first menu entry"
                       + (f", copy {', '.join(f.name for f in wall_files)} to <ESP>/{WALL_DIR}/"
                          if wall_files else "")
                       + ", or rerun with --apply (sudo)")

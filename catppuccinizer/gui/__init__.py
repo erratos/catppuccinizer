@@ -67,11 +67,18 @@ def first_paragraph(text):
     return (text or "").strip().split("\n\n")[0].replace("\n", " ")
 
 
+def summary(doc):
+    """The intro of a target's page: its docstring's first paragraph, without the
+    "Plymouth target:" its tab already says."""
+    text = re.sub(r"^[\w ]{1,30} target:\s*", "", first_paragraph(doc))
+    return text[:1].upper() + text[1:]
+
+
 def schema(targets):
     out = []
     for name, t in targets.items():
         out.append({
-            "name": name, "help": t.help, "summary": first_paragraph(t.doc),
+            "name": name, "help": t.help, "summary": summary(t.doc),
             "description": t.doc or "", "default_out": t.default_out,
             "default_accent": list(t.default_accent), "accent_also": t.accent_also,
             "has_sources": t.has_sources,

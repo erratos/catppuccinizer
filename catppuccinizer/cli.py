@@ -48,6 +48,9 @@ def parse(argv=None, parser=None):
     t = a.target
     if t is None:                     # gui
         return a
+    for o in options.COMMON:          # those the target leaves out (unused_common): their default
+        if not hasattr(a, o.dest):
+            setattr(a, o.dest, False if o.switch else o.default)
     a.accent_given = bool(a.accent)   # -a asked for: say so when it has no effect
     a.flavor = expand(a.flavor, FLAVORS, "flavor")
     a.accent = expand(a.accent or list(t.default_accent), ACCENTS, "accent")

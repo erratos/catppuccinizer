@@ -56,8 +56,9 @@ ten minutes after the page is closed. `--port N` picks the port,
    `--cube-size` with their format.
 5. **Preview** renders the before/after images (`--preview`); **Build** writes
    the result into the output folder, without sudo and without installing
-   anything (the line under the buttons says where). The output folder defaults
-   to `./<target folder>` in the folder the GUI was started from.
+   anything (the line under the buttons says where). The *Output* card sets
+   the folder (by default `./<target folder>` in the folder the GUI was started
+   from) and `--suffix`, the word added to the output names.
 
 The *Command* box always shows the exact `catppuccinize …` line the page runs,
 with the error the command line would give when something is missing (hover a

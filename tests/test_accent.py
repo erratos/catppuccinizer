@@ -38,8 +38,8 @@ class AccentNotes(unittest.TestCase):
         self.assertIn("note: accent ignored by the lut method",
                       printed(note_accent_ignored, asked, "by the lut method"))
         self.assertEqual(printed(note_accent_ignored, parse(["image", "x.png"]), "by the lut method"), "")
-        self.assertIn("accent ignored by the lut target",
-                      printed(parse, ["lut", "-a", "peach", "--format", "cube"]))
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parse(["lut", "-a", "peach"])              # a LUT has no accent: no -a at all
 
 
 if __name__ == "__main__":

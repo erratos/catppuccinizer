@@ -46,6 +46,7 @@ class KSplashTarget(Target):
     help = "recolour a KDE Plasma splash screen"
     default_accent = ("mauve",)
     accent_also = "the QML / SVG colours mapped to accent"
+    unused_common = ("preview",)                      # --test shows the result instead
 
     def options(self):
         return [
@@ -135,6 +136,9 @@ def resolve(arg):
     pkgs = splash_packages()
     if arg in pkgs:
         return pkgs[arg]
+    if p.is_dir():
+        raise SystemExit(f"{arg} is not a splash screen: no contents/splash/Splash.qml in it "
+                         "(give a look-and-feel package or its contents/splash folder)")
     raise SystemExit(f"No splash screen '{arg}' (see --list, or give a folder)")
 
 
@@ -289,8 +293,6 @@ def outputs(a):
 
 
 def build(a):
-    if a.preview:
-        print("note: --preview is not available for splash screens, use --test to see the result")
     pkg = resolve(a.theme)
     splash = pkg / "contents/splash"
     title = package_name(pkg)

@@ -41,7 +41,9 @@ def apply_maps(cfg, maps, strict=True):
         if not hit and not strict:
             continue
         if not hit:
-            have = sorted({f"{g}.{n}" for g, grp in groups.items() for n in grp["colors"]})
+            # the names as --colours lists them: with their group only when there are several
+            have = sorted({f"{g}.{n}" if len(groups) > 1 else n
+                           for g, grp in groups.items() for n in grp["colors"]})
             raise SystemExit(f"--map {m}: no colour named '{k}' "
                              f"(have: {', '.join(have)}; or use a #rrggbb source)")
 

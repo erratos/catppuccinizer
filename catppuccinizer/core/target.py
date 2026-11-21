@@ -26,6 +26,8 @@ class Target:
     default_accent = ("all",)  # accents when -a is not given
     accent_also = None         # what uses the accent whatever --method is (limine: "the menu
                                # colours"); None: a LUT method leaves the accent unused
+    unused_common = ()         # common options that mean nothing here (lut: "accent", "map",
+                               # "preview"): left out of the command line and the GUI
 
     def options(self):
         """The target's own options, as core.options.Option (scope "target"), plus
@@ -39,7 +41,8 @@ class Target:
         --colours, --names, --json, --dry-run (when it has system steps)."""
         listing = [*([opts.COLOURS] if self.has_colours else []),
                    *([opts.NAMES] if self.has_outputs else [])]
-        return [*opts.COMMON, *self.options(), *([opts.LIST] if self.has_sources else []),
+        common = [o for o in opts.COMMON if o.dest not in self.unused_common]
+        return [*common, *self.options(), *([opts.LIST] if self.has_sources else []),
                 *listing, *([opts.JSON] if listing else []),
                 *([opts.DRY_RUN] if self.steps else [])]
 

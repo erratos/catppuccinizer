@@ -12,7 +12,6 @@ the same options (--keep-lum, --smooth, --lutgen-*).
   magick in.jpg catppuccin-mocha-lut-hald.png -hald-clut out.jpg
 """
 from ..core import clut, recolor
-from ..core.mapping import note_accent_ignored
 from ..core.naming import output_name, planned
 from ..core.options import Option
 from ..core.palette import FLAVOR_TITLES
@@ -24,6 +23,7 @@ class LutTarget(Target):
     help = "export the colour look-up table (Hald CLUT, .cube)"
     default_out = "luts"
     default_accent = ()
+    unused_common = ("accent", "map", "preview")      # a LUT has no accent, no source colours
 
     def options(self):
         return [
@@ -42,9 +42,6 @@ class LutTarget(Target):
 
     def check(self, a):
         recolor.check_method_arguments(a)
-        if a.preview or a.map:
-            print("note: --preview and -m are ignored by the lut target")
-        note_accent_ignored(a, "by the lut target (a LUT has no accent)", indent="")
 
     def outputs(self, a):
         return [planned(a.out / name) for flv in a.flavor for name in (

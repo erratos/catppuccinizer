@@ -296,7 +296,7 @@ DRY_RUN = Option("--dry-run", switch=True, scope="common", stage="install",
                          "change is listed instead ('would copy …'). The system is still "
                          "read (the theme in use, limine.conf), so a step that needs root "
                          "still runs with sudo.",
-                 help="with --install, --apply, --test or --restore: build as usual, then "
+                 help="with a system step (--install, --apply…): build as usual, then "
                       "only list the files the steps would copy, change or remove and the "
                       "commands they would run (reading the system may still need sudo)")
 
