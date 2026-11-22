@@ -279,6 +279,124 @@ per step method).
 Add a case to `tests/test_regression.py` (small synthetic fixture) and run
 `python3 tests/test_regression.py --update` once the output looks right.
 
+## Declarative targets (TOML)
+
+A target that recolours a **theme folder** and installs it by copying it and
+setting a line of a configuration file needs no Python: a TOML file describes
+it, and `core.declarative` turns it into a `Target` (options, `--colours`,
+`--names`, `--list`, the GUI, `--preview`, the steps and `--dry-run` come with
+it). GRUB is written this way: [`targets/grub.toml`](../catppuccinizer/targets/grub.toml).
+
+### How far without code
+
+A TOML target can say:
+
+- **where its sources are**: a file every theme folder has (`marker`), the
+  folders where themes are looked up by name (`search`, also the catalogue of
+  `--list` and the GUI), a default;
+- **what is recoloured**: its parts, each a `core.folder.Part` (name, kind
+  `text` / `image` / `animation`, globs, colour syntax of the text files);
+  everything else in the folder is copied as it is, except the `ignore` globs;
+- **how results are named**: always `output_name(flavour, <folder name>,
+  accent, suffix)`, like every target;
+- **install**: copy the result to `<to>/<output name>`, as the user or with
+  sudo;
+- **apply**: set variables in configuration files of the `KEY="value"` kind
+  (`/etc/default/grub`), each written atomically with a dated backup, then run
+  commands;
+- **restore**: generated: the variables get back their previous values (or
+  their lines are removed when they had none), the commands run again, the
+  installed results are removed.
+
+What needs a decision about the content stays in Python: files generated from
+scratch (KDE's `metadata.json`), formats edited by rules (Plymouth scripts, the
+`limine.conf` block), drawing a whole screen for the preview, reading the
+current setting through a command (`kreadconfig6`), a `test` step. Such a
+target is written in Python, possibly next to TOML ones, with the same core.
+
+### Commands in `apply`
+
+Allowed, because most installs need one (`grub-mkconfig` after
+`/etc/default/grub`), with these limits:
+
+- **allow list**: the program must be one of `core.declarative.COMMANDS`
+  (bootloader and cache refreshers); adding one is a change to catppuccinizer,
+  reviewed like code. The arguments are fixed in the file; only `{name}` and
+  `{installed}` are replaced, with checked names. No shell, and as root the
+  program is looked up in the system folders only (`System.run`).
+- **`--dry-run`**: every step goes through `System`, so `--dry-run` lists the
+  commands with the files, and each one is printed before it runs.
+- **confirmation**: the step itself (`--apply`, or its button in the GUI), as
+  for Python targets; no prompt, which the GUI could not answer. `--dry-run`
+  is the way to look first.
+
+### Trust
+
+- TOML files **shipped with catppuccinizer** (`catppuccinizer/targets/*.toml`)
+  may use sudo (`install.sudo = true`) and write system files.
+- TOML files of the **user** (`~/.config/catppuccinizer/targets/*.toml`, see
+  [discovery](#discovery)) run with the user's rights only: `sudo = true` is
+  refused, and the install folder and the files of `set` must be in the user's
+  home. A file dropped in that folder (a download) should not become a root
+  action; a target that needs root is a Python package the user installs, or a
+  TOML file added to catppuccinizer.
+- A user file writable by others than its owner, or owned by someone else
+  than the user (or root), is skipped with a note.
+- The schema is strict: an unknown key, a missing one or a wrong type stops
+  that file with a message naming it; the other targets still work.
+
+### Format
+
+```toml
+name = "grub"                         # the subcommand: a-z, 0-9, '-'
+help = "recolour a GRUB theme"        # one line for catppuccinize --help
+description = """…"""                 # the long --help (optional)
+default_out = "themes"                # output folder (optional, default "themes")
+ignore = ["*.bak"]                    # files left out of the result (optional)
+
+[source]
+marker = "theme.txt"                  # glob of a file every theme folder has
+search = ["/boot/grub/themes", "/usr/share/grub/themes"]   # names, catalogue (optional)
+default = "…"                         # when no source is given (optional)
+label = "Theme"                       # the GUI's label (optional)
+help = "installed theme name or theme folder"              # (optional)
+
+[[parts]]                             # in order: a file goes to the first that takes it
+name = "text"                         # -a text=ACCENT, -m text.NAME
+kind = "text"                         # text | image | animation
+files = ["*.txt"]                     # globs in the folder (default ["*"])
+syntax = "hex"                        # text: qml | svg | hex (default: by extension)
+label = "theme.txt"                   # text: its name in --colours (optional)
+
+[install]
+to = "/boot/grub/themes"              # results go to <to>/<output name>
+sudo = true                           # needs root (built-in files only)
+help = "…"                            # (optional)
+
+[apply]                               # needs [install]
+help = "…"
+explain = "…"                         # the GUI's long text (optional)
+set = [{ file = "/etc/default/grub", key = "GRUB_THEME", value = "{installed}/theme.txt" }]
+run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
+
+[restore]                             # optional: its help; restore exists with [install]
+help = "…"
+```
+
+`{installed}` is `<to>/<output name>`, `{name}` the output name. A value of
+`set` cannot hold `"`, `$`, `` ` ``, `\` or a line break, so it reads the same
+in any shell. The previous values go into the target's state file
+(`paths.state_file`): `restore` puts them back, and `apply` does not record a
+value that already points to one of its results.
+
+### Discovery
+
+`core.target.discover()` loads, in this order, the built-in Python targets,
+the built-in TOML files (`catppuccinizer/targets/*.toml`), the entry points,
+then the user's TOML files (`$XDG_CONFIG_HOME/catppuccinizer/targets/*.toml`,
+`~/.config/…` by default, the invoking user's under sudo). A name already
+taken is skipped with a note.
+
 ## Changing the core
 
 Run `python3 -m unittest discover -s tests`. If a golden output changes on
