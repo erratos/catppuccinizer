@@ -607,7 +607,8 @@ How:
   into a world-readable theme.
 - **Copies** to the system get explicit rights (files 644, folders 755, whatever
   the umask), and replace the old copy at once: written under a temporary name
-  next to it, then renamed. A link at the destination is replaced, never
+  next to it, then renamed (the old copy put back if the new one cannot take
+  its place). A link at the destination is replaced, never
   followed; `remove` removes a link, never what it points to.
 - **Files** are written atomically (temporary file in the same folder, flushed,
   `os.replace`), keep the rights and owner of the file they replace, and are

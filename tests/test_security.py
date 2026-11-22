@@ -116,6 +116,24 @@ class Copies(Tmp):
         self.assertEqual(stat.S_IMODE((dst / "sub").stat().st_mode), 0o755)
         self.assertEqual([p.name for p in dst.parent.iterdir()], ["x"])      # no temporary left
 
+    def test_install_copy_failed(self):
+        """The new copy cannot take its place: the previous one stays, nothing left over."""
+        from unittest import mock
+        src = self.make_source()
+        dst = self.tmp / "themes/x"
+        dst.mkdir(parents=True)
+        (dst / "old.txt").write_text("old")
+        rename = os.rename
+
+        def failing(a, b):
+            if Path(a).name.startswith(".x.new-"):
+                raise OSError(5, "Input/output error")
+            return rename(a, b)
+        with mock.patch.object(core_system.os, "rename", failing), self.assertRaises(OSError):
+            quiet(System().copy_tree, src, dst)
+        self.assertEqual((dst / "old.txt").read_text(), "old")
+        self.assertEqual([p.name for p in dst.parent.iterdir()], ["x"])
+
     def test_install_over_a_link(self):
         src = self.make_source()
         (self.tmp / "themes").mkdir()

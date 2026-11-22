@@ -189,7 +189,12 @@ class System:
                         dst.unlink()            # replace the link itself, not what it points to
                     elif dst.exists():
                         os.rename(dst, old)
-                    os.rename(new, dst)
+                    try:
+                        os.rename(new, dst)
+                    except BaseException:
+                        if old.exists() and not dst.exists():
+                            os.rename(old, dst)     # the previous copy back: never nothing
+                        raise
                 finally:
                     shutil.rmtree(new, ignore_errors=True)
                     shutil.rmtree(old, ignore_errors=True)
