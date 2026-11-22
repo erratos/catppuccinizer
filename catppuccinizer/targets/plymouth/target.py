@@ -19,25 +19,24 @@ import re
 import shutil
 import subprocess
 from collections import defaultdict
-from multiprocessing import Pool
 from pathlib import Path
 
-import numpy as np
 from PIL import Image
 
 from ...core.detect import DEFAULT_SEPARATION, UI_GROUP, detect_group, detect_params
 from ...core.mapping import (apply_maps, background_of, colour_report, note_accent_ignored,
                              print_colours, uses_accent)
-from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, color_args, hex2rgb, rgb
+from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, color_args, rgb
 from ...core.naming import output_name, planned, slug
 from ...core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ...core.parts import accent_sets, check_parts, note_unused
 from ...core.paths import state_file
 from ...core.sources import item, section, tidy
-from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, preview_animation,
-                             recolor_image, recolor_job, separation_image)
+from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, keys_plan,
+                             preview_animation, recolor_image, run_jobs, separation_image)
+from ...core.sources import theme_folders
 from ...core.naming import check_name
-from ...core.system import System, place, source_file, which
+from ...core.system import System, source_file, which
 from ...core.target import Target
 from .upstream import SRC_ENV, local_src, resolve_theme, upstream_themes
 
@@ -61,17 +60,11 @@ class PlymouthTarget(Target):
         return build(a)
 
     def install(self, a, built, system):
-        state = system.load_state(state_file("plymouth", system=True))
-        system.copy_tree(built, place(INSTALL_DIR, built.name, "theme name"))
-        state["installed"] = sorted({*state.get("installed", []), built.name})
-        system.save_state(state_file("plymouth", system=True), state)
+        system.install_tree(built, INSTALL_DIR, state_file("plymouth", system=True), "theme name")
 
     def apply(self, a, built, system):
-        state = system.load_state(state_file("plymouth", system=True))
-        current = default_theme()
-        if "previous" not in state and current and current not in state.get("installed", []):
-            state["previous"] = current             # what restore makes active again
-        system.save_state(state_file("plymouth", system=True), state)
+        # what restore makes active again
+        system.keep_previous(state_file("plymouth", system=True), default_theme() or None)
         if system.run(["plymouth-set-default-theme", "-R",                 # -R: initramfs
                        check_name(built.name, "theme name")]):
             raise SystemExit("plymouth-set-default-theme failed")
@@ -83,12 +76,7 @@ class PlymouthTarget(Target):
 
     def restore(self, a, system):
         path = state_file("plymouth", system=True)
-        state = system.load_state(path)
-        if not state:
-            raise SystemExit(f"Nothing to restore ({path} not found: nothing was installed "
-                             "or applied)")
-        # names read back from the state file are checked like new ones
-        installed = [check_name(n, f"theme name in {path}") for n in state.get("installed", [])]
+        state, installed = system.restore_state(path, "theme name")
         previous = state.get("previous") and check_name(state["previous"], f"theme name in {path}")
         if default_theme() in installed:
             if not previous:
@@ -96,9 +84,7 @@ class PlymouthTarget(Target):
                                  "sudo plymouth-set-default-theme -R NAME, then rerun --restore")
             if system.run(["plymouth-set-default-theme", "-R", previous]):
                 raise SystemExit("plymouth-set-default-theme failed")
-        for name in installed:
-            system.remove(place(INSTALL_DIR, name))
-        system.save_state(path, {})
+        system.uninstall(path, INSTALL_DIR, installed)
 
     def colours(self, a):
         return colours(a)
@@ -352,11 +338,11 @@ def write_status_variant(base_dir, flavor, bar, bar_width, bar_gap):
 
 
 # ------------------------------------------------------------------- preview
-def preview_sheet(theme, plan, cfg, base, out):
+def preview_sheet(theme, plan, cfg, out):
     """One row per image group: original (over its background) | recoloured (over base)
     | separation (each source colour in its own plain colour, see recolor)."""
     rows = []
-    for g, (src_bg, keys, targets) in plan.items():
+    for g, (src_bg, keys, targets, base) in plan.items():
         paths = theme.groups[g]
         if g == UI_GROUP:   # the largest UI image is the most telling
             path = max(paths, key=lambda p: Image.open(p).size[0] * Image.open(p).size[1]
@@ -397,11 +383,11 @@ def frame_ms(theme):
     return 20 * max(1, int(m.group(1))) if m else 20
 
 
-def animation_preview(theme, plan, base, out):
+def animation_preview(theme, plan, out):
     """--preview-animation: the main animation, before (over its background) | after
     (over base), as an animated WebP."""
     g = main_animation(theme)
-    src_bg, keys, targets = plan[g]
+    src_bg, keys, targets, base = plan[g]
     def pairs():
         for path in theme.groups[g]:
             im = Image.open(path).convert("RGBA")
@@ -416,9 +402,7 @@ def animation_preview(theme, plan, base, out):
 def installed_themes():
     """The installed themes that have images to recolour, the default one marked."""
     active = default_theme()
-    for d in sorted(Path(INSTALL_DIR).iterdir()):
-        if not d.is_dir() or not any(d.glob("*.plymouth")):
-            continue
+    for d in theme_folders(INSTALL_DIR, "*.plymouth"):
         try:
             theme = Theme(d)
         except (SystemExit, OSError, configparser.Error):
@@ -568,34 +552,26 @@ def build(a):
         if not a.no_status and not theme.adi_template and not previewing(a):
             print("  (no -status variant: only for adi1090x-style script themes)")
         for flv in a.flavor:
-            base = rgb(flv, "base")
             for accents, aname in sets:
                 out_name = output_name(flv, theme.slug, aname, a.suffix)
                 # bar colour: its accent, else the most common colour target
                 bar = accents.get("bar") or (main_colours[0] if main_colours else "blue")
-                plan = {}
-                for g, grp in cfg["groups"].items():
-                    if g not in theme.groups:
-                        continue
-                    acc = accents.get(g)
-                    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
-                    targets = np.array([rgb(flv, acc if c["target"] == "accent" else c["target"])
-                                        for c in grp["colors"].values()])
-                    plan[g] = (hex2rgb(grp["background"]), keys, targets)
+                plan = {g: keys_plan(grp, flv, accents.get(g))
+                        for g, grp in cfg["groups"].items() if g in theme.groups}
                 if previewing(a):
                     (a.out / "previews").mkdir(parents=True, exist_ok=True)
                     if a.preview_animation:
                         out = a.out / "previews" / f"{out_name}.webp"
                         print(f"  recolouring {len(theme.groups[main_animation(theme)])} "
                               "images of the main animation…", flush=True)
-                        animation_preview(theme, plan, base, out)
+                        animation_preview(theme, plan, out)
                     else:
                         out = a.out / "previews" / f"{out_name}.png"
-                        preview_sheet(theme, plan, cfg, base, out)
+                        preview_sheet(theme, plan, cfg, out)
                     print(f"  preview: {out}")
                     continue
                 write_theme(theme, out_name, flv, aname, bar, a.out / out_name)
-                for g, (src_bg, keys, targets) in plan.items():
+                for g in plan:
                     # a group without "accent" is the same for every accent: recoloured
                     # once, then copied into the other accents' themes
                     gkey = (flv, g, accents.get(g))
@@ -604,18 +580,15 @@ def build(a):
                                    for p in theme.groups[g]]
                         continue
                     done[gkey] = a.out / out_name
-                    jobs += [(p, a.out / out_name / p.name, src_bg, keys, targets, base)
-                             for p in theme.groups[g]]
+                    jobs += [(p, a.out / out_name / p.name, "keys", cfg["groups"][g], flv,
+                              accents.get(g), a) for p in theme.groups[g]]
                 status.append(((a.out / out_name, flv, bar, cfg["bar_width"], cfg["bar_gap"]),
                                with_status))
 
     if not jobs:
         return None
     print(f"{len(status)} theme(s), {len(jobs)} images", flush=True)
-    with Pool() as pool:
-        for i, _ in enumerate(pool.imap_unordered(recolor_job, jobs, chunksize=8), 1):
-            if i % 500 == 0 or i == len(jobs):
-                print(f"{i}/{len(jobs)} images", flush=True)
+    run_jobs(jobs, parallel=True)
     for src, dst in copies:
         shutil.copyfile(src, dst)
     for args, with_st in status:

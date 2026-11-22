@@ -6,8 +6,9 @@ from collections import Counter
 
 import numpy as np
 
+from .formats import collect_text_colours
 from .palette import (AUTO_HUE_TARGETS, TARGETS, colour_name, hex2rgb, hue_dist, hue_of, rgb,
-                      srgb_to_oklab)
+                      rgb2hex, srgb_to_oklab)
 
 # neutral roles from background to foreground
 RAMP = ["base", "surface0", "surface1", "surface2", "overlay0", "overlay1", "overlay2",
@@ -97,6 +98,20 @@ def note_accent_ignored(a, reason=NO_ACCENT, indent="  "):
 def resolve_target(flavor, accent, target):
     """Catppuccin RGB of a target name ("accent" -> the chosen accent)."""
     return rgb(flavor, accent if target == "accent" else target)
+
+
+def text_colours(files, maps, strict=True, group="text"):
+    """The colours written in text files (QML, SVG, theme files: core.formats), mapped
+    to Catppuccin roles (map_colour_counts), after -m. group: its name for -m GROUP.NAME."""
+    cfg = {"groups": {group: {"colors": map_colour_counts(collect_text_colours(files))}}}
+    apply_maps(cfg, maps, strict=strict)
+    return cfg["groups"][group]["colors"]
+
+
+def text_lookup(colors, flavor, accent):
+    """{#source: #new} of text colours for a flavour and an accent
+    (core.formats.recolour_text)."""
+    return {c["source"]: rgb2hex(resolve_target(flavor, accent, c["target"])) for c in colors.values()}
 
 
 # ------------------------------------------------- --colours (list, write nothing)

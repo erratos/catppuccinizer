@@ -255,6 +255,47 @@ class System:
         else:
             self.remove(path)
 
+    # ------------------------------------------------ installed results
+    # A target that installs its results as folders of one system folder keeps their
+    # names in its state file ("installed"), with what its apply step replaced
+    # ("previous"): restore selects that again, then removes them.
+    def install_tree(self, src, base, state, what="name"):
+        """Copy the folder src to base/<its name> (the name checked first) and add it
+        to the state file's installed results. Returns the installed folder."""
+        src = Path(src)
+        data = self.load_state(state)
+        dst = place(base, src.name, what)
+        self.copy_tree(src, dst)
+        data["installed"] = sorted({*data.get("installed", []), src.name})
+        self.save_state(state, data)
+        return dst
+
+    def keep_previous(self, state, current, name=None):
+        """Before apply: remember current (what restore selects again), unless one was
+        remembered already, current is None (not known), or it is an installed
+        result (name: the result's name in current; default current itself)."""
+        data = self.load_state(state)
+        if ("previous" not in data and current is not None
+                and (current if name is None else name) not in data.get("installed", [])):
+            data["previous"] = current
+        self.save_state(state, data)
+
+    def restore_state(self, state, what="name"):
+        """For restore: (state, installed names); the names read back are checked like
+        new ones. Fails when there is nothing to restore."""
+        data = self.load_state(state)
+        if not data:
+            raise SystemExit(f"Nothing to restore ({state} not found: nothing was installed "
+                             "or applied)")
+        return data, [check_name(n, f"{what} in {state}") for n in data.get("installed", [])]
+
+    def uninstall(self, state, base, names):
+        """After restore selected the previous one: remove the installed results, and
+        the state file."""
+        for name in names:
+            self.remove(place(base, name))
+        self.save_state(state, {})
+
 
 def glob_escape(name):
     return re.sub(r"([*?\[])", r"[\1]", name)

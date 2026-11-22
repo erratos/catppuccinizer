@@ -11,6 +11,7 @@
 """
 import os
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import Pool
 from functools import lru_cache
 from pathlib import Path
 
@@ -172,10 +173,40 @@ def recolor_frames(frames, src_bg, keys, targets, base, quantize=True, parallel=
             yield from pool.map(_recolor_frame, chunk)
 
 
-def recolor_job(args):
-    """Pool-friendly: (path, dst, src_bg, keys, targets, base) -> saved image."""
-    path, dst, src_bg, keys, targets, base = args
-    recolor_image(path, src_bg, keys, targets, base).save(dst, optimize=True)
+def keys_plan(grp, flavor, accent):
+    """(source background, keys, targets, base) of a keys group for a flavour and an
+    accent: the arguments of recolor_image() / recolor_frames() after the image."""
+    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
+    targets = np.array([mapping.resolve_target(flavor, accent, c["target"])
+                        for c in grp["colors"].values()])
+    return hex2rgb(grp["background"]), keys, targets, rgb(flavor, "base")
+
+
+def render_job(job):
+    """Pool-friendly render() + save: (src, dst, method, grp, flavor, accent, a). The
+    file is saved as its extension says (JPEG at quality 95, PNG optimized when small)."""
+    src, dst, method, grp, flavor, accent, a = job
+    im = render(src, method, grp, flavor, accent, a)
+    if dst.suffix.lower() in (".jpg", ".jpeg"):
+        im.convert("RGB").save(dst, quality=95)
+    elif dst.suffix.lower() == ".png":
+        im.save(dst, optimize=im.width * im.height <= OPTIMIZE_MAX_PIXELS)
+    else:
+        im.save(dst)
+
+
+def run_jobs(jobs, what="images", parallel=None):
+    """render_job() over jobs, in worker processes when there are enough of them
+    (parallel=None: more than 8); progress every 500 and at the end when long."""
+    jobs = list(jobs)
+    if not (len(jobs) > 8 if parallel is None else parallel):
+        for job in jobs:
+            render_job(job)
+        return
+    with Pool() as pool:
+        for i, _ in enumerate(pool.imap_unordered(render_job, jobs, chunksize=8), 1):
+            if i % 500 == 0 or i == len(jobs) and len(jobs) >= 100:
+                print(f"{i}/{len(jobs)} {what}", flush=True)
 
 
 # ---------------------------------------------------------------- analysis
@@ -340,10 +371,7 @@ def render(path, method, grp, flavor, accent, a):
         return recolor_lut(path, lut_for(method, flavor, a, accent=accent, hue=grp["dominant"]))
     if method in LUT_METHODS:
         return recolor_lut(path, lut_for(method, flavor, a))
-    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
-    targets = np.array([rgb(flavor, accent if c["target"] == "accent" else c["target"])
-                        for c in grp["colors"].values()])
-    return recolor_image(path, hex2rgb(grp["background"]), keys, targets, rgb(flavor, "base"))
+    return recolor_image(path, *keys_plan(grp, flavor, accent))
 
 
 def colour_report(path, method, grp, note=None, part=None):

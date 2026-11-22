@@ -55,7 +55,8 @@ tests/
 | `mapping.colour_report(source, method, colors, ..., part, accent)` / `recolor.colour_report(path, method, grp, part=)` | one entry of `--colours` (names as `-m` accepts them, source, target, share; the part it belongs to and whether it uses the accent) |
 | `parts.accent_sets(args, using)` / `check_parts(args, known)` / `note_unused(args, using)` / `single(args, parts)` | the results to write from `-a` (`PART=ACCENT` entries: `args.part_accents`), each with its accent per part and the accent of its output name |
 | `mapping.uses_accent(colors)` / `note_accent_ignored(a, reason)` | whether a colour goes to `accent`; the note printed when `-a` was given for nothing |
-| `recolor.recolor_image(path, bg, keys, targets, base)` | keys method on one image (alpha kept) |
+| `recolor.recolor_image(path, bg, keys, targets, base)` / `keys_plan(grp, flavor, accent)` | keys method on one image (alpha kept); the `bg, keys, targets, base` of a detected group for a flavour and an accent |
+| `recolor.run_jobs(jobs)` / `render_job(job)` | `render()` + save of many images, `(src, dst, method, grp, flavor, accent, a)` each, in worker processes when there are more than 8 |
 | `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
 | `options.Option(...)` / `options.defaults(opts, **values)` | declare an option ([below](#options)); a namespace of defaults for scripts |
 | `recolor.method_options(methods=None, help=None, needs=None, keys_always=False)` | `--method`, `--separation`, `--keep-lum`, `--smooth`, `--lutgen-*` (only the given methods; `keys_always`: `--separation` matters whatever `--method`, for a target that also recolours with keys on its own) |
@@ -66,11 +67,14 @@ tests/
 | `recolor.accent_ignored_reason(method, grp)` | why the accent has no effect on an image, or None |
 | `clut.apply_cube` / `resample` / `read_hald` / `write_hald` / `write_cube` | 3D LUT application and files |
 | `formats.collect_text_colours(files)` / `recolour_text_file(f, lookup)` | colours inside QML / SVG / SVGZ |
+| `mapping.text_colours(files, maps, strict, group)` / `text_lookup(colors, flavor, accent)` | the colours of text files mapped to roles, after `-m`; their `{#source: #new}` for a flavour and accent |
 | `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
 | `recolor.recolor_frames(frames, ...)` | keys method over a stream of frames, in parallel |
 | `paths.cache_dir()` / `give_back(path)` | where to store things (the invoking user's home under sudo), sudo ownership |
 | `paths.state_file(target, system)` | where a step keeps what `restore` needs (the theme in use before…) |
 | `system.System` | `copy_tree`, `copy_file`, `write_text(…, backup=True)`, `remove`, `run`, `load_state` / `save_state`: every change a step makes, printed (only listed with `--dry-run`) |
+| `System.install_tree(src, base, state)` / `keep_previous(state, current, name)` / `restore_state(state)` / `uninstall(state, base, names)` | results installed as folders of one system folder: copied and remembered; what apply replaced, remembered once; for restore, the state and the installed names (checked); removed |
+| `sources.theme_folders(base, marker)` | the theme folders of a folder: those with a file matching `marker` (`"*.plymouth"`) |
 | `system.place(base, name)` / `naming.check_name(name)` | a system path built from a theme or package name, checked first (no `/`, `..`, leading `-`) |
 | `system.copy_folder(src, dst)` / `source_file(path, root)` | copy a source theme without following links out of it; the file to read for a theme file, or None |
 | `system.which(name)` / `read_text(path)` | a command's absolute path (as root: system folders only); a text file as it is, for a byte-exact rewrite |

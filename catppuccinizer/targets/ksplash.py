@@ -22,26 +22,25 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-import numpy as np
-
 from ..core import naming, recolor
 from ..core.detect import detect_group, detect_params
-from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect_text_colours,
-                            is_animated, recolour_text_file, save_animation, text_files)
-from ..core.mapping import (apply_maps, background_of, colour_report, map_colour_counts,
-                            note_accent_ignored, print_colours, resolve_target, uses_accent)
-from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
+from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, is_animated,
+                            recolour_text_file, save_animation, text_files)
+from ..core.mapping import (apply_maps, background_of, colour_report, note_accent_ignored,
+                            print_colours, text_colours, text_lookup, uses_accent)
+from ..core.palette import FLAVOR_TITLES
 from ..core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ..core.parts import accent_sets, check_parts, note_unused, single
 from ..core.paths import state_file
 from ..core.naming import check_name
-from ..core.sources import item, section, tidy
-from ..core.system import copy_folder, place, source_file, which
+from ..core.sources import item, section, theme_folders, tidy
+from ..core.system import copy_folder, source_file, which
 from ..core.target import Target
 
 SEARCH = [Path.home() / ".local/share/plasma/look-and-feel", Path("/usr/share/plasma/look-and-feel")]
 USER_DIR = SEARCH[0]
 SETTINGS = ("Theme", "Engine")              # [KSplash] of ksplashrc
+MARKER = "contents/splash/Splash.qml"       # what makes a look-and-feel package a splash screen
 
 
 # -a PART=ACCENT (core.parts): the QML / SVG colours, the animations, the other images
@@ -86,33 +85,22 @@ class KSplashTarget(Target):
         return build(a)
 
     def install(self, a, built, system):
-        state = system.load_state(state_file("ksplash"))
-        system.copy_tree(built[0], place(USER_DIR, built[0].name, "package id"))
-        state["installed"] = sorted({*state.get("installed", []), built[0].name})
-        system.save_state(state_file("ksplash"), state)
+        system.install_tree(built[0], USER_DIR, state_file("ksplash"), "package id")
 
     def apply(self, a, built, system):
-        state = system.load_state(state_file("ksplash"))
         current = {key: read_setting(key) for key in SETTINGS}
-        if "previous" not in state and current["Theme"] not in state.get("installed", []):
-            state["previous"] = current             # what restore selects again
+        system.keep_previous(state_file("ksplash"), current, current["Theme"])   # for restore
         set_settings(system, {"Theme": built[0].name, "Engine": "KSplashQML"})
-        system.save_state(state_file("ksplash"), state)
 
     def test(self, a, built, system):
         print("  (closes by itself, or click it)")
         system.run(["ksplashqml", "--test", "--window", built[0]])
 
     def restore(self, a, system):
-        state = system.load_state(state_file("ksplash"))
-        if not state:
-            raise SystemExit(f"Nothing to restore ({state_file('ksplash')} not found: nothing was installed "
-                             "or applied)")
+        state, installed = system.restore_state(state_file("ksplash"), "package id")
         if "previous" in state:
             set_settings(system, state["previous"])
-        for pid in state.get("installed", []):      # read back: checked like new names
-            system.remove(place(USER_DIR, pid, f"package id in {state_file('ksplash')}"))
-        system.save_state(state_file("ksplash"), {})
+        system.uninstall(state_file("ksplash"), USER_DIR, installed)
 
     def colours(self, a):
         return colours(a)
@@ -132,13 +120,8 @@ class KSplashTarget(Target):
 
 # ------------------------------------------------------------------ packages
 def splash_packages():
-    found = {}
-    for base in reversed(SEARCH):                  # user packages override system ones
-        if base.is_dir():
-            for d in base.iterdir():
-                if (d / "contents/splash/Splash.qml").exists():
-                    found[d.name] = d
-    return found
+    # user packages override system ones
+    return {d.name: d for base in reversed(SEARCH) for d in theme_folders(base, MARKER)}
 
 
 def resolve(arg):
@@ -183,11 +166,10 @@ def metadata(pkg, pid, name, description):
 
 def installed(base, active):
     """The splash screens of a look-and-feel folder, the selected one marked."""
-    for d in sorted(base.iterdir(), key=lambda d: d.name):
-        if (d / "contents/splash/Splash.qml").exists():
-            preview = d / "contents/previews/splash.png"
-            yield item(d.name, package_name(d), current=d.name == active,
-                       thumb=preview if preview.is_file() else None)
+    for d in theme_folders(base, MARKER):
+        preview = d / "contents/previews/splash.png"
+        yield item(d.name, package_name(d), current=d.name == active,
+                   thumb=preview if preview.is_file() else None)
 
 
 def preview_group(preview, rasters):
@@ -219,10 +201,7 @@ def analyse(a, pkg, tmp):
     """Colours of a splash package after -m: (QML / SVG colours, {image: (method or
     "anim", group, extra)}). Animations are sampled into tmp."""
     splash = pkg / "contents/splash"
-    vector = {"groups": {"vector": {"colors": map_colour_counts(
-        collect_text_colours(text_files(splash)))}}}
-    apply_maps(vector, a.map, strict=False)
-    vcolors = vector["groups"]["vector"]["colors"]
+    vcolors = text_colours(text_files(splash), a.map, strict=False, group="vector")
     if vcolors:
         print("  QML / SVG colours")
         print_colours(vcolors)
@@ -385,8 +364,7 @@ def build(a):
                 pkg, pid, name, f"Catppuccin {FLAVOR_TITLES[flv]} recolour of the "
                                 f"{title} splash screen"), indent=4) + "\n")
 
-            lookup = {c["source"]: rgb2hex(resolve_target(flv, accents.get("vector"), c["target"]))
-                      for c in vcolors.values()}
+            lookup = text_lookup(vcolors, flv, accents.get("vector"))
             for f in text_files(dst / "contents/splash"):
                 recolour_text_file(f, lookup)
 
@@ -402,15 +380,11 @@ def build(a):
                 done[key] = out
                 if method == "anim":
                     n, durations, loop = extra
-                    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
-                    targets = np.array([resolve_target(flv, acc, c["target"])
-                                        for c in grp["colors"].values()])
                     if n > 100:
                         print(f"  recolouring {n} frames of {src.name}…", flush=True)
                     frames = recolor.recolor_frames(
-                        anim_frames(src), hex2rgb(grp["background"]), keys, targets,
-                        rgb(flv, "base"), quantize=out.suffix.lower() == ".gif",
-                        parallel=n > 48)
+                        anim_frames(src), *recolor.keys_plan(grp, flv, acc),
+                        quantize=out.suffix.lower() == ".gif", parallel=n > 48)
                     save_animation(frames, n, out, durations, loop)
                 else:
                     im = recolor.render(src, method, grp, flv, acc, a)
@@ -422,13 +396,6 @@ def build(a):
             print(f"  -> {dst}  ({name})")
     shutil.rmtree(tmp, ignore_errors=True)
     return built or None
-
-
-def anim_plan(grp, flv, acc):
-    """(source background, keys, targets, base) of an animation."""
-    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
-    targets = np.array([resolve_target(flv, acc, c["target"]) for c in grp["colors"].values()])
-    return hex2rgb(grp["background"]), keys, targets, rgb(flv, "base")
 
 
 def preview(a, pkg, slug, rasters, sets):
@@ -445,7 +412,7 @@ def preview(a, pkg, slug, rasters, sets):
     if a.preview_animation:
         src = anims[0]
         method, grp, (n, durations, _) = rasters[src]
-        plan = anim_plan(grp, flv, acc_of(method, grp))
+        plan = recolor.keys_plan(grp, flv, acc_of(method, grp))
         after = recolor.recolor_frames(anim_frames(src), *plan, quantize=False, parallel=n > 48)
         pairs = ((recolor.on_black(b), recolor.on_black(r)) for b, r in zip(anim_frames(src), after))
         dst = out / f"{package_id(flv, slug, aname, a)}.webp"
@@ -464,7 +431,7 @@ def preview(a, pkg, slug, rasters, sets):
             src = anims[0]
             method, grp, (n, _, _) = rasters[src]
             frame = next(anim_frames(src, {n // 2}))
-            im = recolor.recolor_image(frame, *anim_plan(grp, flv, acc_of(method, grp)),
+            im = recolor.recolor_image(frame, *recolor.keys_plan(grp, flv, acc_of(method, grp)),
                                        quantize=False)
             recolor.side_by_side(frame, im, dst, grp)
     print(f"  preview: {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + aname if aname else ''})")

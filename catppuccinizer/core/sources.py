@@ -64,6 +64,16 @@ def tidy(path):
         return str(path)
 
 
+def theme_folders(base, marker):
+    """The theme folders of base, by name: the folders with a file matching marker, a
+    glob relative to the folder ("*.plymouth", "contents/splash/Splash.qml")."""
+    base = Path(base)
+    if not base.is_dir():
+        return []
+    return [d for d in sorted(base.iterdir(), key=lambda d: d.name)
+            if d.is_dir() and any(d.glob(marker))]
+
+
 # --------------------------------------------------------------- wallpapers
 def wallpaper_dirs():
     return [("System wallpapers", Path("/usr/share/wallpapers")),

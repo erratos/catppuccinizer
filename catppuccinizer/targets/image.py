@@ -22,13 +22,13 @@ from pathlib import Path
 from PIL import Image
 
 from ..core import recolor
-from ..core.formats import collect_text_colours, read_text, recolour_text, write_text
-from ..core.mapping import (apply_maps, colour_report, map_colour_counts, note_accent_ignored,
-                            print_colours, resolve_target, uses_accent)
+from ..core.formats import read_text, recolour_text, write_text
+from ..core.mapping import (colour_report, note_accent_ignored, print_colours, text_colours,
+                            text_lookup, uses_accent)
 from ..core.naming import output_name, planned, slug
 from ..core.options import Option
 from ..core.parts import accent_sets, check_parts
-from ..core.palette import FLAVOR_TITLES, rgb2hex
+from ..core.palette import FLAVOR_TITLES
 from ..core.sources import wallpaper_sections
 from ..core.target import Target
 
@@ -122,8 +122,7 @@ class ImageTarget(Target):
             note_accent_ignored(a)
         for flv in a.flavor:
             for _, acc in sets_of(a, path, uses_accent(colors)):
-                lookup = {c["source"]: rgb2hex(resolve_target(flv, acc, c["target"]))
-                          for c in colors.values()}
+                lookup = text_lookup(colors, flv, acc)
                 name = output_name(flv, path.stem, acc, a.suffix)
                 new = recolour_text(text, False, lookup)
                 if a.preview:
@@ -140,9 +139,7 @@ class ImageTarget(Target):
 
 def vector_colours(path, a):
     """Colours written in an SVG, mapped to Catppuccin roles, after -m."""
-    cfg = {"groups": {"svg": {"colors": map_colour_counts(collect_text_colours([path]))}}}
-    apply_maps(cfg, a.map, strict=a.strict_map)
-    return cfg["groups"]["svg"]["colors"]
+    return text_colours([path], a.map, strict=a.strict_map, group="svg")
 
 
 def images(a):
