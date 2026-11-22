@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .core import options
+from .core import options, settings
 from .core.mapping import format_colour_report
 from .core.naming import dedupe, format_planned
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
@@ -71,19 +71,31 @@ def parse(argv=None, parser=None):
         raise SystemExit("--dry-run goes with " + " / ".join(f"--{s}" for s in t.steps))
     if "restore" in asked and len(asked) > 1:
         raise SystemExit("--restore goes alone (it undoes --install / --apply)")
+    if "configure" in asked and len(asked) > 1:
+        raise SystemExit("--configure goes alone (the system settings, apart from the theme)")
+    given = settings.given(a, t.all_options())
+    if given and "configure" not in asked:
+        flags = " ".join(o.flags[-1] for o in settings.setting_options(t.all_options()) if o.dest in given)
+        raise SystemExit(f"{flags}: system settings, written with --configure")
     options.check(a, t.all_options())
-    t.check(a)
+    if "configure" not in asked:          # the theme's checks: the settings need no theme
+        t.check(a)
     return a
 
 
 def run(t, a):
     """build, then the system steps asked for, in order: --apply implies --install;
-    --restore runs alone, without building."""
+    --restore and --configure run alone, without building."""
     system = System(dry_run=getattr(a, "dry_run", False))
     dry = " (dry run: nothing is changed)" if system.dry_run else ""
     if getattr(a, "restore", False):
         print(f"restore{dry}")
         return t.restore(a, system)
+    if getattr(a, "configure", False):
+        if not settings.given(a, t.all_options()):       # nothing to change: what is set now
+            return print(settings.format_settings(t.all_options(), t.settings_now(a), t.tips))
+        print(f"configure{dry}")
+        return t.configure(a, system)
     if a.preview_of:
         print("preview: the first flavour and accent only ({}, {})".format(*a.preview_of))
     built = t.build(a)

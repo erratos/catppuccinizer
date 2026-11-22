@@ -28,6 +28,7 @@ from ..core.palette import FLAVOR_TITLES
 from ..core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ..core.parts import check_parts, note_unused, single
 from ..core.paths import state_file
+from ..core.settings import given, remember, setting, settings_state
 from ..core.naming import check_name
 from ..core.online import Ocs
 from ..core.sources import item, section, theme_folders, tidy
@@ -37,6 +38,9 @@ from ..core.target import Target
 SEARCH = [Path.home() / ".local/share/plasma/look-and-feel", Path("/usr/share/plasma/look-and-feel")]
 USER_DIR = SEARCH[0]
 SETTINGS = ("Theme", "Engine")              # [KSplash] of ksplashrc
+ENGINES = {"on": "KSplashQML", "off": "none"}
+SPLASH = setting("--splash", label="Splash screen", choices=list(ENGINES),
+                 help="show a splash screen at login, or none (Engine; not set: on)")
 MARKER = "contents/splash/Splash.qml"       # what makes a look-and-feel package a splash screen
 
 
@@ -53,6 +57,10 @@ class KSplashTarget(Target):
                   note="Plasma splash screens with previews, each with its own licence (the "
                        "ones of System Settings, Splash Screen, Get New…)")]
     accent_also = "the QML / SVG colours mapped to accent"
+    tips = ["The splash shows while Plasma starts, so a fast login shows it briefly; "
+            "--test shows it in a window as long as you like.",
+            "--splash off skips it (a black screen until the desktop), as System Settings, "
+            "Splash Screen, None does."]
 
     def options(self):
         return [
@@ -69,6 +77,10 @@ class KSplashTarget(Target):
                          "on a click."),
             step("restore", help="select the previous splash screen again and remove "
                                  "the installed ones"),
+            SPLASH,
+            step("configure", help="write the display settings given (ksplashrc)",
+                 explain="Here: the splash engine in ksplashrc (kwriteconfig6), the value "
+                         "replaced being remembered; seen at the next login."),
         ]
 
     def check(self, a):
@@ -109,6 +121,20 @@ class KSplashTarget(Target):
 
     def outputs(self, a):
         return outputs(a)
+
+    def configure(self, a, system):
+        value = given(a, [SPLASH])["splash"]
+        engine = read_setting("Engine") or None
+        target = value if value == "default" else ENGINES[value]
+        writes = remember(system, settings_state("ksplash", system=False),
+                          {"Engine": target}, {"Engine": engine})
+        if writes:
+            set_settings(system, writes)
+        else:
+            print("  ksplashrc: nothing to change")
+
+    def settings_now(self, a=None):
+        return {"splash": "off" if read_setting("Engine") == "none" else "on"}
 
     def locations(self):
         try:

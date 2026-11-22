@@ -31,6 +31,7 @@ catppuccinizer/
     sources.py        where sources come from: system locations (sections, items), links
     online.py         online sources the GUI browses (Wallhaven, OCS stores, GitHub releases), downloads
     archives.py       archives unpacked safely (no '..', no links, limits)
+    settings.py       system settings (--configure): declared, checked, values replaced kept
   targets/
     plymouth/         Plymouth themes (+ preview script)
     image.py          images (wallpapers, logos…)
@@ -48,6 +49,7 @@ tests/
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     system locations, installed themes and wallpapers, links, --list
   test_online.py      online sources, request rules, Wallhaven, OCS, GitHub, safe archives (no network)
+  test_settings.py    system settings: checks, values kept and undone, INI files, each target's
   test_outputs.py     --names of every target against what the build writes
   test_previews.py    --preview / --preview-animation: first flavour and accent, no build
   test_folder.py      core.folder (parts of a theme folder) and the "hex" colour syntax
@@ -86,6 +88,9 @@ tests/
 | `system.System` | `copy_tree`, `copy_file`, `write_text(…, backup=True)`, `remove`, `run`, `load_state` / `save_state`: every change a step makes, printed (only listed with `--dry-run`) |
 | `System.install_tree(src, base, state)` / `keep_previous(state, current, name)` / `restore_state(state)` / `uninstall(state, base, names)` | results installed as folders of one system folder: copied and remembered; what apply replaced, remembered once; for restore, the state and the installed names (checked); removed |
 | `system.get_variable(text, key)` / `set_variable(text, key, value, raw)` / `unquote(raw)` | a `KEY="value"` file (`/etc/default/grub`): the raw value; the text with it set (checked and quoted), restored (`raw`) or removed (`None`), the rest byte for byte |
+| `system.get_ini(text, section, key)` / `set_ini(text, section, key, value)` / `config_text(path)` | an INI file (`plymouthd.conf`): a key of a section read, set or removed (`None`), the rest byte for byte; a configuration file as it is (`""` when missing) |
+| `settings.setting(flag, help, check=… / choices=…)` / `integer` / `decimal` / `pattern` / `plain_text` | a [system setting](#system-settings) and the checks of its value (`default` always accepted) |
+| `settings.given(args, options)` / `remember(system, state, changes, current)` / `settings_state(target, system)` | the settings given; what to write for them, the values they replace kept in the settings state file (`default` writes them back) |
 | `paths.config_dir()` | the user's configuration folder (`~/.config/catppuccinizer`, the invoking user's under sudo) |
 | `declarative.load(path, builtin)` | the `Target` a TOML file describes ([below](#declarative-targets-toml)) |
 | `sources.theme_folders(base, marker)` | the theme folders of a folder: those with a file matching `marker` (`"*.plymouth"`) |
@@ -235,6 +240,43 @@ and devices left out, files and size limited), the theme folders found
 (`core.online.theme_dirs()`), the archive removed. `--list` prints an online
 source's page with the links.
 
+### System settings
+
+How the result is shown, set in the system's own files (a boot menu's timeout,
+Plymouth's delay), apart from the theme: options made with
+`core.settings.setting()` (stage `configure`, `None` when not given), the step
+`step("configure")`, and two methods:
+
+```python
+from ..core.settings import given, integer, remember, setting, settings_state
+from ..core.system import config_text, get_variable, set_variable, unquote
+
+TIMEOUT = setting("--timeout", check=integer(0, 60), metavar="SECONDS",
+                  help="seconds before the default entry (not set: 5)")
+# in options(): TIMEOUT, step("configure", sudo="run", help="write the settings given")
+
+def configure(self, a, system):            # runs alone: nothing is built
+    changes = {"TIMEOUT": v for v in given(a, [TIMEOUT]).values()}   # a value or "default"
+    text = config_text(CONF)
+    current = {"TIMEOUT": get_variable(text, "TIMEOUT")}
+    for key, value in remember(system, settings_state("mine"), changes, current).items():
+        text = set_variable(text, key, value, raw=True)
+    system.write_text(CONF, text, backup=True)
+
+def settings_now(self, a=None):            # {dest: text or None}, for --configure and the GUI
+    return {"timeout": unquote(get_variable(config_text(CONF), "TIMEOUT") or "") or None}
+```
+
+A value is checked when the command line is parsed (`integer`, `decimal`,
+`pattern`, `plain_text`, or `choices`); `default` undoes a setting: where the
+target writes its own block or file, it removes it; where it changes a line of
+the system's file, `remember()` keeps the value replaced (first change only) in
+`settings_state(<target>)` and gives it back. `--configure` goes alone (no
+theme checks, nothing built); without a setting it prints the current values
+(`settings_now(args)`) and `Target.tips`. Limine (its own block of
+`limine.conf`), Plymouth (`plymouthd.conf`, a systemd drop-in), the KDE splash
+(`ksplashrc`) and GRUB (TOML, [`[configure]`](#format)) have some.
+
 Optionally too, `def colours(self, a)` does only the analysis and returns the
 colours `-m` can remap, as `mapping.colour_report(...)` entries (or
 `recolor.colour_report(path, *recolor.plan(path, a, verbose=False))` for an
@@ -298,8 +340,8 @@ use the accent rendered once per flavour, then copied. `colours(fold)` is the
 before/after images) and returns what the system steps work on. The steps are
 optional methods, each with its option made by `options.step()`; the command
 line runs build, then `install` (also for `--apply`), `apply` and `test`, in
-that order. `restore` runs alone, without building; `--dry-run` is added to
-targets that have steps.
+that order. `restore` and `configure` run alone, without building; `--dry-run`
+is added to targets that have steps.
 
 | Step | Effect | Typical rights |
 |---|---|---|
@@ -309,6 +351,7 @@ targets that have steps.
 | `apply` | selected / configured | often root |
 | `test` | shown without rebooting or logging out | depends |
 | `restore` | `apply` and `install` undone | as `apply` |
+| `configure` | the [system settings](#system-settings) given, apart from the theme | as `apply` |
 
 A step changes the system only through the `System` object it gets: each change
 is printed, and with `--dry-run` only listed. Reading the system (the current
@@ -382,7 +425,10 @@ A TOML target can say:
   commands;
 - **restore**: generated: the variables get back their previous values (or
   their lines are removed when they had none), the commands that name no
-  `{…}` run again, the installed results are removed.
+  `{…}` run again, the installed results are removed;
+- **configure**: [system settings](#system-settings) as variables of
+  `KEY="value"` files, each checked (choices, a range, a pattern, or plain
+  text), then commands; `default` gives a variable back its previous value.
 
 What needs a decision about the content stays in Python: files generated from
 scratch (KDE's `metadata.json`), formats edited by rules (Plymouth scripts, the
@@ -468,6 +514,24 @@ run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
 
 [restore]                             # optional: its help; restore exists with [install]
 help = "…"
+
+[configure]                           # optional: system settings (--configure)
+sudo = true                           # needs root (built-in files only)
+help = "…"                            # (optional; explain too)
+run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]     # after a change (allow list, no {…})
+tips = ["…"]                          # shown with the settings (optional)
+
+[[configure.settings]]                # any number
+name = "timeout"                      # --timeout
+file = "/etc/default/grub"            # a KEY="value" file
+key = "GRUB_TIMEOUT"
+help = "seconds before the default entry boots (not set: 5)"
+min = -1                              # checked by min and max,
+max = 3600
+# choices = ["menu", "hidden"]        # or choices,
+# pattern = '\d+x\d+'                # or a pattern (what = its description),
+                                      # or nothing: one line of text
+label = "Timeout"                     # (optional)
 ```
 
 A `[[source.online]]` store is reached as described in
@@ -519,6 +583,12 @@ output folder goes through `core.system` (the `System` object of the steps).
 | `ksplashrc`, Plymouth default theme | through `kwriteconfig6`, `plymouth-set-default-theme -R` | apply, restore | the user / root |
 | `/boot/grub/themes/<name>/` | GRUB themes | install | root, 644 / 755 |
 | `/etc/default/grub` + dated backups | `GRUB_THEME`, then `grub-mkconfig` | apply, restore | root, rights of the existing file |
+| `<ESP>/…/limine.conf` + dated backups | the display settings block | configure | root |
+| `/etc/plymouth/plymouthd.conf` + dated backups | `ShowDelay`, `DeviceTimeout`, `DeviceScale`, then the initramfs rebuilt | configure | root, rights of the existing file |
+| `/etc/systemd/system/plymouth-quit.service.d/catppuccinizer.conf` | `--hold`: a sleep before Plymouth quits, then `systemctl daemon-reload` | configure | root, 644 |
+| `/etc/default/grub` + dated backups | `GRUB_TIMEOUT`, `GRUB_GFXMODE`…, then `grub-mkconfig` | configure | root |
+| `ksplashrc` | `Engine` (splash on / off), through `kwriteconfig6` | configure | the user |
+| `…/catppuccinizer/<target>-settings.json` | the values the settings replaced (for `default`) | configure | as the step |
 | what a user's TOML target names | its install folder, its `KEY="value"` files | install, apply, restore | the user, inside their home only |
 
 How:
@@ -548,6 +618,10 @@ How:
   comes back as the backup of the first `apply`, and later changes (new kernel
   entries) are kept. A wallpaper path of `limine.conf` that leaves the ESP
   (`boot():/../…`) is refused.
+- **System settings** are checked when the command line is parsed (numbers in
+  a range, patterns, choices, one line of text), go through the same file
+  rules as the steps (backup, atomic write, byte for byte, Limine's block read
+  back before it is written), and `default` undoes each one.
 - **`KEY="value"` files** (`/etc/default/grub`) change only the line that sets
   the variable (or one line added at the end); a value is quoted and cannot
   hold `"`, `$`, `` ` ``, `\` or a line break, so no shell reads more into it;

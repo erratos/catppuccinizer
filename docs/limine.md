@@ -131,6 +131,40 @@ back would lose; the backups stay on the ESP if you want one anyway. A file
 without a theme is left as it is; a broken block (a begin line without its end)
 is refused, to be fixed by hand.
 
+## Display settings
+
+How the menu behaves and is drawn, apart from the theme: `--configure` writes
+the settings given into a block of their own in `limine.conf` (between
+`# >>> display settings (catppuccinizer)` and its end line), after a backup.
+It builds nothing, and leaves the theme's block alone (and the theme's steps
+leave it alone). The global options it replaces are commented out, as for the
+theme; `default` removes a setting from the block, so the line it had
+commented out comes back, and when the block is empty the file is as it was,
+byte for byte.
+
+```bash
+sudo catppuccinize limine --configure                          # the current values, and tips
+sudo catppuccinize limine --configure --timeout 2 --font-scale 2x2 --branding "My PC"
+sudo catppuccinize limine --configure --timeout default        # undo one
+sudo catppuccinize limine --wallpaper current --preview        # see them in the preview
+```
+
+| Setting | Writes | Value | Not set |
+|---|---|---|---|
+| `--timeout` | `timeout` | seconds (0: at once), or `no` to wait | 5 |
+| `--resolution` | `interface_resolution` | `WIDTHxHEIGHT` | the screen's own |
+| `--branding` | `interface_branding` | the title at the top | Limine and its version |
+| `--hide-help` | `interface_help_hidden` | `yes` / `no`: the lines of keys | no |
+| `--font-scale` | `term_font_scale` | `WxH`, `2x2` doubles the text | 2x2 from 2560×1440, 4x4 from 5120×2880 |
+| `--margin` | `term_margin` | pixels around the menu frame, over a wallpaper | 64 |
+| `--margin-gradient` | `term_margin_gradient` | pixels of the frame's fade | 4 |
+| `--remember-last` | `remember_last_entry` | `yes` / `no` | no |
+| `--editor` | `editor_enabled` | `yes` / `no`: editing an entry with E | yes |
+
+The [preview](#preview) reads `limine.conf`, so it shows the settings once
+written. With config enrollment, run `sudo limine-enroll-config` afterwards
+(`--configure` reminds you).
+
 ## Options
 
 | Option | Meaning |
@@ -146,6 +180,7 @@ is refused, to be fixed by hand.
 | `--install` | copy the wallpaper to `<ESP>/catppuccin/` (sudo) |
 | `--apply` | install, then write the theme into `limine.conf` (sudo) |
 | `--restore` | remove the theme from `limine.conf` and its wallpapers (sudo) |
+| `--configure` | write the [display settings](#display-settings) given (sudo); alone: print them |
 | `--dry-run` | with the steps above: only list what they would change |
 | `--conf`, `--esp` | `limine.conf` to edit, ESP mount point (searched by default) |
 | `--method`, `--separation`, `--auto-fit`, `--keep-lum`, `--smooth`, `--chroma`, `--dark-fade`, `--lutgen-*` | how the wallpaper is recoloured, as for [images](images.md#options) (with `--wallpaper`) |

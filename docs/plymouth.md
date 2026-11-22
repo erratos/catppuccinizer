@@ -240,23 +240,32 @@ can also pick the theme in *System Settings → Boot Splash Screen* once copied.
 Make sure `splash` is in your kernel command line and the `plymouth` hook is
 enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.conf`).
 
-## Tips
+## Display settings
 
-### Seeing the splash on a fast machine
-
-On a fast machine the splash may vanish before you see it. A systemd drop-in
-can delay the end of Plymouth by a few seconds (and so the login screen):
+When and how the splash shows, apart from the theme: `--configure` writes the
+settings given, builds nothing, and `default` undoes one.
 
 ```bash
-sudo mkdir -p /etc/systemd/system/plymouth-quit.service.d
-printf '[Service]\nExecStartPre=/usr/bin/sleep 5\n' |
-    sudo tee /etc/systemd/system/plymouth-quit.service.d/delay.conf
-sudo systemctl daemon-reload
+sudo catppuccinize plymouth --configure                     # the current values, and tips
+sudo catppuccinize plymouth --configure --show-delay 0 --hold 3
+sudo catppuccinize plymouth --configure --hold default      # undo it
 ```
 
-To remove it: `sudo rm /etc/systemd/system/plymouth-quit.service.d/delay.conf`,
-then `sudo systemctl daemon-reload`. Keep the delay short: the whole boot waits
-for it.
+| Setting | Writes | Value | Not set |
+|---|---|---|---|
+| `--show-delay` | `ShowDelay` in `[Daemon]` of `/etc/plymouth/plymouthd.conf` | seconds of boot before the splash shows: a shorter boot shows none | `plymouthd.defaults` (often 0) |
+| `--device-timeout` | `DeviceTimeout` (same file) | seconds to wait for the graphics driver before the text splash | `plymouthd.defaults` (often 8) |
+| `--scale` | `DeviceScale` (same file) | `1` or `2`: HiDPI | chosen from the screen |
+| `--hold` | `/etc/systemd/system/plymouth-quit.service.d/catppuccinizer.conf` | seconds the splash stays longer at the end of the boot | none |
+
+`plymouthd.conf` is edited line by line (a dated backup first, the rest kept
+byte for byte), and the value replaced is remembered (in
+`/var/lib/catppuccinizer/plymouth-settings.json`) for `default`; the initramfs
+holds a copy, so it is rebuilt afterwards (`plymouth-set-default-theme -R` with
+the theme in use). `--hold` writes a systemd drop-in that makes
+`plymouth-quit.service` wait (`ExecStartPre=sleep N`), then reloads systemd; on
+a fast machine the splash would vanish before you see it, but keep it short:
+the whole boot waits for it. `default` removes the drop-in.
 
 ## Options
 
@@ -279,6 +288,7 @@ for it.
 | `--apply` | | install, make it the default theme, rebuild the initramfs (sudo) |
 | `--test [S]` | `10` | install and show it for S seconds without rebooting (sudo) |
 | `--restore` | | previous default theme again, installed themes removed (sudo) |
+| `--configure` | | write the [display settings](#display-settings) given (sudo); alone: print them |
 | `--dry-run` | | with the steps above: only list what they would change |
 
 Output names: `catppuccin-<flavor>-<theme>[-<accent>][-<suffix>]`.

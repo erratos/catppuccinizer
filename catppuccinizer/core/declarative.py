@@ -21,8 +21,10 @@ from .options import PREVIEW_ANIMATION, Option, previewing, step
 from .palette import FLAVOR_TITLES
 from .parts import check_parts, note_unused, single
 from .paths import state_file, user_home
+from .settings import given, integer, pattern, plain_text, remember, setting, settings_state
 from .sources import item, link, section, theme_folders, tidy
-from .system import copy_folder, get_variable, place, read_text, set_variable, unquote
+from .system import (UNSAFE_VALUE, VARIABLE, config_text, copy_folder, get_variable, place,
+                     set_variable, unquote)
 from .target import Target
 
 # the programs apply may run: bootloader and cache refreshers (adding one is a change
@@ -38,7 +40,7 @@ SCHEMA = {                 # key: (type, required)
     "": {"name": (STR, True), "help": (STR, True), "description": (STR, False),
          "default_out": (STR, False), "ignore": (STRS, False), "source": (TABLE, True),
          "parts": (TABLES, True), "install": (TABLE, False), "apply": (TABLE, False),
-         "restore": (TABLE, False)},
+         "restore": (TABLE, False), "configure": (TABLE, False)},
     "source": {"marker": (STR, True), "search": (STRS, False), "default": (STR, False),
                "label": (STR, False), "help": (STR, False), "links": (TABLES, False),
                "online": (TABLES, False)},
@@ -52,6 +54,11 @@ SCHEMA = {                 # key: (type, required)
               "run": (COMMAND_LIST, False)},
     "set": {"file": (STR, True), "key": (STR, True), "value": (STR, True)},
     "restore": {"help": (STR, False)},
+    "configure": {"settings": (TABLES, True), "help": (STR, False), "explain": (STR, False),
+                  "sudo": (BOOL, False), "run": (COMMAND_LIST, False), "tips": (STRS, False)},
+    "settings": {"name": (STR, True), "file": (STR, True), "key": (STR, True), "help": (STR, True),
+                 "label": (STR, False), "choices": (STRS, False), "min": (INT, False),
+                 "max": (INT, False), "pattern": (STR, False), "what": (STR, False)},
 }
 
 
@@ -226,10 +233,52 @@ class TomlTarget(Target):
             self.step_help["restore"] = spec.get("restore", {}).get(
                 "help", "select the previous one again and remove the installed ones"
                 if self.sets else "remove the installed ones")
+        self.settings, self.configure_sudo, self.configure_run = [], False, []
+        if "configure" in spec:
+            self.load_settings(spec["configure"], f"{where} [configure]", builtin)
         names = [p.name for p in self.parts]
         texts = [p.label or p.name for p in self.parts if p.kind == "text"]
         self.accent_also = f"the colours of {', '.join(texts)}" if texts else None
         self.part_names = names
+
+    def load_settings(self, conf, where, builtin):
+        """[configure]: settings of KEY="value" files ([[configure.settings]]), the
+        commands to run after a change, the tips."""
+        check_table(conf, "configure", where)
+        self.configure_sudo = conf.get("sudo", False)
+        if self.configure_sudo and not builtin:
+            raise SystemExit(f"{where}: sudo = true is only for the TOML targets of catppuccinizer")
+        for cmd in conf.get("run", []):
+            if cmd[0] not in COMMANDS or any("{" in c for c in cmd):
+                raise SystemExit(f"{where}: {cmd[0]} is not a command configure may run "
+                                 f"({', '.join(COMMANDS)}, without {{…}})")
+            self.configure_run.append(cmd)
+        self.tips = list(conf.get("tips", []))
+        for k, st in enumerate(conf["settings"]):
+            w = f"{where} [[configure.settings]] #{k + 1}"
+            check_table(st, "settings", w)
+            if not NAME.fullmatch(st["name"]) or st["name"] in (o.flags[-1][2:] for o, *_ in self.settings):
+                raise SystemExit(f"{w}: name must be unique, lowercase letters, digits and '-'")
+            kinds = [k for k in ("choices", "min", "pattern") if k in st]
+            if len(kinds) > 1 or ("min" in st) != ("max" in st) or ("what" in st and "pattern" not in st):
+                raise SystemExit(f"{w}: a setting is checked by choices, by min and max, or by a "
+                                 "pattern (with what, its description), or is plain text")
+            try:
+                if "pattern" in st:
+                    re.compile(st["pattern"])
+                check = (None if "choices" in st else integer(st["min"], st["max"]) if "min" in st
+                         else pattern(st["pattern"], st.get("what", f"text matching {st['pattern']}"))
+                         if "pattern" in st else plain_text(200, forbid='"$`\\'))
+                o = setting(f"--{st['name']}", help=st["help"], label=st.get("label"), check=check,
+                            choices=st.get("choices"), metavar=None if "choices" in st else "VALUE",
+                            sudo="run" if self.configure_sudo else None)
+            except (re.error, ValueError) as e:
+                raise SystemExit(f"{w}: {e}") from None
+            if not VARIABLE.fullmatch(st["key"]):
+                raise SystemExit(f"{w}: key must be a variable name (letters, digits, _)")
+            self.settings.append((o, system_path(st["file"], builtin, w), st["key"]))
+        self.step_help["configure"] = conf.get("help", "write the settings given")
+        self.configure_explain = conf.get("explain")
 
     # ------------------------------------------------------------ declared
     @property
@@ -238,7 +287,7 @@ class TomlTarget(Target):
 
     @property
     def steps(self):
-        return [s for s in ("install", "apply", "restore") if s in self.step_help]
+        return [s for s in ("install", "apply", "restore", "configure") if s in self.step_help]
 
     @property
     def has_locations(self):
@@ -249,17 +298,58 @@ class TomlTarget(Target):
 
     def options(self):
         kinds = {p.kind for p in self.parts}
-        sudo = "run" if self.sudo else None
-        steps = [step(s, sudo=sudo, help=self.step_help[s] + (" (sudo)" if self.sudo else ""),
-                      **({"explain": self.apply_explain} if s == "apply" and self.apply_explain else {}))
+        explain = {"apply": getattr(self, "apply_explain", None),
+                   "configure": getattr(self, "configure_explain", None)}
+        def sudo(s):
+            return self.configure_sudo if s == "configure" else self.sudo
+        steps = [step(s, sudo="run" if sudo(s) else None,
+                      help=self.step_help[s] + (" (sudo)" if sudo(s) else ""),
+                      **({"explain": explain[s]} if explain.get(s) else {}))
                  for s in self.steps]
+        settings = [o for o, _, _ in self.settings]
+        configure = [o for o in steps if o.dest == "configure"]          # after its settings
+        steps = [o for o in steps if o.dest != "configure"]
         # optional on the command line: --list and --restore go without it
         return [Option("theme", label=self.source_label, nargs="?", default=self.default,
                        metavar="THEME", accept="dir", help=self.source_help),
                 *(recolor.method_options(keys_always="animation" in kinds)
                   if kinds & {"image", "animation"} else []),
                 *([PREVIEW_ANIMATION] if "animation" in kinds else []),
-                *steps]
+                *steps, *settings, *configure]
+
+    # ------------------------------------------------------------ settings
+    def settings_now(self, a=None):
+        return {o.dest: (unquote(v) if (v := get_variable(config_text(f), key)) is not None else None)
+                for o, f, key in self.settings}
+
+    def configure(self, a, system):
+        values = given(a, [o for o, _, _ in self.settings])
+        changed = False
+        for f in dict.fromkeys(f for _, f, _ in self.settings):
+            mine = [(o, key) for o, g, key in self.settings if g == f and o.dest in values]
+            if not mine:
+                continue
+            text = config_text(f)
+            ids = {f"{f}|{key}": values[o.dest] for o, key in mine}
+            for (o, key), v in zip(mine, ids.values()):
+                if v != "default" and UNSAFE_VALUE.search(v):
+                    raise SystemExit(f"{o.flags[-1]}: the value {v!r} cannot be written safely "
+                                     "(no \", $, `, \\ or line break)")
+            current = {f"{f}|{key}": get_variable(text, key) for _, key in mine}
+            writes = remember(system, settings_state(self.name, system=bool(self.configure_sudo)),
+                              {i: v if v == "default" else f'"{v}"' for i, v in ids.items()}, current)
+            new = text
+            for i, raw in writes.items():
+                new = set_variable(new, i.rpartition("|")[2], raw, raw=True)
+            if new != text:
+                system.write_text(f, new, backup=True)
+                changed = True
+        if not changed:
+            print("  nothing to change")
+            return
+        for cmd in self.configure_run:
+            if system.run(cmd):
+                raise SystemExit(f"{cmd[0]} failed")
 
     def check(self, a):
         check_parts(a, self.part_names)
@@ -370,7 +460,7 @@ class TomlTarget(Target):
         """{"<file>|<key>": raw value or None} of the variables apply sets."""
         out = {}
         for f, key, _ in self.sets:
-            text = system_text(f)
+            text = config_text(f)
             out[f"{f}|{key}"] = get_variable(text, key)
         return out
 
@@ -407,7 +497,7 @@ class TomlTarget(Target):
     def write_sets(self, system, values):
         """values: {"<file>|<key>": (value or None, raw)}, one write per file."""
         for f in dict.fromkeys(f for f, _, _ in self.sets):
-            text = system_text(f)
+            text = config_text(f)
             new = text
             for (g, key, _) in self.sets:
                 if g == f and f"{f}|{key}" in values:
@@ -422,14 +512,6 @@ class TomlTarget(Target):
                 continue                      # restore: a command about the result goes with it
             if system.run([fill(c, name or "", installed or "") for c in cmd]):
                 raise SystemExit(f"{cmd[0]} failed")
-
-
-def system_text(f):
-    """A configuration file as it is ("" when it does not exist)."""
-    try:
-        return read_text(f) if f.exists() else ""
-    except PermissionError:
-        raise SystemExit(f"Cannot read {f}: run with sudo")
 
 
 def files(base):

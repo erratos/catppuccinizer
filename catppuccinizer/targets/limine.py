@@ -8,7 +8,7 @@ conflicting global options are commented out). --restore undoes both.
 
 limine.conf is edited byte for byte: apply only adds the block and comments out
 options, restore removes exactly that, and the result is checked before it is
-written (check_insert): the rest of the file stays as it was.
+written (Block.check): the rest of the file stays as it was.
 
 Without --wallpaper only the menu colours change (text, highlight, frame): the
 wallpaper set in limine.conf is kept (the menu background becomes see-through
@@ -37,6 +37,7 @@ from ..core.naming import output_name, planned
 from ..core.online import KDE_WALLPAPERS, WALLHAVEN
 from ..core.options import Option, previewing, step
 from ..core.parts import accent_sets, check_parts, note_unused, single
+from ..core.settings import DEFAULT, given, integer, pattern, plain_text, setting
 from ..core.palette import FLAVOR_TITLES, PALETTES, hex2rgb
 from ..core.sources import WALLPAPER_LINKS, item, section, wallpaper_sections
 from ..core.system import place, read_text, which
@@ -63,6 +64,16 @@ class LimineTarget(Target):
     links = WALLPAPER_LINKS
     online = [WALLHAVEN, KDE_WALLPAPERS]
     accent_also = "the menu colours"
+    tips = [
+        "--preview draws the menu with these settings as limine.conf has them: configure, "
+        "then preview to see the countdown, the title, the text size and the margins.",
+        "A larger text on a 4K screen: --font-scale 2x2, or a lower --resolution "
+        "(1920x1080), which also makes the menu faster to draw.",
+        "Booting straight into the default entry: --timeout 0 (hold a key at boot to see the "
+        "menu again, depending on the firmware); --timeout no waits for a choice.",
+        "With config enrollment (Secure Boot, limine-entry-tool), run "
+        "'sudo limine-enroll-config' after each change: --configure reminds you.",
+    ]
 
     def options(self):
         return OPTIONS
@@ -108,6 +119,14 @@ class LimineTarget(Target):
     def locations(self):
         return [section("Set in limine.conf", current_wallpapers), *wallpaper_sections()]
 
+    def configure(self, a, system):
+        configure(a, system)
+
+    def settings_now(self, a=None):
+        conf = getattr(a, "conf", None) or find_conf(getattr(a, "esp", None) or default_esp())
+        found = settings_of(read(conf))
+        return {dest: found.get(key) for dest, key in SETTING_KEYS.items()}
+
     def outputs(self, a):
         return outputs(a)
 
@@ -116,6 +135,34 @@ CURRENT = "current"           # --wallpaper current: the wallpaper(s) limine.con
 WALLPAPER = ["wallpaper"]     # a wallpaper to recolour
 MENU_ONLY = ("only the menu colours change (text, highlight, frame): the wallpaper set in "
              "limine.conf is kept as it is")
+YES_NO = ["yes", "no"]
+# the display settings (core.settings): written in their own block of limine.conf
+SETTING_KEYS = {"timeout": "timeout", "resolution": "interface_resolution",
+                "branding": "interface_branding", "hide_help": "interface_help_hidden",
+                "font_scale": "term_font_scale", "margin": "term_margin",
+                "margin_gradient": "term_margin_gradient", "remember_last": "remember_last_entry",
+                "editor": "editor_enabled"}
+SETTINGS_OPTIONS = [
+    setting("--timeout", check=integer(0, 3600, words=("no",)), metavar="SECONDS",
+            help="seconds before the default entry boots, 0 at once, 'no' to wait (not set: 5)"),
+    setting("--resolution", check=pattern(r"\d{3,5}x\d{3,5}", "WIDTHxHEIGHT, such as 1920x1080"),
+            metavar="WxH", help="resolution of the menu (not set: the screen's own)"),
+    setting("--branding", label="Title", check=plain_text(80), metavar="TEXT",
+            help="the title at the top of the menu (not set: Limine and its version)"),
+    setting("--hide-help", label="Hide the key help", choices=YES_NO,
+            help="hide the lines of keys under the title (not set: no)"),
+    setting("--font-scale", label="Text size", check=pattern(r"[1-8]x[1-8]", "WxH from 1x1 to 8x8"),
+            metavar="WxH", help="the font scaled WxH times, 2x2 doubles it (not set: 2x2 from "
+                                "2560x1440, 4x4 from 5120x2880, else 1x1)"),
+    setting("--margin", check=integer(0, 2000), metavar="PIXELS",
+            help="space between the screen edge and the menu frame, over a wallpaper (not set: 64)"),
+    setting("--margin-gradient", label="Frame fade", check=integer(0, 2000), metavar="PIXELS",
+            help="width of the fade around the menu frame, over a wallpaper (not set: 4)"),
+    setting("--remember-last", label="Remember the last entry", choices=YES_NO,
+            help="boot the entry chosen last time by default (not set: no)"),
+    setting("--editor", label="Entry editor", choices=YES_NO,
+            help="allow editing an entry with E at boot; no closes that door (not set: yes)"),
+]
 OPTIONS = [
     Option("--wallpaper", label="Wallpaper", type=Path, metavar="IMAGE", accept="image", source=True,
            empty=MENU_ONLY,
@@ -139,7 +186,33 @@ OPTIONS = [
            help="limine.conf to edit (default: searched on the ESP)"),
     Option("--esp", label="ESP folder", type=Path, accept="dir", stage="apply",
            help="ESP mount point (default: ESP_PATH of /etc/default/limine, or /boot)"),
+    *SETTINGS_OPTIONS,
+    step("configure", sudo="run", help="write the display settings given into limine.conf (sudo)",
+         explain="Here: the settings go into a block of their own in limine.conf (apart from "
+                 "the theme's), the global options they replace are commented out, and the "
+                 "rest of the file is checked to stay byte for byte the same."),
 ]
+
+
+def configure(a, system):
+    """The settings given, merged into the settings block of limine.conf (DEFAULT:
+    the setting removed from it, so the line it had commented out comes back)."""
+    conf = a.conf or find_conf(a.esp or default_esp())
+    text = read(conf)
+    values = dict(line.split(": ", 1) for line in SETTINGS.lines(text) if ": " in line)
+    for dest, value in given(a, SETTINGS_OPTIONS).items():
+        key = SETTING_KEYS[dest]
+        if value != DEFAULT:
+            values[key] = value
+        elif values.pop(key, None) is None:
+            print(f"  {key}: as it was, nothing to undo")
+    lines = [SETTINGS.begin, *(f"{k}: {v}" for k, v in values.items()), SETTINGS.end] if values else []
+    new = SETTINGS.insert(text, lines, list(values))
+    if new == text:
+        print(f"  {conf}: nothing to change")
+        return
+    system.write_text(conf, new, backup=True)
+    enrollment_note()
 
 
 def check_args(a):
@@ -439,23 +512,76 @@ def find_conf(esp):
     raise SystemExit(f"limine.conf not found under {esp} (use --conf)")
 
 
-# our block, and the blank line insert_theme puts after it
-BLOCK = re.compile(rf"^{re.escape(BEGIN)}[^\n]*\n(?:.*?\n)??{re.escape(END)}\n\n?", re.M | re.S)
+class Block:
+    """A block of limine.conf that catppuccinizer writes: its lines between a begin
+    and an end comment, before the first menu entry (a blank line after it), and
+    the global options it replaces commented out with a prefix of its own.
+    Removing it gives the file back byte for byte. Two of them: the theme's
+    (THEME: apply, restore) and the display settings' (SETTINGS: configure)."""
+
+    def __init__(self, begin, end, disabled, what):
+        self.begin, self.end, self.disabled, self.what = begin, end, disabled, what
+        self.regex = re.compile(rf"^{re.escape(begin)}[^\n]*\n(?:.*?\n)??{re.escape(end)}\n\n?",
+                                re.M | re.S)
+
+    def markers(self, text):
+        return (len(re.findall(rf"^{re.escape(self.begin)}", text, re.M)),
+                len(re.findall(rf"^{re.escape(self.end)}$", text, re.M)))
+
+    def strip(self, text):
+        """text without the block, the options it had commented out enabled again."""
+        text = self.regex.sub("", text)
+        if self.markers(text) != (0, 0):
+            raise SystemExit(f"limine.conf: a '{self.begin}' line without its '{self.end}' line "
+                             "(or the reverse); fix it by hand, nothing was written")
+        return re.sub(rf"^{re.escape(self.disabled)}", "", text, flags=re.M)
+
+    def lines(self, text):
+        """The lines inside the block (without its markers), [] when there is none."""
+        found = self.regex.search(text)
+        return [x.rstrip("\r") for x in found.group(0).rstrip("\n").split("\n")[1:-1]] if found else []
+
+    def insert(self, text, lines, disable):
+        """text with the block (lines, markers included) before the first menu entry
+        (at the top when there is none), the global options named in disable
+        commented out; an older block is replaced. No lines: the block removed."""
+        base = self.strip(text)
+        if not lines:
+            return base
+        block = "".join(line + "\n" for line in lines) + "\n"
+        out, in_globals = [], True
+        for line in base.splitlines(keepends=True):
+            if in_globals and line.lstrip().startswith("/"):        # first menu entry
+                out.append(block)
+                in_globals = False
+            key = line.split(":", 1)[0].strip().lower()
+            if in_globals and key in disable and not line.lstrip().startswith("#"):
+                line = self.disabled + line
+            out.append(line)
+        if in_globals:
+            out.insert(0, block)
+        new = "".join(out)
+        self.check(base, new, block)
+        return new
+
+    def check(self, base, new, block):
+        """Read the new limine.conf back before it is written: one block, exactly ours,
+        and the rest of the file unchanged byte for byte (once the options it
+        commented out are enabled again)."""
+        found = self.regex.search(new)
+        if (self.markers(new) != (1, 1) or not found or found.group(0) != block
+                or self.strip(new) != base):
+            raise SystemExit(f"limine.conf: the new file would change more than the "
+                             f"catppuccinizer {self.what} block; nothing was written")
 
 
-def markers(text):
-    return (len(re.findall(rf"^{re.escape(BEGIN)}", text, re.M)),
-            len(re.findall(rf"^{re.escape(END)}$", text, re.M)))
+THEME = Block(BEGIN, END, DISABLED, "theme")
+SETTINGS = Block("# >>> display settings (catppuccinizer)", "# <<< display settings (catppuccinizer)",
+                 "# (catppuccinizer settings) ", "settings")
 
 
 def strip_theme(text):
-    """Remove our block and re-enable the options we had commented out: exactly what
-    insert_theme added, so the rest of the file comes back byte for byte."""
-    text, n = BLOCK.subn("", text)
-    if markers(text) != (0, 0):
-        raise SystemExit(f"limine.conf: a '{BEGIN}' line without its '{END}' line (or the "
-                         "reverse); fix it by hand, nothing was written")
-    return re.sub(rf"^{re.escape(DISABLED)}", "", text, flags=re.M)
+    return THEME.strip(text)
 
 
 def global_values(text, key):
@@ -481,37 +607,9 @@ def resolve_on_esp(ref, esp):
 
 
 def insert_theme(text, lines, replace_wallpaper=False):
-    """limine.conf with our block (lines) before the first menu entry (at the top
-    when there is none) and the conflicting global options commented out; the
-    rest of the file is kept byte for byte (line endings included)."""
-    base = strip_theme(text)
-    disable = KEYS + (WALL_KEYS if replace_wallpaper else [])
-    block = "".join(line + "\n" for line in lines) + "\n"
-    out, in_globals = [], True
-    for line in base.splitlines(keepends=True):
-        if in_globals and line.lstrip().startswith("/"):        # first menu entry
-            out.append(block)
-            in_globals = False
-        key = line.split(":", 1)[0].strip().lower()
-        if in_globals and key in disable and not line.lstrip().startswith("#"):
-            line = DISABLED + line
-        out.append(line)
-    if in_globals:
-        out.insert(0, block)
-    new = "".join(out)
-    check_insert(base, new, block)
-    return new
-
-
-def check_insert(base, new, block):
-    """Read the new limine.conf back before it is written: one block, exactly ours,
-    and the rest of the file unchanged byte for byte (once our commented-out
-    options are enabled again)."""
-    found = BLOCK.search(new)
-    if (markers(new) != (1, 1) or not found or found.group(0) != block
-            or strip_theme(new) != base):
-        raise SystemExit("limine.conf: the new file would change more than the "
-                         "catppuccinizer block; nothing was written")
+    """limine.conf with the theme block (lines) and the global options it replaces
+    commented out (the wallpaper's too with replace_wallpaper)."""
+    return THEME.insert(text, lines, KEYS + (WALL_KEYS if replace_wallpaper else []))
 
 
 def read(conf):

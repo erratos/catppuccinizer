@@ -13,8 +13,9 @@ what a front-end needs to show it:
   "target" (declared by the target);
 - stage: the stage it belongs to (STAGES): "analyse" lists or detects and writes
   no output, "preview" / "build" write into the output folder, "install",
-  "apply", "test" and "restore" touch the system. The option that runs a system
-  step is made with step() (dest = stage = the step's name);
+  "apply", "test" and "restore" touch the system, "configure" holds the system
+  settings (core.settings). The option that runs a system step is made with
+  step() (dest = stage = the step's name);
 - sudo: None or "run" (the command must run as root);
 - when: when the option matters, {key: allowed values}. A key is another
   option's dest ({"method": ["lutgen"]}) or "analysis.<fact>", a fact from the
@@ -44,8 +45,8 @@ from pathlib import Path
 from .naming import suffix_type
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"     # catppuccinizer/assets
-STAGES = ("analyse", "preview", "build", "install", "apply", "test", "restore")
-SYSTEM_STAGES = ("install", "apply", "test", "restore")
+STAGES = ("analyse", "preview", "build", "install", "apply", "test", "restore", "configure")
+SYSTEM_STAGES = ("install", "apply", "test", "restore", "configure")
 STEPS = SYSTEM_STAGES                  # Target methods, each with its option (step())
 SCOPES = ("common", "method", "target")          # + "method:<name>"
 SUDO = (None, "run")
@@ -236,7 +237,7 @@ def check(args, options):
         return d in by and given(getattr(args, d, None), by[d].default)
     for o in options:
         v = getattr(args, o.dest, None)
-        if o.range and v is not None and not o.range[0] <= v <= o.range[1]:
+        if o.range and isinstance(v, (int, float)) and not o.range[0] <= v <= o.range[1]:
             raise SystemExit(f"{o.flags[-1]} must be between {o.range[0]} and {o.range[1]}")
         if not on(o.dest):
             continue
@@ -277,6 +278,9 @@ STEP_EXPLAIN = {
     "test": "Shows the result without rebooting or logging out, then gives control back.",
     "restore": "Undoes Apply and Install with what they recorded: the previous setting comes "
                "back and what was installed is removed. Nothing is built.",
+    "configure": "Writes the system settings given (how the result is shown), apart from the "
+                 "theme: nothing is built. A configuration file it edits is backed up first; "
+                 "the value 'default' undoes a setting (what the file had before comes back).",
 }
 
 

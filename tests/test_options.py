@@ -82,7 +82,7 @@ class Declarations(unittest.TestCase):
         ply = {o.dest: o for o in TARGETS["plymouth"].all_options()}
         self.assertFalse(ply["list"].gui)          # the page has its own buttons
         self.assertFalse(ply["colours"].gui)       # the page shows the colours by itself
-        self.assertEqual(TARGETS["limine"].steps, ["install", "apply", "restore"])
+        self.assertEqual(TARGETS["limine"].steps, ["install", "apply", "restore", "configure"])
 
     def test_when_refers_to_existing_options(self):
         facts = options.analysis([])

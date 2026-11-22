@@ -39,6 +39,7 @@ class Target:
                                # core.sources.link() (the GUI's "Other sources", --list)
     online = ()                # other sources the GUI browses itself, core.online
                                # OnlineSource objects (--list prints their page)
+    tips = ()                  # system settings: tips (text), shown with the settings
 
     def options(self):
         """The target's own options, as core.options.Option (scope "target"), plus
@@ -76,6 +77,11 @@ class Target:
     def has_outputs(self):
         """Whether the target defines outputs() (--names, the GUI's output preview)."""
         return type(self).outputs is not Target.outputs
+
+    @property
+    def has_settings(self):
+        """Whether the target has system settings (core.settings: --configure)."""
+        return "configure" in self.steps
 
     @property
     def has_colours(self):
@@ -131,6 +137,15 @@ class Target:
 
     def restore(self, args, system):
         """Undo apply and install (without building anything)."""
+
+    def configure(self, args, system):
+        """Write the system settings given (core.settings), without building."""
+
+    def settings_now(self, args=None):
+        """The current value of each system setting, {dest: text or None when not
+        set}, read from the system (core.settings); writes nothing. args: the
+        command line's, when it names where to read (Limine's --esp), else None."""
+        raise NotImplementedError
 
 
 def user_targets_dir():

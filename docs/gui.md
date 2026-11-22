@@ -147,6 +147,17 @@ find is underlined in red (a `#rrggbb` source colour is always accepted). When
 nothing can be remapped (`--method lut`, a LUT has no source colours), the
 editor is hidden and the list says why.
 
+### System settings
+
+Targets with display settings (Limine, Plymouth, KDE splash, GRUB) end with a
+**System settings** card, apart from the theme: each setting with its value
+now (read from the system; Limine's needs root to read the ESP, the card says
+so), a field or buttons to change it (left empty: kept), and **↺ default** to
+undo it. **Configure** (marked **sudo** where it needs root) writes only the
+settings given, builds nothing, and follows *Dry run*; the values shown are
+read again afterwards. *Tips* lists the target's advice. Build and the other
+steps never carry these settings.
+
 ### Install, apply, test, restore
 
 Targets that can change the system (Plymouth, Limine, KDE splash, GRUB) get one
@@ -249,4 +260,7 @@ GUI without GUI code:
   `Target.links` (web pages) fill *Other sources…* (see
   [Architecture](architecture.md#writing-a-target));
 - `Target.accent_also` names what still uses the accent when `--method` is a
-  LUT (Limine: the menu colours); without it, the accents are dimmed then.
+  LUT (Limine: the menu colours); without it, the accents are dimmed then;
+- settings made with `core.settings.setting()` and the `configure` step fill
+  the *System settings* card, with `Target.settings_now()` (the values now)
+  and `Target.tips`.

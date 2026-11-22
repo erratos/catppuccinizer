@@ -88,6 +88,9 @@ class Gui(unittest.TestCase):
         self.assertEqual((lut["has_locations"], lut["links"], lut["online"]), (False, [], []))
         self.assertEqual([o["name"] for o in image["online"]], ["wallhaven", "kde-store-299"])  # in the page
         self.assertEqual({o["accept"] for o in image["online"]}, {"image"})
+        self.assertEqual({t["name"] for t in s["targets"] if t["has_settings"]},   # System settings
+                         {"limine", "plymouth", "ksplash", "grub"})
+        self.assertTrue(all(t["tips"] for t in s["targets"] if t["has_settings"]))
         grub = next(t for t in s["targets"] if t["name"] == "grub")           # [[source.online]]
         self.assertEqual([(o["name"], o["accept"]) for o in grub["online"]], [("gnome-look-109", "dir")])
         self.assertNotIn("gnome-look.org", json.dumps(grub["links"]))         # no longer a mere link

@@ -31,23 +31,38 @@ from ...core.naming import output_name, planned, slug
 from ...core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ...core.parts import accent_sets, check_parts, note_unused
 from ...core.paths import state_file
+from ...core.settings import DEFAULT, decimal, given, integer, remember, setting, settings_state
 from ...core.sources import item, section, theme_folders
 from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, keys_plan,
                              preview_animation, recolor_image, run_jobs, separation_image)
 from ...core.naming import check_name
 from ...core.online import GithubRelease, Ocs
-from ...core.system import System, source_file, which
+from ...core.system import System, config_text, get_ini, set_ini, source_file, which
 from ...core.target import Target
 
 HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE / "scripts"
 
 INSTALL_DIR = "/usr/share/plymouth/themes"
+DAEMON_CONF = Path("/etc/plymouth/plymouthd.conf")              # [Daemon] Key=Value
+DAEMON_DEFAULTS = Path("/usr/share/plymouth/plymouthd.defaults")  # what is not set there
+HOLD_DROPIN = Path("/etc/systemd/system/plymouth-quit.service.d/catppuccinizer.conf")
 
 
 class PlymouthTarget(Target):
     name = "plymouth"
     help = "recolour Plymouth themes (installed ones, or theme folders)"
+    tips = [
+        "The splash only shows with 'splash' (and usually 'quiet') on the kernel command "
+        "line: KERNEL_CMDLINE in /etc/default/limine, GRUB_CMDLINE_LINUX_DEFAULT in "
+        "/etc/default/grub (then grub-mkconfig).",
+        "Plymouth must be in the initramfs: the plymouth hook in /etc/mkinitcpio.conf "
+        "(Arch), or dracut's plymouth module; the delay and scale settings are copied into "
+        "it, so --configure rebuilds it.",
+        "A splash that never shows on a fast machine: --show-delay 0 shows it at once, "
+        "--hold 3 keeps it 3 seconds longer (the boot waits for it).",
+        "Blurry or tiny on a HiDPI screen: --scale 2 (or 1).",
+    ]
     online = [
         GithubRelease("adi1090x/plymouth-themes", "adi1090x: Plymouth themes", marker="*.plymouth",
                       note="80 animated themes (GPL-3.0), previewed in its README (animated "
@@ -101,6 +116,12 @@ class PlymouthTarget(Target):
     def locations(self):
         return [section(f"Installed themes ({INSTALL_DIR})", installed_themes)]
 
+    def configure(self, a, system):
+        configure(a, system)
+
+    def settings_now(self, a=None):
+        return settings_now()
+
 
 OPTIONS = [
     Option("themes", label="Themes", nargs="*", default=[], metavar="THEME", accept="dir",
@@ -123,6 +144,78 @@ OPTIONS = [
     step("restore", sudo="run",
          help="make the previous default theme active again, remove the installed ones (sudo)"),
 ]
+# the display settings (core.settings): [Daemon] of plymouthd.conf, and a systemd drop-in
+DAEMON_KEYS = {"show_delay": "ShowDelay", "device_timeout": "DeviceTimeout", "scale": "DeviceScale"}
+SETTINGS_OPTIONS = [
+    setting("--show-delay", check=decimal(0, 60), metavar="SECONDS",
+            help="seconds of boot before the splash shows: a shorter boot shows none "
+                 "(ShowDelay; not set: plymouthd.defaults, often 0)"),
+    setting("--device-timeout", check=decimal(1, 60), metavar="SECONDS",
+            help="seconds to wait for the graphics driver before the text splash "
+                 "(DeviceTimeout; not set: plymouthd.defaults, often 8)"),
+    setting("--scale", label="HiDPI scale", choices=["1", "2"],
+            help="draw the splash at 1x or 2x (DeviceScale; not set: chosen from the screen)"),
+    setting("--hold", label="Hold the splash", check=integer(1, 30), metavar="SECONDS",
+            help="keep the splash SECONDS longer at the end of the boot, which waits for it "
+                 "(a systemd drop-in for plymouth-quit.service; not set: none)"),
+]
+OPTIONS += [
+    *SETTINGS_OPTIONS,
+    step("configure", sudo="run", help="write the display settings given (sudo)",
+         explain=f"Here: the delay, timeout and scale go into [Daemon] of {DAEMON_CONF} (the "
+                 "value replaced is remembered), then the initramfs is rebuilt "
+                 "(plymouth-set-default-theme -R), as it holds a copy; --hold writes "
+                 f"{HOLD_DROPIN} and reloads systemd."),
+]
+
+
+def settings_now():
+    """The settings as plymouthd.conf has them (else plymouthd.defaults, said so), and
+    the hold of our drop-in."""
+    conf, defaults = config_text(DAEMON_CONF), config_text(DAEMON_DEFAULTS)
+    now = {}
+    for dest, key in DAEMON_KEYS.items():
+        value = get_ini(conf, "Daemon", key)
+        fallback = get_ini(defaults, "Daemon", key)
+        now[dest] = value if value is not None else f"{fallback} (plymouthd.defaults)" if fallback else None
+    m = re.search(r"^ExecStartPre=\S*sleep (\d+)", config_text(HOLD_DROPIN), re.M)
+    now["hold"] = m.group(1) if m else None
+    return now
+
+
+def configure(a, system):
+    values = given(a, SETTINGS_OPTIONS)
+    changes = {DAEMON_KEYS[d]: v for d, v in values.items() if d in DAEMON_KEYS}
+    if changes:
+        text = config_text(DAEMON_CONF)
+        current = {k: get_ini(text, "Daemon", k) for k in changes}
+        new = text
+        for key, value in remember(system, settings_state("plymouth"), changes, current).items():
+            new = set_ini(new, "Daemon", key, value)
+        if new != text:
+            system.write_text(DAEMON_CONF, new, backup=True)
+            theme = default_theme()
+            if not theme:
+                raise SystemExit("The default theme is not known: rebuild the initramfs with "
+                                 "sudo plymouth-set-default-theme -R THEME")
+            if system.run(["plymouth-set-default-theme", "-R", check_name(theme, "theme name")]):
+                raise SystemExit("plymouth-set-default-theme failed")
+        else:
+            print(f"  {DAEMON_CONF}: nothing to change")
+    if "hold" in values:
+        if values["hold"] == DEFAULT:
+            if not HOLD_DROPIN.exists():
+                print("  hold: as it was, nothing to undo")
+                return
+            system.remove(HOLD_DROPIN)
+            if HOLD_DROPIN.parent.is_dir() and not any(HOLD_DROPIN.parent.iterdir()):
+                system.remove(HOLD_DROPIN.parent)
+        else:
+            sleep = which("sleep") or "/usr/bin/sleep"
+            system.write_text(HOLD_DROPIN, "# written by catppuccinizer (plymouth --configure --hold): "
+                                           "the splash stays longer\n"
+                                           f"[Service]\nExecStartPre={sleep} {values['hold']}\n")
+        system.run(["systemctl", "daemon-reload"])
 
 
 def check_args(a):

@@ -33,7 +33,9 @@ sudo catppuccinize plymouth -a mauve --test              # your boot splash, sho
 before/after image instead of the result (`--preview-animation`: the animation
 of a boot splash, as an animated WebP). Nothing is installed on your system
 unless you pass `--install` or `--apply` (`--dry-run` lists what they would
-change, `--restore` undoes them).
+change, `--restore` undoes them). Apart from the theme, `--configure` sets how
+it is shown (Limine's timeout and resolution, Plymouth's delay, GRUB's
+resolution…): `sudo catppuccinize limine --configure` prints the current values.
 
 Every command names its outputs `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]`
 ([output names](docs/colours.md#output-names)).

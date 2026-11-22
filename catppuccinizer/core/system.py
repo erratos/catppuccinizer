@@ -148,6 +148,15 @@ def read_text(path):
         return f.read()
 
 
+def config_text(path):
+    """A configuration file as it is (read_text), "" when it does not exist."""
+    path = Path(path)
+    try:
+        return read_text(path) if path.exists() else ""
+    except PermissionError:
+        raise SystemExit(f"Cannot read {path}: run with sudo")
+
+
 class System:
     def __init__(self, dry_run=False):
         self.dry_run = dry_run
@@ -344,3 +353,58 @@ def set_variable(text, key, value, raw=False):
         m = found[-1]
         return text[:m.start(2)] + new + text[m.end(2):]
     return text + ("" if not text or text.endswith("\n") else "\n") + f"{key}={new}\n"
+
+
+# ------------------------------------------------------------ INI files
+# [Section] / Key=Value files (plymouthd.conf): one key of one section read and
+# changed, the rest of the file kept byte for byte.
+INI_KEY = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
+
+
+def _ini_section(text, section):
+    """(start, end) of the body of [section] (the last one), or None."""
+    heads = list(re.finditer(r"^[ \t]*\[([^\]\r\n]*)\][ \t]*(?:\r?\n|$)", text, re.M))
+    for i in reversed(range(len(heads))):
+        if heads[i].group(1).strip() == section:
+            return heads[i].end(), heads[i + 1].start() if i + 1 < len(heads) else len(text)
+    return None
+
+
+def _ini_lines(text, section, key):
+    if not INI_KEY.fullmatch(key) or not INI_KEY.fullmatch(section):
+        raise SystemExit(f"Not an INI section and key: [{section}] {key!r}")
+    body = _ini_section(text, section)
+    if body is None:
+        return body, []
+    pat = re.compile(rf"^([ \t]*{re.escape(key)}[ \t]*=[ \t]*)([^\r\n]*)(\r?\n|$)", re.M)
+    return body, list(pat.finditer(text, *body))
+
+
+def get_ini(text, section, key):
+    """The value of Key= in [section] (the last line that sets it), or None."""
+    _, found = _ini_lines(text, section, key)
+    return found[-1].group(2).strip() if found else None
+
+
+def set_ini(text, section, key, value):
+    """text with Key=value in [section]: the last line that sets it changed, else a
+    line added at the end of the section (the section added at the end of the file
+    when missing); value None: the lines that set it removed."""
+    body, found = _ini_lines(text, section, key)
+    if value is None:
+        for m in reversed(found):
+            text = text[:m.start()] + text[m.end():]
+        return text
+    if re.search(r"[\x00-\x1f\x7f]", value):
+        raise SystemExit(f"{key}: the value {value!r} cannot be written (one line only)")
+    if found:
+        m = found[-1]
+        return text[:m.start(2)] + value + text[m.end(2):]
+    nl = "\r\n" if "\r\n" in text else "\n"
+    if body is None:
+        sep = "" if not text else nl if text.endswith("\n") else nl * 2
+        return text + sep + f"[{section}]{nl}{key}={value}{nl}"
+    at = len(text[:body[1]].rstrip("\r\n"))          # after the section's last line,
+    at += 2 if text.startswith("\r\n", at) else 1 if text.startswith("\n", at) else 0   # its end
+    prefix = "" if text[:at].endswith("\n") else nl    # (blank lines before the next one kept)
+    return text[:at] + prefix + f"{key}={value}{nl}" + text[at:]

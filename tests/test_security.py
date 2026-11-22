@@ -301,12 +301,12 @@ class Limine(Tmp):
         lines = limine.theme_lines("mocha", "mauve")
         new = limine.insert_theme(LIMINE_CONF, lines)
         block = "".join(x + "\n" for x in lines) + "\n"
-        limine.check_insert(LIMINE_CONF, new, block)                   # fine
+        limine.THEME.check(LIMINE_CONF, new, block)                    # fine
         for bad in (new.replace("timeout: 3", "timeout: 0"),          # something else changed
                     new.replace("backdrop:", "backdrop: 0 #"),         # not our block
                     new + block):                                     # two blocks
             with self.assertRaises(SystemExit):
-                limine.check_insert(LIMINE_CONF, bad, block)
+                limine.THEME.check(LIMINE_CONF, bad, block)
 
     def test_wallpaper_stays_on_the_esp(self):
         esp = self.tmp / "esp"
@@ -395,6 +395,15 @@ class GuiRequests(unittest.TestCase):
             self.assertEqual(self.request(path)[0], 404)
         self.assertEqual(self.request("/api/online/fetch", {"target": "image", "source": ["wallhaven"], "id": "a"})[0], 404)
         self.assertEqual(self.request("/api/online?target=image&source=wallhaven", token=False)[0], 403)
+
+    def test_settings_route(self):
+        """The current system settings: read only, a declared target only, the token asked."""
+        status, r = self.request("/api/settings?target=grub")
+        self.assertEqual(status, 200)
+        self.assertEqual(set(r["values"]), {"timeout", "timeout_style", "gfxmode", "gfxpayload"})
+        for path in ("/api/settings?target=image", "/api/settings?target=../x", "/api/settings"):
+            self.assertEqual(self.request(path)[0], 404)
+        self.assertEqual(self.request("/api/settings?target=grub", token=False)[0], 403)
 
     # ------------------------------------------------------------- access
     def test_token_host_origin(self):

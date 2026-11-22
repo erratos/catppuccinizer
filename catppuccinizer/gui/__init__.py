@@ -87,6 +87,7 @@ def schema(targets):
             "default_accent": list(t.default_accent), "accent_also": t.accent_also,
             "has_locations": t.has_locations, "links": list(t.links),
             "online": [s.info() for s in t.online],
+            "has_settings": t.has_settings, "tips": list(t.tips),
             "has_colours": t.has_colours, "has_outputs": t.has_outputs,
             "options": [o.schema() for o in t.all_options() if o.gui],
         })
@@ -629,6 +630,15 @@ def make_handler(app):
                         return self.send(200, {"sections": t.locations()})
                 except (SystemExit, Exception) as e:  # noqa: BLE001 - shown in the page
                     return self.send(200, {"sections": [], "error": str(e) or type(e).__name__})
+            if u.path == "/api/settings":           # the system settings as they are now
+                t = app.targets.get((q.get("target") or [""])[0])
+                if not t or not t.has_settings:
+                    return self.send(404, {"error": "unknown target"})
+                try:
+                    return self.send(200, {"values": t.settings_now()})
+                except (SystemExit, Exception) as e:  # noqa: BLE001 - shown in the page
+                    msg = e.code if isinstance(e, SystemExit) else e
+                    return self.send(200, {"values": {}, "error": str(msg) or type(e).__name__})
             if u.path in ("/api/online", "/api/online/thumb"):
                 src = app.online_source(q)
                 if src is None:

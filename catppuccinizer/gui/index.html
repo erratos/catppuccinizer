@@ -149,6 +149,13 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .opt .name { font-weight: 600; }
 .opt .flag { font-family: var(--mono); font-size: 11.5px; color: var(--overlay1); }
 .opt .help { color: var(--overlay2); font-size: 12.5px; }
+.opt .now { color: var(--subtext0); font-size: 12px; }
+.opt .now b { color: var(--text); font-weight: 600; }
+.settings-actions { margin-top: 12px; align-items: center; }
+.tipsbox { margin-top: 12px; }
+.tipsbox summary { cursor: pointer; color: var(--subtext1); }
+.tips { margin: 8px 0 0; padding-left: 18px; color: var(--subtext0); font-size: 13px; }
+.tips li { margin: 4px 0; }
 .opt.set { border-color: color-mix(in srgb, var(--accent) 55%, var(--surface0)); }
 .badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 4px;
          background: color-mix(in srgb, var(--peach) 22%, transparent); color: var(--peach); }
@@ -418,7 +425,8 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
 const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
             colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0, helpOpen: new Set(),
-            btnErr: {}, stepArgs: {}, parts: {}, live: null, liveBusy: false, livePending: false, liveImage: {} };
+            btnErr: {}, stepArgs: {}, parts: {}, live: null, liveBusy: false, livePending: false, liveImage: {},
+            settings: {} };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -525,8 +533,18 @@ function sendVals() {
   const parts = Object.entries(S.parts[S.target] || {}).map(([part, a]) => `${part}=${a}`);
   if (parts.length && t.default_accent.length) v.accent = [...(v.accent || []), ...parts];
   if (!t.default_accent.length) delete v.accent;
-  for (const o of t.options) if ((o.when && !shown(o)) || o.role === "step" || o.role === "preview" || o.dest === "dry_run") delete v[o.dest];
+  for (const o of t.options) if ((o.when && !shown(o)) || o.role === "step" || o.role === "preview" || o.dest === "dry_run" || isSetting(o)) delete v[o.dest];
   return v;
+}
+// the system settings (core.settings): their own card and step, apart from the theme
+const isSetting = (o) => o.stage === "configure" && o.role !== "step";
+const settingOpts = () => cur().options.filter(isSetting);
+// what Configure sends: the settings given, and the options of the system steps (Limine's --esp)
+function settingVals() {
+  const v = vals(), out = {};
+  for (const o of cur().options)
+    if ((isSetting(o) || (["install", "apply", "test", "restore"].includes(o.stage) && o.role !== "step")) && v[o.dest] !== undefined) out[o.dest] = v[o.dest];
+  return out;
 }
 // facts from the analysis of the sources (the colour list, /api/colours) that an option's
 // `when` can use; unknown ones (not analysed yet) hide nothing. A target without
@@ -567,7 +585,7 @@ const analysisOnly = (when) => Object.fromEntries(Object.entries(when || {}).fil
 // common options with their own place in the page; the others go to the Options card
 const COMMON_WIDGETS = new Set(["flavor", "accent", "map", "preview", "out", "suffix", "dry_run"]);
 // the system steps: one button each, in this order (core.options.STEPS)
-const steps = () => cur().options.filter((o) => o.role === "step");
+const steps = () => cur().options.filter((o) => o.role === "step" && o.dest !== "configure");
 // the options of the steps that touch the system, and of the analysis, get their own groups
 const STAGE_GROUPS = { analyse: "Analyse (writes no output)", install: "System steps", apply: "System steps",
                        test: "System steps", restore: "System steps" };
@@ -588,14 +606,16 @@ function render() {
   const sources = t.options.filter((o) => o.role === "source");
   if (sources.length) cards.push(card(++n, "Source", sources.map(sourceField)));
   cards.push(card(++n, "Colours", coloursCard(t, sources.length > 0)));
-  const options = t.options.filter((o) => o.role === "option" || (o.role === "common" && !COMMON_WIDGETS.has(o.dest)));
+  const options = t.options.filter((o) => (o.role === "option" && !isSetting(o)) || (o.role === "common" && !COMMON_WIDGETS.has(o.dest)));
   if (options.length) cards.push(card(++n, "Options", optionsCard(options)));
   // where, and how the results are named (--suffix)
   cards.push(card(++n, "Output", [pathField(opt("out"), { placeholder: `${tidy(S.schema.cwd)}/${t.default_out}`, accept: "dir" }),
     h("p", { class: "hint" }, steps().length ? "Build writes here only; the system is changed by the Install / Apply buttons (try them with Dry run first)."
       : "Nothing is written outside this folder."),
     opt("suffix") ? h("div", { class: "opts", style: { marginTop: "10px" } }, optionField(opt("suffix"))) : null]));
+  if (t.has_settings) cards.push(card(++n, "System settings", settingsCard(t)));
   form.replaceChildren(...cards.filter(Boolean));
+  if (t.has_settings) loadSettings();
   renderPreviews(sources.length > 0);
   renderSteps();
   renderColours();
@@ -875,6 +895,71 @@ function mapEditor() {
   return box;
 }
 
+// --------------------------------------------------------- system settings
+// How the result is shown, in the system's own files (core.settings): each setting with
+// its value now (/api/settings), left empty to keep it, "default" to undo it; Configure
+// writes only those given, without building.
+function settingsCard(t) {
+  const conf = opt("configure");
+  const btn = h("button", { class: "btn", "data-step": "configure", title: conf.help, onclick: () => run("configure"),
+    onmouseenter: () => { S.hover = "configure"; updateCommand(); }, onmouseleave: () => { S.hover = null; updateCommand(); } },
+    "Configure", conf.sudo === "run" ? h("span", { class: "badge" }, "sudo") : null);
+  const [q, panel] = helpParts({ dest: "__settings", flags: ["the system settings"] }, () => [h("p", {}, conf.explain || conf.help)]);
+  return [
+    h("p", { class: "hint" }, "How the result is shown, set in the system's configuration files, apart from the theme. ",
+      "Leave a setting empty to keep it; “default” undoes it (what the file had before comes back). ",
+      "Configure writes only these settings: nothing is built (Dry run, under the command, lists the changes)."),
+    h("p", { class: "warn hidden", id: "settingserr" }),
+    h("div", { class: "opts" }, settingOpts().map(settingField)),
+    h("div", { class: "row settings-actions" }, btn, h("span", { class: "sp" }), q),
+    panel,
+    t.tips.length ? h("details", { class: "tipsbox" }, h("summary", {}, "Tips"),
+      h("ul", { class: "tips" }, t.tips.map((x) => h("li", {}, x)))) : null,
+  ];
+}
+function settingField(o) {
+  const v = vals()[o.dest];
+  const box = h("div", { class: "opt" + (v !== undefined ? " set" : ""), "data-dest": o.dest });
+  const head = h("div", { class: "head" }, h("div", {}, h("div", { class: "name" }, nice(o)), h("div", { class: "flag" }, o.flags.join(", "))));
+  if (o.sudo) head.append(h("span", { class: "badge", title: "Needs administrator rights: run with sudo" }, "sudo"));
+  const undo = (on) => h("button", { class: "btn small" + (on ? " primary" : " ghost"), title: "Undo this setting: what the file had before comes back",
+    onclick: () => setVal(o.dest, on ? undefined : "default", true) }, "↺ default");
+  let control;
+  if (o.kind === "choice") {
+    control = h("div", { class: "seg" }, h("button", { class: v === undefined ? "on" : "", title: "keep it as it is", onclick: () => setVal(o.dest, undefined, true) }, "keep"),
+      o.choices.filter((c) => c !== "default").map((c) => h("button", { class: c === v ? "on" : "", onclick: () => setVal(o.dest, c, true) }, c)),
+      undo(v === "default"));
+  } else {
+    control = h("div", { class: "row" }, h("input", { type: "text", class: "grow", value: v === "default" ? "" : v ?? "", readonly: v === "default",
+      placeholder: v === "default" ? "back to what it was" : `keep${o.metavar ? ` (${o.metavar})` : ""}`, spellcheck: "false",
+      oninput: (e) => { setVal(o.dest, e.target.value.trim() || undefined); box.classList.toggle("set", !!e.target.value.trim()); } }),
+      undo(v === "default"));
+  }
+  box.append(head, control, h("div", { class: "help" }, helpText(o)), h("div", { class: "now", "data-now": o.dest }, nowText(o.dest)));
+  return box;
+}
+function nowText(dest) {
+  const st = S.settings[S.target];
+  if (!st) return "now: …";
+  if (st.error) return "now: unknown";
+  const x = st.values[dest];
+  return h("span", {}, "now: ", h("b", {}, x ?? "not set"));
+}
+async function loadSettings(force = false) {
+  const name = S.target;
+  if (!force && S.settings[name]) return paintSettings();
+  let r;
+  try { r = await api(`/api/settings?target=${encodeURIComponent(name)}`); }
+  catch (err) { r = { values: {}, error: String(err.message || err) }; }
+  S.settings[name] = r;
+  if (S.target === name) paintSettings();
+}
+function paintSettings() {
+  const st = S.settings[S.target], err = $("settingserr");
+  document.querySelectorAll("[data-now]").forEach((el) => el.replaceChildren(nowText(el.dataset.now)));
+  if (err) { err.classList.toggle("hidden", !st?.error); err.textContent = st?.error ? `Current values unknown: ${st.error}` : ""; }
+}
+
 // ----------------------------------------------------------------- options
 function optionsCard(options) {
   const group = (o) => o.group || STAGE_GROUPS[o.stage];
@@ -1023,7 +1108,7 @@ function renderPreviews(hasSources) {
 }
 // what a button runs: the form values, plus a preview or one step (null: Build)
 function action(step) {
-  const values = sendVals(), o = step && !isPreview(step) ? opt(step) : null;
+  const values = step === "configure" ? settingVals() : sendVals(), o = step && !isPreview(step) ? opt(step) : null;
   if (isPreview(step)) values[step] = true;
   if (o) { values[step] = (o.kind === "optional" && stepArg(step)) || true; if (S.dry[S.target]) values.dry_run = true; }
   // a step keeps its own rights, a dry run too (it may have to read the system: the ESP);
@@ -1062,6 +1147,7 @@ async function updateCommand() {
   const parts = (r.command || "").split(" ");
   c.replaceChildren(...parts.map((p, i) => i === 0 || (i === 1 && parts[0] === "sudo") || (p === "catppuccinize") ? h("b", {}, p + " ") : (/^-/.test(p) ? h("span", { style: { color: "var(--blue)" } }, p + " ") : p + " ")));
   $("dest").textContent = !r.out ? "" : S.hover === "restore" ? "Restore only undoes Install / Apply: it builds nothing."
+    : S.hover === "configure" ? "Configure only writes the system settings given: it builds nothing."
     : isPreview(S.hover) ? `${label(opt(S.hover))}: the first flavour and accent only, into ${tidy(r.out)}/previews/.`
     : S.hover ? `${label(opt(S.hover))} builds into ${tidy(r.out)} first.`
     : `Build writes into ${tidy(r.out)}${$("sudo").checked ? " (with sudo, handed back to you)" : ""}: nothing installed.`;
@@ -1074,10 +1160,12 @@ async function updateCommand() {
 // one that cannot run is greyed, its tooltip says why, a click shows it. They stay
 // hoverable (no `disabled`), so the tooltip shows everywhere.
 async function updateButtons() {
-  const acts = [...previews().map((o) => o.dest), ...steps().map((o) => o.dest)];
+  const acts = [...previews().map((o) => o.dest), ...steps().map((o) => o.dest), ...(cur().has_settings ? ["configure"] : [])];
   const answers = await Promise.all(acts.map((a) => api("/api/command", action(a)).catch(() => ({}))));
   if (S.hover) return;
   acts.forEach((a, i) => { S.btnErr[a] = answers[i].error || null; });
+  if (cur().has_settings && !S.btnErr.configure && !settingOpts().some((o) => vals()[o.dest] !== undefined))
+    S.btnErr.configure = "change a setting first (or “default” to undo one)";
   paintButtons();
 }
 function paintButtons() {
@@ -1092,7 +1180,7 @@ function paintButtons() {
   };
   paint($("runbtn"), "build");
   document.querySelectorAll("#previewbtns button").forEach((b) => paint(b, b.dataset.preview));
-  document.querySelectorAll("#steps button").forEach((b) => paint(b, b.dataset.step));
+  document.querySelectorAll("#steps button, .settings-actions button[data-step]").forEach((b) => paint(b, b.dataset.step));
 }
 
 // ------------------------------------------------------------ live preview
@@ -1193,7 +1281,7 @@ async function run(step) {
   if (err) return toast(err);
   const r = await api("/api/run", action(step));
   if (r.error) { toast(r.error); return; }
-  S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.accentIgnored = false;
+  S.job = { id: r.job, done: false, out: r.out, step }; S.since = 0; S.accentIgnored = false;
   $("log").replaceChildren(); $("results").replaceChildren();
   $("prog").style.width = "0"; setStatus("run", isPreview(step) ? `${label(opt(step))}…` : step ? `${label(opt(step))}${S.dry[S.target] ? " (dry run)" : ""}…` : "Building…");
   $("stopbtn").classList.remove("hidden"); $("openout").classList.add("hidden");
@@ -1211,6 +1299,7 @@ async function poll() {
   if (!r.done) { setTimeout(poll, 350); return; }
   S.job.done = true;
   if (S.names) { S.names.stale = true; scheduleNames(); }   // what exists has changed
+  if (S.job.step === "configure" && r.code === 0) loadSettings(true);
   $("stopbtn").classList.add("hidden");
   $("prog").style.width = r.code === 0 ? "100%" : $("prog").style.width;
   setStatus(r.code === 0 ? "ok" : "fail", r.code === 0 ? `Done — ${r.outputs.length} item(s) written`

@@ -74,6 +74,30 @@ your paths (see below).
 was none), runs `grub-mkconfig` again and removes the themes catppuccinizer
 installed. It builds nothing.
 
+## Display settings
+
+How the menu behaves and is drawn, apart from the theme: `--configure` sets
+variables of `/etc/default/grub` (a dated backup first, the rest of the file
+kept byte for byte), then runs `grub-mkconfig -o /boot/grub/grub.cfg`. It builds
+nothing; `default` puts back what the variable was (or removes its line), the
+values replaced being remembered in `/var/lib/catppuccinizer/grub-settings.json`.
+
+```bash
+sudo catppuccinize grub --configure                         # the current values, and tips
+sudo catppuccinize grub --configure --timeout 3 --gfxmode 1920x1080,auto
+sudo catppuccinize grub --configure --timeout default       # undo it
+```
+
+| Setting | Variable | Value | Not set |
+|---|---|---|---|
+| `--timeout` | `GRUB_TIMEOUT` | seconds (0: at once, -1: wait) | 5 |
+| `--timeout-style` | `GRUB_TIMEOUT_STYLE` | `menu`, `countdown`, or `hidden` (Esc shows it) | menu |
+| `--gfxmode` | `GRUB_GFXMODE` | `WIDTHxHEIGHT[xDEPTH]` or `auto`, several separated by commas | auto |
+| `--gfxpayload` | `GRUB_GFXPAYLOAD_LINUX` | `keep`, `text` or `WIDTHxHEIGHT` | chosen by GRUB |
+
+They are declared in `grub.toml` (`[configure]`), like the rest of the target:
+a TOML target of yours can declare its own ([format](architecture.md#format)).
+
 ## A target of your own
 
 Copy `grub.toml` to `~/.config/catppuccinizer/targets/`, rename it (`name`)

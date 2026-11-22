@@ -172,6 +172,90 @@ class Schema(Home):
         self.assertIsInstance(targets["grub"], declarative.TomlTarget)       # built-in TOML
 
 
+SETTINGS_TOML = """
+[configure]
+help = "write the settings"
+tips = ["a tip"]
+
+[[configure.settings]]
+name = "timeout"
+file = "~/conf/default"
+key = "TIMEOUT"
+min = -1
+max = 60
+help = "seconds"
+
+[[configure.settings]]
+name = "style"
+file = "~/conf/default"
+key = "STYLE"
+choices = ["menu", "hidden"]
+help = "the style"
+
+[[configure.settings]]
+name = "mode"
+file = "~/conf/default"
+key = "MODE"
+pattern = '\\d+x\\d+'
+what = "WxH"
+help = "resolution"
+
+[[configure.settings]]
+name = "title"
+file = "~/conf/default"
+key = "TITLE"
+help = "free text"
+"""
+
+
+class Settings(Home):
+    """[configure]: settings of KEY="value" files, declared in TOML."""
+
+    def test_schema(self):
+        t = declarative.load(self.write(USER_TOML + SETTINGS_TOML))
+        self.assertEqual(t.steps, ["install", "apply", "restore", "configure"])
+        self.assertEqual(t.tips, ["a tip"])
+        flags = [f for o in t.all_options() for f in o.flags]
+        self.assertLess(flags.index("--restore"), flags.index("--timeout"))
+        self.assertLess(flags.index("--title"), flags.index("--configure"))
+        for change, msg in (
+                (('name = "style"', 'name = "timeout"'), "name must be unique"),
+                (('min = -1', 'min = -1\nchoices = ["a"]'), "checked by choices"),
+                (('max = 60\n', ''), "checked by choices"),
+                (('key = "MODE"', 'key = "MO DE"'), "key must be a variable name"),
+                (("pattern = '", "pattern = '("), "missing"),
+                (('file = "~/conf/default"\nkey = "TITLE"', 'file = "/etc/default/x"\nkey = "TITLE"'),
+                 "not in your home"),
+                (('help = "write the settings"', 'help = "x"\nsudo = true'), "only for the TOML targets"),
+                (('tips = ["a tip"]', 'run = [["rm", "-rf", "/"]]'), "is not a command configure may run"),
+                (('tips = ["a tip"]', 'run = [["fc-cache", "{name}"]]'), "is not a command configure may run")):
+            with self.subTest(change=change[1]):
+                self.assertIn(msg, self.load_error(USER_TOML + SETTINGS_TOML.replace(*change)))
+
+    def test_cycle(self):
+        self.write(USER_TOML + SETTINGS_TOML)
+        conf = self.home / "conf/default"
+        conf.parent.mkdir()
+        conf.write_bytes(CONF.encode())
+        cli("mygrub", "--configure", "--timeout", "-1", "--style", "hidden", "--title", "My PC")
+        text = conf.read_bytes().decode()
+        self.assertIn('TIMEOUT="-1"\r\n', text)
+        self.assertTrue(text.endswith('STYLE="hidden"\nTITLE="My PC"\n'))
+        self.assertRegex(cli("mygrub", "--configure"), r"--timeout +-1\n")
+        for bad in (["--title", "a$(reboot)"], ["--mode", "big"], ["--timeout", "61"], ["--style", "x"]):
+            with self.subTest(value=bad), self.assertRaises(SystemExit):
+                cli("mygrub", "--configure", *bad)
+        cli("mygrub", "--configure", "--timeout", "default", "--style", "default", "--title", "default")
+        self.assertEqual(conf.read_bytes().decode(), CONF)                # byte for byte
+        self.assertFalse((self.tmp / "state/mygrub-settings.json").exists())
+
+    def test_grub(self):
+        grub = discover()["grub"]
+        self.assertEqual([o.dest for o in grub.all_options() if o.stage == "configure"],
+                         ["timeout", "timeout_style", "gfxmode", "gfxpayload", "configure"])
+        self.assertEqual(grub.configure_run, [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]])
+
+
 class UserSteps(Home):
     """A user's TOML target, really installed, applied and restored in the home."""
 

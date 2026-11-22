@@ -61,3 +61,49 @@ run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
 
 [restore]
 help = "put the previous GRUB_THEME back, run grub-mkconfig, remove the installed themes"
+
+[configure]                           # the display settings: --configure (core.settings)
+sudo = true
+help = "write the display settings given into /etc/default/grub, then run grub-mkconfig"
+explain = """Here: each setting is a variable of /etc/default/grub (a backup is made, the \
+value replaced is remembered), then grub-mkconfig -o /boot/grub/grub.cfg writes the menu \
+again; seen at the next boot."""
+run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
+tips = [
+    "A theme only shows with the graphical terminal: GRUB_TERMINAL_OUTPUT must not be 'console'.",
+    "A menu too small on a large screen: --gfxmode 1920x1080 (or lower), as a theme is drawn at that resolution.",
+    "--timeout-style hidden boots at once and shows the menu when Esc (or Shift) is held.",
+]
+
+[[configure.settings]]
+name = "timeout"
+file = "/etc/default/grub"
+key = "GRUB_TIMEOUT"
+min = -1
+max = 3600
+help = "seconds before the default entry boots, 0 at once, -1 to wait (not set: 5)"
+
+[[configure.settings]]
+name = "timeout-style"
+file = "/etc/default/grub"
+key = "GRUB_TIMEOUT_STYLE"
+choices = ["menu", "countdown", "hidden"]
+help = "during the timeout: the menu, a countdown, or nothing until Esc is pressed (not set: menu)"
+
+[[configure.settings]]
+name = "gfxmode"
+label = "Resolution"
+file = "/etc/default/grub"
+key = "GRUB_GFXMODE"
+pattern = '(auto|\d{3,5}x\d{3,5}(x\d{2})?)(,(auto|\d{3,5}x\d{3,5}(x\d{2})?))*'
+what = "WIDTHxHEIGHT[xDEPTH] or auto, several separated by commas"
+help = "resolution of the menu: the first of the list the screen supports (not set: auto)"
+
+[[configure.settings]]
+name = "gfxpayload"
+label = "Linux resolution"
+file = "/etc/default/grub"
+key = "GRUB_GFXPAYLOAD_LINUX"
+pattern = 'keep|text|\d{3,5}x\d{3,5}(x\d{2})?'
+what = "keep, text, or WIDTHxHEIGHT[xDEPTH]"
+help = "the resolution Linux starts with: keep (the menu's), text, or WxH (not set: chosen by GRUB)"

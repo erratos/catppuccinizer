@@ -90,4 +90,14 @@ it closes by itself, or click it.
 `--restore` selects the previous splash screen again and removes the packages
 catppuccinizer installed. It builds nothing.
 
+## Display settings
+
+`--configure --splash off` shows no splash screen at login (a black screen
+until the desktop), as System Settings, Splash Screen, None does; `on` brings
+it back, `default` what `ksplashrc` had before (`Engine` of `[KSplash]`,
+through `kwriteconfig6`; the value replaced is remembered in
+`~/.local/state/catppuccinizer/ksplash-settings.json`). `--configure` alone
+prints the current value. It builds nothing and leaves the selected splash
+screen as it is.
+
 See `catppuccinize ksplash --help` for all options.
