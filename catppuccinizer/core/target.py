@@ -37,6 +37,8 @@ class Target:
                                # "preview"): left out of the command line and the GUI
     links = ()                 # other sources: web pages to download sources from, as
                                # core.sources.link() (the GUI's "Other sources", --list)
+    online = ()                # other sources the GUI browses itself, core.online
+                               # OnlineSource objects (--list prints their page)
 
     def options(self):
         """The target's own options, as core.options.Option (scope "target"), plus
@@ -51,7 +53,7 @@ class Target:
         listing = [*([opts.COLOURS] if self.has_colours else []),
                    *([opts.NAMES] if self.has_outputs else [])]
         common = [o for o in opts.COMMON if o.dest not in self.unused_common]
-        return [*common, *self.options(), *([opts.LIST] if self.has_locations or self.links else []),
+        return [*common, *self.options(), *([opts.LIST] if self.has_locations or self.other_sources else []),
                 *listing, *([opts.JSON] if listing else []),
                 *([opts.DRY_RUN] if self.steps else [])]
 
@@ -59,6 +61,11 @@ class Target:
     def steps(self):
         """The system steps the target defines, in order (core.options.STEPS)."""
         return [s for s in opts.STEPS if getattr(type(self), s) is not getattr(Target, s)]
+
+    @property
+    def other_sources(self):
+        """Every other source as a link: the online sources' pages, then the links."""
+        return [*(s.link() for s in self.online), *self.links]
 
     @property
     def has_locations(self):

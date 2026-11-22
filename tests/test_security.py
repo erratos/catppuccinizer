@@ -355,6 +355,47 @@ class GuiRequests(unittest.TestCase):
                 status, content, ctype = e.code, e.read(), e.headers.get("Content-Type", "")
         return status, json.loads(content) if ctype.startswith("application/json") else content
 
+    # ------------------------------------------------------- online sources
+    def test_online_sources(self):
+        """Search, thumbnails and downloads of an online source go through the
+        server, to the source's own hosts only; the page names a declared source."""
+        import io as _io
+        from unittest import mock
+        from catppuccinizer.core import online
+        q = lambda p: urllib.request.quote(str(p), safe="")      # noqa: E731
+        buf = _io.BytesIO()
+        Image.new("RGB", (60, 40), (30, 30, 46)).save(buf, "JPEG")
+        search = {"data": [{"id": "abc123", "purity": "sfw", "resolution": "60x40", "file_size": 2048,
+                            "thumbs": {"small": "https://th.wallhaven.cc/small/ab/abc123.jpg"}}],
+                  "meta": {"current_page": 1, "last_page": 1}}
+        info = {"data": {"purity": "sfw", "path": "https://w.wallhaven.cc/full/ab/wallhaven-abc123.jpg"}}
+        routes = {"https://wallhaven.cc/api/v1/search": json.dumps(search).encode(),
+                  "https://wallhaven.cc/api/v1/w/abc123": json.dumps(info).encode(),
+                  "https://th.wallhaven.cc/": buf.getvalue(), "https://w.wallhaven.cc/": buf.getvalue()}
+
+        class Response(_io.BytesIO):
+            headers = {}
+
+        def fake(url, hosts):
+            return Response(next(v for k, v in routes.items() if url.startswith(k)))
+        with mock.patch.object(online, "_open", fake):
+            status, r = self.request("/api/online?target=image&source=wallhaven&q=forest")
+            self.assertEqual((status, [i["id"] for i in r["items"]]), (200, ["abc123"]))
+            status, data = self.request("/api/online/thumb?target=image&source=wallhaven&s=32&url="
+                                        + q("https://th.wallhaven.cc/small/ab/abc123.jpg"))
+            self.assertEqual((status, data[:2]), (200, b"\xff\xd8"))          # a JPEG made here
+            for url in ("https://evil.org/x.jpg", "http://th.wallhaven.cc/x.jpg", "file:///etc/passwd"):
+                self.assertEqual(self.request("/api/online/thumb?target=image&source=wallhaven&url=" + q(url))[0], 404)
+            status, r = self.request("/api/online/fetch", {"target": "limine", "source": "wallhaven", "id": "abc123"})
+            self.assertEqual(r["path"], str(self.tmp / "cache/downloads/wallhaven/wallhaven-abc123.jpg"))
+            self.assertIn("not a Wallhaven id",
+                          self.request("/api/online/fetch", {"target": "image", "source": "wallhaven", "id": "../x"})[1]["error"])
+        for path in ("/api/online?target=grub&source=wallhaven", "/api/online?target=image&source=nope",
+                     "/api/online/thumb?target=../x&source=wallhaven&url=x"):
+            self.assertEqual(self.request(path)[0], 404)
+        self.assertEqual(self.request("/api/online/fetch", {"target": "image", "source": ["wallhaven"], "id": "a"})[0], 404)
+        self.assertEqual(self.request("/api/online?target=image&source=wallhaven", token=False)[0], 403)
+
     # ------------------------------------------------------------- access
     def test_token_host_origin(self):
         self.assertEqual(self.request("/api/ping")[0], 200)

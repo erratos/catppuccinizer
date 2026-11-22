@@ -29,6 +29,8 @@ catppuccinizer/
     target.py         Target base class + discovery (Python, TOML, entry points, the user's TOML)
     declarative.py    targets described in TOML (a theme folder, install, KEY="value" settings)
     sources.py        where sources come from: system locations (sections, items), links
+    online.py         online sources the GUI browses (Wallhaven), https requests, downloads
+    archives.py       archives unpacked safely (no '..', no links, limits)
   targets/
     plymouth/         Plymouth themes (+ preview script)
     image.py          images (wallpapers, logos…)
@@ -45,6 +47,7 @@ tests/
   test_tuning.py      --chroma, --dark-fade, --auto-fit: effect, defaults = the former constants
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     system locations, installed themes and wallpapers, links, --list
+  test_online.py      online sources, request rules, Wallhaven, safe archives (no network)
   test_outputs.py     --names of every target against what the build writes
   test_previews.py    --preview / --preview-animation: first flavour and accent, no build
   test_folder.py      core.folder (parts of a theme folder) and the "hex" colour syntax
@@ -180,10 +183,31 @@ Plymouth: the installed themes, and adi1090x and Gnome-look as links; image:
 the wallpapers, and wallpaper sites (`WALLPAPER_LINKS`); Limine: the wallpaper
 of `limine.conf` + the wallpapers, the same sites; KDE splash: the user's and
 the system's splash screens, the KDE Store; GRUB (TOML): its `search` folders,
-Gnome-look and Gorgeous GRUB. Nothing is downloaded by the tool itself. The GUI
+Gnome-look and Gorgeous GRUB. The GUI
 needs nothing else:
 its forms come from `options()`
 (see [Graphical interface](gui.md#for-target-authors)).
+
+Some other sources can be browsed in the GUI itself (`Target.online`, a list of
+`core.online.OnlineSource`): the page searches them through the server and
+shows their thumbnails; a click downloads the item into the cache and puts its
+path in the source argument, as a file chosen with the browser would be.
+
+```python
+from ..core.online import WALLHAVEN
+
+online = [WALLHAVEN]          # image, limine
+```
+
+An `OnlineSource` declares its `name`, `title`, `home`, `note`, the `hosts` it
+reaches (and `thumb_hosts`), what it gives (`accept`: `"image"` or `"dir"`), and
+implements `search(query, page)` (items from `core.online.item()`) and
+`fetch(id)` (the local path, downloaded once). Its requests go through
+`core.online.get()` / `download()`: `https://` to its hosts only, redirects
+included, a time and a size limit, written in full then renamed. What comes as
+an archive is unpacked by `core.archives.extract()` (no absolute name or `..`,
+links and devices left out, files and size limited). `--list` prints an online
+source's page with the links.
 
 Optionally too, `def colours(self, a)` does only the analysis and returns the
 colours `-m` can remap, as `mapping.colour_report(...)` entries (or
@@ -448,7 +472,7 @@ output folder goes through `core.system` (the `System` object of the steps).
 | Where | What | Step | Rights |
 |---|---|---|---|
 | output folder (`-o`) | the results | build | the user; under sudo, handed back to them |
-| `~/.cache/catppuccinizer/` | GUI uploads | GUI | the user |
+| `~/.cache/catppuccinizer/` | GUI uploads, `downloads/<source>/` (online sources) | GUI | the user (`700`) |
 | `/usr/share/plymouth/themes/<name>/` | Plymouth themes | install | root, files 644, folders 755 |
 | `/var/lib/catppuccinizer/<target>.json` | what `restore` needs (system-wide steps) | install, apply | root, 644 |
 | `~/.local/state/catppuccinizer/<target>.json` | the same, for the user's steps | install, apply | the user |

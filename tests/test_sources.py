@@ -72,8 +72,8 @@ class Sections(unittest.TestCase):
                 if name == "lut":
                     self.assertEqual((t.has_locations, tuple(t.links), "--list" in flags), (False, (), False))
                     continue
-                self.assertTrue(t.links)
-                for ln in t.links:
+                self.assertTrue(t.other_sources)
+                for ln in t.other_sources:
                     self.assertEqual(set(ln), {"name", "url", "note"})
                     self.assertTrue(ln["url"].startswith("https://"))
                 self.assertIn("--list", flags)

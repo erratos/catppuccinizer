@@ -83,7 +83,9 @@ class Gui(unittest.TestCase):
         self.assertEqual(kinds["preview"]["role"], "preview")
         self.assertNotIn("preview_animation", kinds)            # a picture does not move
         lut = next(t for t in s["targets"] if t["name"] == "lut")
-        self.assertEqual((lut["has_locations"], lut["links"]), (False, []))
+        self.assertEqual((lut["has_locations"], lut["links"], lut["online"]), (False, [], []))
+        self.assertEqual([o["name"] for o in image["online"]], ["wallhaven"])     # browsed in the page
+        self.assertEqual(image["online"][0]["accept"], "image")
         self.assertFalse(lut["has_colours"])
         self.assertEqual({o["dest"]: o for o in lut["options"]}["method"]["choices"], ["lut", "lutgen"])
         self.assertNotIn("boot_delay", [o["dest"] for o in plymouth["options"]])

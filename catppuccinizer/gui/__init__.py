@@ -41,6 +41,8 @@ from PIL import Image
 
 from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
+from ..core.archives import ArchiveError
+from ..core.online import NetworkError, thumbnail as online_thumbnail
 from ..core.paths import cache_dir
 from ..core.options import STEPS, active, analysis, image_file
 from ..core.recolor import NO_ACCENT_METHODS
@@ -84,6 +86,7 @@ def schema(targets):
             "description": t.doc or "", "default_out": t.default_out,
             "default_accent": list(t.default_accent), "accent_also": t.accent_also,
             "has_locations": t.has_locations, "links": list(t.links),
+            "online": [s.info() for s in t.online],
             "has_colours": t.has_colours, "has_outputs": t.has_outputs,
             "options": [o.schema() for o in t.all_options() if o.gui],
         })
@@ -375,6 +378,13 @@ class App:
             return {"error": err}
         return {"items": items, "out": str(a.out), "command": command_line(argv, bool(body.get("sudo")))}
 
+    def online_source(self, q):
+        """The online source a request names ({"target": [...], "source": [...]}, as
+        parse_qs gives them), or None."""
+        t = self.targets.get((q.get("target") or [""])[0])
+        name = (q.get("source") or [""])[0]
+        return next((s for s in (t.online if t else ()) if s.name == name), None)
+
     def live(self, body):
         """The live preview: the source image recoloured with the form values, in this
         process, on a reduced copy (gui.live), for the first flavour and accent. Only
@@ -619,6 +629,22 @@ def make_handler(app):
                         return self.send(200, {"sections": t.locations()})
                 except (SystemExit, Exception) as e:  # noqa: BLE001 - shown in the page
                     return self.send(200, {"sections": [], "error": str(e) or type(e).__name__})
+            if u.path in ("/api/online", "/api/online/thumb"):
+                src = app.online_source(q)
+                if src is None:
+                    return self.send(404, {"error": "unknown online source"})
+                try:
+                    if u.path == "/api/online":
+                        page = (q.get("page") or ["1"])[0]
+                        return self.send(200, src.search((q.get("q") or [""])[0][:200],
+                                                         int(page) if page.isdigit() else 1))
+                    size = (q.get("s") or ["256"])[0]
+                    size = min(int(size), 512) if size.isdigit() and int(size) else 256
+                    return self.send(200, online_thumbnail(src, (q.get("url") or [""])[0], size),
+                                     "image/jpeg", cache=True)
+                except NetworkError as e:
+                    status = 200 if u.path == "/api/online" else 404
+                    return self.send(status, {"error": str(e)})
             if u.path == "/api/job":
                 job = app.jobs.get((q.get("id") or [""])[0])
                 if not job:
@@ -693,6 +719,14 @@ def make_handler(app):
                 return self.send(200, app.names(data))
             if u.path == "/api/live":
                 return self.send(200, app.live(data))
+            if u.path == "/api/online/fetch":       # download an item into the cache
+                src = app.online_source({k: [v] for k, v in data.items() if isinstance(v, str)})
+                if src is None:
+                    return self.send(404, {"error": "unknown online source"})
+                try:
+                    return self.send(200, {"path": str(src.fetch(str(data.get("id", ""))))})
+                except (NetworkError, ArchiveError) as e:
+                    return self.send(200, {"error": str(e)})
             if u.path == "/api/run":
                 return self.send(200, app.run(data))
             if u.path == "/api/stop":

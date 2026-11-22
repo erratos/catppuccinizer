@@ -139,7 +139,7 @@ is refused, to be fixed by hand.
 | `--wallpaper IMAGE` | image to recolour and use as the Limine wallpaper |
 | `--style` | `stretched`, `centered` or `tiled` (with `--wallpaper`) |
 | `--preview` | only draw the boot menu as it will look (first flavour and accent) in `<out>/previews/`: [Preview](#preview) |
-| `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP), the installed wallpapers and wallpaper sites to download more from |
+| `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP), the installed wallpapers and wallpaper sites to download more from (the GUI searches Wallhaven itself) |
 | `--names` | only list the folders and files the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | only list the wallpaper colours `-m` can remap (the menu has none); `--json` for JSON |
 | `-s, --suffix` | extra word at the end of the folder and wallpaper names |

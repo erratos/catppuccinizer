@@ -27,15 +27,19 @@ ten minutes after the page is closed. `--port N` picks the port,
    - *Browse files…* / *Browse folders…*: any file or folder (your Pictures and
      Downloads folders are in its places); images can also be dropped on the
      page;
-   - *Other sources…*: web pages to see and download more (opened in your
-     browser); download there, extract an archive, then choose what you
+   - *Other sources…*: more on the web. Some sources are browsed right in the
+     panel (*online sources*: Wallhaven for images and Limine): search, pages
+     of thumbnails, and a click downloads the file into
+     `~/.cache/catppuccinizer/downloads/` and fills the field (one or more for
+     a source that takes several). The others are web pages, opened in your
+     browser: download there, extract an archive, then choose what you
      downloaded with *Browse…*.
 
    What each target offers:
    - images: the wallpapers installed in `/usr/share/wallpapers`,
      `/usr/share/backgrounds` and `~/.local/share/wallpapers` (a KDE wallpaper
-     package: its largest image); other sources: Wallhaven, Unsplash, the KDE
-     Store wallpapers;
+     package: its largest image); other sources: Wallhaven (in the panel,
+     safe for work images only), Unsplash, the KDE Store wallpapers;
    - Plymouth: left empty, the theme in use is recoloured. The installed themes;
      other sources: [adi1090x/plymouth-themes](plymouth.md#getting-themes) (80
      animations) and the Gnome-look Plymouth themes;
@@ -184,10 +188,19 @@ What the page can reach:
 Non-HTML answers forbid scripts (an SVG opened on its own cannot read the
 token), and requests are limited in size (1 MB of JSON).
 
-The page itself reaches nothing outside the server: the other sources are
-plain `https://` links (a target cannot declare another kind), opened in a new
-tab, without the page's address (`noopener`, `noreferrer`: the token stays
-here).
+The page itself reaches nothing outside the server: the web pages of the
+other sources are plain `https://` links (a target cannot declare another
+kind), opened in a new tab, without the page's address (`noopener`,
+`noreferrer`: the token stays here). The online sources are reached by the
+server, only when the panel asks:
+
+| Online sources | Rule |
+|---|---|
+| hosts | `https://` only, to the hosts the source declares (Wallhaven: `wallhaven.cc`, `w.wallhaven.cc`, `th.wallhaven.cc`), redirects included; 20 s per request |
+| search | the source's API, its answer read as data (4 MB at most) |
+| thumbnails | fetched by the server (4 MB at most), decoded and written again as JPEG: the page still loads images from the server only |
+| downloads | an item the source lists, by its id (checked), up to 200 MB, written in full then renamed, only for you (`700` / `600`); a file already there is used again; a download that is not an image is removed |
+| archives | (for the sources that give them) unpacked in a new folder: no absolute name or `..`, no link or device, 5000 files and 500 MB at most |
 
 ## For target authors
 
@@ -227,7 +240,8 @@ GUI without GUI code:
 - `gui=False` keeps an option out of the forms (`--colours`: the page shows
   that list by itself; `--list` repeats the system locations and other sources);
 - `Target.locations()` fills *System locations…*, by sections, with thumbnails
-  and what is *in use*, and `Target.links` *Other sources…* (see
+  and what is *in use*; `Target.online` (browsed in the panel) and
+  `Target.links` (web pages) fill *Other sources…* (see
   [Architecture](architecture.md#writing-a-target));
 - `Target.accent_also` names what still uses the accent when `--method` is a
   LUT (Limine: the menu colours); without it, the accents are dimmed then.

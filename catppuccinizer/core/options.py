@@ -374,7 +374,7 @@ class ListSources(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         from .sources import format_sources
         t = namespace.target
-        print(format_sources(t.locations() if t.has_locations else [], t.links))
+        print(format_sources(t.locations() if t.has_locations else [], t.other_sources))
         parser.exit()
 
 

@@ -11,6 +11,7 @@ catppuccinize image photo.jpg --method lut --keep-lum 0.7 --preview
 catppuccinize image logo.svg -m blue=lavender    # SVG stays SVG
 catppuccinize image photo.jpg --method lutgen --lutgen-algo rbf   # LUT made by lutgen
 catppuccinize image --list                       # installed wallpapers, and sites to get more
+catppuccinize gui                                # Other sources…: search Wallhaven, click to use
 ```
 
 Output: `images/catppuccin-<flavor>-<name>[-<accent>][-<suffix>].png` (JPEG/WebP

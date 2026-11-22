@@ -34,6 +34,7 @@ from PIL import Image
 from ..core import recolor
 from ..core.mapping import colour_report
 from ..core.naming import output_name, planned
+from ..core.online import WALLHAVEN
 from ..core.options import Option, previewing, step
 from ..core.parts import accent_sets, check_parts, note_unused, single
 from ..core.palette import FLAVOR_TITLES, PALETTES, hex2rgb
@@ -60,6 +61,7 @@ class LimineTarget(Target):
     name = "limine"
     help = "Catppuccin colours + wallpaper for the Limine boot menu"
     links = WALLPAPER_LINKS
+    online = [WALLHAVEN]
     accent_also = "the menu colours"
 
     def options(self):
