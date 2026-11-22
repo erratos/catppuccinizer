@@ -20,7 +20,8 @@ catppuccinizer/
     recolor.py        keys method, LUT methods (lut, lutgen), auto choice, render/save/preview
     clut.py           3D LUTs: trilinear application, resampling, Hald CLUT and .cube files
     lutgen.py         --lutgen-* options, runs the external lutgen binary
-    formats.py        colours written as text (QML, SVG/SVGZ), animations (GIF, WebP)
+    formats.py        colours written as text (QML, SVG/SVGZ, theme files), animations (GIF, WebP)
+    folder.py         a theme folder recoloured by parts: text files, images, animations
     textscreen.py     a boot menu's text screen (bitmap font, cells, margin), for previews
     paths.py          cache / restore state, sudo-aware home and ownership
     naming.py         output names (catppuccin-<flavor>-<source>[-<accent>][-<suffix>])
@@ -42,6 +43,7 @@ tests/
   test_sources.py     catalogue sections, installed themes and wallpapers, --list
   test_outputs.py     --names of every target against what the build writes
   test_previews.py    --preview / --preview-animation: first flavour and accent, no build
+  test_folder.py      core.folder (parts of a theme folder) and the "hex" colour syntax
 ```
 
 ## Core API (what targets use)
@@ -66,7 +68,8 @@ tests/
 | `recolor.LUT_METHODS` / `NO_ACCENT_METHODS` / `lut_for(method, flavor, args, n, accent, hue)` | the LUT methods (no source colours), those without accent (all but `lut-accent`), and their cube (`lut-accent`: the accent given to `dominant_hue(path)`) |
 | `recolor.accent_ignored_reason(method, grp)` | why the accent has no effect on an image, or None |
 | `clut.apply_cube` / `resample` / `read_hald` / `write_hald` / `write_cube` | 3D LUT application and files |
-| `formats.collect_text_colours(files)` / `recolour_text_file(f, lookup)` | colours inside QML / SVG / SVGZ |
+| `formats.collect_text_colours(files, syntax)` / `recolour_text_file(f, lookup, syntax)` | colours inside text files, written as `qml`, `svg` or `hex` (`"#rrggbb"` strings: GRUB's `theme.txt`); `syntax_of(path)` from the extension |
+| `folder.Part(name, kind, files)` / `analyse(root, parts, a)` / `results(a, fold, parts)` / `colours(fold)` / `write(fold, flavor, accents, a, out_of, done)` / `preview_still` / `preview_moving` | a theme folder recoloured as a whole ([below](#theme-folders)) |
 | `mapping.text_colours(files, maps, strict, group)` / `text_lookup(colors, flavor, accent)` | the colours of text files mapped to roles, after `-m`; their `{#source: #new}` for a flavour and accent |
 | `formats.is_animated(f)` / `anim_info` / `anim_frames` / `anim_sample` / `save_animation(...)` | animated GIF and WebP, streamed frame by frame |
 | `recolor.recolor_frames(frames, ...)` | keys method over a stream of frames, in parallel |
@@ -186,6 +189,34 @@ declare an entry point and install it next to catppuccinizer:
 [project.entry-points."catppuccinizer.targets"]
 grub = "my_package.grub:TARGET"
 ```
+
+### Theme folders
+
+A target whose source is a folder of files to recolour (KDE splash, the TOML
+targets) describes its parts with `core.folder.Part(name, kind, files)`: `kind`
+is `text` (colours written in the files, `syntax` from the extension unless
+given), `image` (still images, with the `--method` options) or `animation`
+(GIFs and animated WebPs, keys frame by frame); `files` are globs relative to
+the folder, without case, `*` going across folders. A file goes to the first
+part it matches whose kind fits it; links out of the folder are left out.
+
+```python
+FILES = [Part("text", "text", ("*.qml", "*.svg")), Part("animations", "animation"),
+         Part("images", "image")]
+fold = folder.analyse(src, FILES, a)              # every file's colours, after -m
+using, sets = folder.results(a, fold, FILES)      # parts that use the accent
+done = {}
+for flv in a.flavor:
+    for accents, name in sets:
+        copy_folder(src, dst)                     # the files no part takes stay as they are
+        folder.write(fold, flv, accents, a, lambda f: dst / f.relative_to(src), done)
+```
+
+`write` recolours the copied text files in place and renders the pictures over
+their copies, still images in parallel; `done` makes a picture that does not
+use the accent rendered once per flavour, then copied. `colours(fold)` is the
+`--colours` list; `preview_still` / `preview_moving` the `--preview` /
+`--preview-animation` of the folder (the largest image, the longest animation).
 
 ### Steps
 

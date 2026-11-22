@@ -1,7 +1,16 @@
-"""File formats: colours written as text (QML, SVG/SVGZ) and animations (GIF, WebP)."""
+"""File formats: colours written as text (QML, SVG/SVGZ, theme files) and animations
+(GIF, WebP).
+
+How a text file writes its colours (its syntax):
+- qml: "#rgb" / "#rrggbb" / "#aarrggbb" strings, color: "white", Qt.rgba(r, g, b, a);
+- svg: fill / stroke / stop-color… = #rrggbb (or #rrggbbaa, white, black);
+- hex: "#rgb" / "#rrggbb" / "#rrggbbaa" strings, and "white"… after a key naming a
+  colour (GRUB's theme.txt: item_color = "#cccccc", CSS-like files).
+syntax_of() picks it from the extension (.qml, .svg / .svgz, else hex)."""
 import gzip
 import re
 from collections import Counter
+from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageSequence
@@ -18,11 +27,20 @@ SVG_RE = re.compile(r"((?:fill|stroke|stop-color|flood-color|lighting-color|colo
 QML_HEX_RE = re.compile(r"\"(#[0-9a-fA-F]{8}|#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\"")
 QML_NAMED_RE = re.compile(r"(\b(?:color|[a-zA-Z]*Color)\s*:\s*)\"(black|white|gray|grey)\"")
 QML_RGBA_RE = re.compile(r"Qt\.rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)")
+HEX_RE = re.compile(r"([\"'])(#[0-9a-fA-F]{8}|#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\1")
+HEX_NAMED_RE = re.compile(r"(\b[\w-]*colou?r\s*[:=]\s*)([\"'])(black|white|gray|grey)\2", re.I)
 TEXT_SUFFIXES = {".qml", ".svg", ".svgz"}
+SYNTAXES = ("qml", "svg", "hex")
+
+
+def syntax_of(path):
+    """How a text file writes its colours, from its extension."""
+    ext = Path(path).suffix.lower()
+    return "qml" if ext == ".qml" else "svg" if ext in (".svg", ".svgz") else "hex"
 
 
 def parse_hex(h, qml):
-    """'#rgb' / '#rrggbb' / '#aarrggbb' (QML) or '#rrggbbaa' (SVG) -> (rgb hex, alpha hex)."""
+    """'#rgb' / '#rrggbb' / '#aarrggbb' (QML) or '#rrggbbaa' (SVG, hex) -> (rgb hex, alpha hex)."""
     h = h.lstrip("#").lower()
     if len(h) == 3:
         return "#" + "".join(c * 2 for c in h), None
@@ -52,12 +70,18 @@ def _rgba_hex(m):
     return rgb2hex([float(m.group(i)) * 255 for i in (1, 2, 3)])
 
 
-def collect_text_colours(files):
-    """Counter {#rrggbb: occurrences} over QML / SVG / SVGZ files."""
+def collect_text_colours(files, syntax=None):
+    """Counter {#rrggbb: occurrences} over text files (syntax: of every file; None:
+    syntax_of() each one)."""
     counts = Counter()
     for f in files:
-        text, qml = read_text(f), f.suffix.lower() == ".qml"
-        if qml:
+        text, kind = read_text(f), syntax or syntax_of(f)
+        if kind == "hex":
+            for m in HEX_RE.finditer(text):
+                counts[parse_hex(m.group(2), False)[0]] += 1
+            for m in HEX_NAMED_RE.finditer(text):
+                counts[NAMED[m.group(3).lower()]] += 1
+        elif kind == "qml":
             for m in QML_HEX_RE.finditer(text):
                 counts[parse_hex(m.group(1), True)[0]] += 1
             for m in QML_NAMED_RE.finditer(text):
@@ -71,8 +95,13 @@ def collect_text_colours(files):
     return counts
 
 
-def recolour_text(text, qml, lookup):
-    """Replace colours in QML (qml=True) or SVG text; lookup: {#src: #new}. Alpha is kept."""
+def recolour_text(text, syntax, lookup):
+    """Replace the colours of a text written in syntax (SYNTAXES); lookup: {#src: #new}.
+    Alpha is kept."""
+    if syntax not in SYNTAXES:
+        raise ValueError(f"unknown colour syntax {syntax!r}")
+    qml = syntax == "qml"
+
     def sub_hex(h):
         rgbhex, alpha = parse_hex(h, qml)
         new = lookup.get(rgbhex, rgbhex).lstrip("#")
@@ -80,6 +109,10 @@ def recolour_text(text, qml, lookup):
             return "#" + new
         return "#" + (alpha + new if qml else new + alpha)
 
+    if syntax == "hex":
+        text = HEX_RE.sub(lambda m: f"{m.group(1)}{sub_hex(m.group(2))}{m.group(1)}", text)
+        return HEX_NAMED_RE.sub(
+            lambda m: f"{m.group(1)}{m.group(2)}{lookup[NAMED[m.group(3).lower()]]}{m.group(2)}", text)
     if qml:
         text = QML_HEX_RE.sub(lambda m: f'"{sub_hex(m.group(1))}"', text)
         text = QML_NAMED_RE.sub(lambda m: f'{m.group(1)}"{lookup[NAMED[m.group(2).lower()]]}"', text)
@@ -97,8 +130,8 @@ def recolour_text(text, qml, lookup):
     return SVG_RE.sub(sub_svg, text)
 
 
-def recolour_text_file(f, lookup):
-    write_text(f, recolour_text(read_text(f), f.suffix.lower() == ".qml", lookup))
+def recolour_text_file(f, lookup, syntax=None):
+    write_text(f, recolour_text(read_text(f), syntax or syntax_of(f), lookup))
 
 
 # ----------------------------------------------------------------- animations

@@ -100,10 +100,11 @@ def resolve_target(flavor, accent, target):
     return rgb(flavor, accent if target == "accent" else target)
 
 
-def text_colours(files, maps, strict=True, group="text"):
+def text_colours(files, maps, strict=True, group="text", syntax=None):
     """The colours written in text files (QML, SVG, theme files: core.formats), mapped
-    to Catppuccin roles (map_colour_counts), after -m. group: its name for -m GROUP.NAME."""
-    cfg = {"groups": {group: {"colors": map_colour_counts(collect_text_colours(files))}}}
+    to Catppuccin roles (map_colour_counts), after -m. group: its name for -m GROUP.NAME;
+    syntax: how they are written (None: from each file's extension)."""
+    cfg = {"groups": {group: {"colors": map_colour_counts(collect_text_colours(files, syntax))}}}
     apply_maps(cfg, maps, strict=strict)
     return cfg["groups"][group]["colors"]
 

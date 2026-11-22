@@ -124,7 +124,7 @@ class ImageTarget(Target):
             for _, acc in sets_of(a, path, uses_accent(colors)):
                 lookup = text_lookup(colors, flv, acc)
                 name = output_name(flv, path.stem, acc, a.suffix)
-                new = recolour_text(text, False, lookup)
+                new = recolour_text(text, "svg", lookup)
                 if a.preview:
                     (a.out / "previews").mkdir(exist_ok=True)
                     dst = a.out / "previews" / f"{name}.png"

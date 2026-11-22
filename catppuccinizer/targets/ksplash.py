@@ -19,18 +19,14 @@ import json
 import re
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 
-from ..core import naming, recolor
-from ..core.detect import detect_group, detect_params
-from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, is_animated,
-                            recolour_text_file, save_animation, text_files)
-from ..core.mapping import (apply_maps, background_of, colour_report, note_accent_ignored,
-                            print_colours, text_colours, text_lookup, uses_accent)
+from ..core import folder, naming, recolor
+from ..core.formats import RASTER, is_animated
+from ..core.mapping import note_accent_ignored
 from ..core.palette import FLAVOR_TITLES
 from ..core.options import PREVIEW_ANIMATION, Option, previewing, step
-from ..core.parts import accent_sets, check_parts, note_unused, single
+from ..core.parts import check_parts, note_unused, single
 from ..core.paths import state_file
 from ..core.naming import check_name
 from ..core.sources import item, section, theme_folders, tidy
@@ -44,7 +40,9 @@ MARKER = "contents/splash/Splash.qml"       # what makes a look-and-feel package
 
 
 # -a PART=ACCENT (core.parts): the QML / SVG colours, the animations, the other images
-PARTS = ("vector", "animations", "images")
+FILES = [folder.Part("vector", "text", ("*.qml", "*.svg", "*.svgz"), label="QML / SVG"),
+         folder.Part("animations", "animation"), folder.Part("images", "image")]
+PARTS = tuple(p.name for p in FILES)
 
 
 class KSplashTarget(Target):
@@ -172,10 +170,11 @@ def installed(base, active):
                    thumb=preview if preview.is_file() else None)
 
 
-def preview_group(preview, rasters):
+def preview_group(preview, fold):
     """Colours of the animation the preview is a still of (the one that rebuilds it
     best), or None when no animation explains it well enough."""
-    scored = [(recolor.fit_error(preview, g)[0], g) for m, g, _ in rasters.values() if m == "anim"]
+    scored = [(recolor.fit_error(preview, p.grp)[0], p.grp) for p in fold.pictures.values()
+              if p.method == "anim"]
     if not scored:
         return None
     err, grp = min(scored, key=lambda x: x[0])
@@ -197,45 +196,20 @@ def stills(pkg):
 
 
 # ---------------------------------------------------------------------- main
-def analyse(a, pkg, tmp):
-    """Colours of a splash package after -m: (QML / SVG colours, {image: (method or
-    "anim", group, extra)}). Animations are sampled into tmp."""
-    splash = pkg / "contents/splash"
-    vcolors = text_colours(text_files(splash), a.map, strict=False, group="vector")
-    if vcolors:
-        print("  QML / SVG colours")
-        print_colours(vcolors)
-
-    rasters = {}                                   # path -> ("anim"|method, grp, extra)
-    previews = pkg / "contents/previews/splash.png"
-    for f in [*sorted(splash.rglob("*")), *([previews] if previews.exists() else [])]:
-        if not source_file(f, splash if f != previews else pkg):
-            continue                               # not copied either (core.system.copy_folder)
-        ext = f.suffix.lower()
-        if f == previews and (grp := preview_group(f, rasters)):
-            # the preview is a still of an animation: same colours and -m, so it
-            # matches the splash in System Settings (alone it may go to the LUT)
-            rasters[f] = ("keys", grp, None)
-            print(f"  {f.relative_to(pkg)}: keys (colours of the animation)")
-            continue
-        if is_animated(f):
-            n, durations, loop = anim_info(f)
-            grp = detect_group(anim_sample(f, n, tmp), is_ui=False,
-                               params=detect_params(a.separation))
-            cfg = {"groups": {"image": grp}}
-            apply_maps(cfg, a.map, strict=False)
-            rasters[f] = ("anim", grp, (n, durations, loop))
-            print(f"  {f.relative_to(pkg)}: {n} frames")
-        elif ext in RASTER:
-            a.strict_map = False
-            method, grp = recolor.plan(f, a, verbose=False)
-            rasters[f] = (method, grp, None)
-            print(f"  {f.relative_to(pkg)}: {method}")
+def analyse(a, pkg):
+    """The colours of a splash package after -m (core.folder): its QML / SVG, images
+    and animations, then the preview of System Settings (contents/previews/splash.png)."""
+    fold = folder.analyse(pkg / "contents/splash", FILES, a)
+    still = pkg / "contents/previews/splash.png"
+    if source_file(still, pkg):           # not copied either when it is a link out of pkg
+        if grp := preview_group(still, fold):
+            # a still of an animation: same colours and -m, so it matches the splash in
+            # System Settings (alone it may go to the LUT); --colours leaves it out
+            fold.pictures[still] = folder.Picture("animations", "keys", grp, listed=False)
+            print(f"  {still.relative_to(pkg)}: keys (colours of the animation)")
         else:
-            continue
-        if rasters[f][1] is not None and rasters[f][0] not in recolor.LUT_METHODS:
-            print_colours(rasters[f][1]["colors"], show_share=False)
-    return vcolors, rasters
+            fold.pictures[still] = folder.picture(still, "images", a, still.relative_to(pkg))
+    return fold
 
 
 def colours(a):
@@ -243,20 +217,7 @@ def colours(a):
     (contents/previews/splash.png) is left out when it takes an animation's colours:
     it follows that animation, -m included, so it has nothing of its own to remap."""
     pkg = resolve(a.theme)
-    tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
-    try:
-        vcolors, rasters = analyse(a, pkg, tmp)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-    out = [colour_report("QML / SVG", "text", vcolors, part="vector")] if vcolors else []
-    for f, (method, grp, extra) in rasters.items():
-        name = f.relative_to(pkg)
-        if method == "anim":
-            out.append(colour_report(name, "keys", grp["colors"], background=background_of(grp),
-                                     note=f"animation, {extra[0]} frames", part="animations"))
-        elif part_of(method, grp, rasters) == "images":
-            out.append(recolor.colour_report(name, method, grp, part="images"))
-    return out
+    return folder.colours(analyse(a, pkg), name=lambda f: f.relative_to(pkg))
 
 
 def read_setting(key):
@@ -279,27 +240,6 @@ def set_settings(system, values):
                     *([value] if value else ["--delete"])])
 
 
-def part_of(method, grp, rasters):
-    """The part of an image: the animations, with the preview when it is a still of
-    one (it takes its colours), else the images."""
-    if method == "anim" or any(g is grp for m, g, _ in rasters.values() if m == "anim"):
-        return "animations"
-    return "images"
-
-
-def results(a, vcolors, rasters):
-    """(parts that use the accent, core.parts.accent_sets), in PARTS order."""
-    used = {"vector"} if uses_accent(vcolors) else set()
-    used |= {part_of(m, g, rasters) for m, g, _ in rasters.values() if raster_accent(m, g)}
-    using = [p for p in PARTS if p in used]
-    return using, accent_sets(a, using)
-
-
-def raster_accent(method, grp):
-    """Whether an image (or an animation: keys) uses the accent."""
-    return not recolor.accent_ignored_reason("keys" if method == "anim" else method, grp)
-
-
 def package_id(flv, slug, acc, a):
     return naming.output_name(flv, slug, acc, a.suffix)
 
@@ -308,11 +248,7 @@ def outputs(a):
     """One look-and-feel package per flavour (and accent, when something uses it)."""
     pkg = resolve(a.theme)
     slug = naming.slug(package_name(pkg), "splash")
-    tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
-    try:
-        _, sets = results(a, *analyse(a, pkg, tmp))
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    _, sets = folder.results(a, analyse(a, pkg), FILES)
     if previewing(a):
         ext = ".webp" if a.preview_animation else ".png"
         return [naming.planned(a.out / "previews" / f"{package_id(flv, slug, name, a)}{ext}")
@@ -328,19 +264,14 @@ def build(a):
     slug = naming.slug(title, "splash")
     print(f"{title} ({pkg})")
 
-    tmp = Path(tempfile.mkdtemp(prefix="catppuccinize-"))
-    vcolors, rasters = analyse(a, pkg, tmp)
+    fold = analyse(a, pkg)
     preview_src = source_file(pkg / "contents/previews/splash.png", pkg)
-
-    using, sets = results(a, vcolors, rasters)
+    using, sets = folder.results(a, fold, FILES)
     if not using:
         note_accent_ignored(a)
     note_unused(a, using)
     if previewing(a):
-        try:
-            preview(a, pkg, slug, rasters, sets)
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
+        preview(a, fold, pkg, slug, sets)
         return None
     built = []
     done = {}      # (image, flavour, accent or None) -> recoloured file, copied for other accents
@@ -364,76 +295,27 @@ def build(a):
                 pkg, pid, name, f"Catppuccin {FLAVOR_TITLES[flv]} recolour of the "
                                 f"{title} splash screen"), indent=4) + "\n")
 
-            lookup = text_lookup(vcolors, flv, accents.get("vector"))
-            for f in text_files(dst / "contents/splash"):
-                recolour_text_file(f, lookup)
-
-            for src, (method, grp, extra) in rasters.items():
-                rel = src.relative_to(splash) if src.is_relative_to(splash) else None
-                out = dst / "contents/splash" / rel if rel else dst / "contents/previews/splash.png"
-                # an image that ignores the accent is the same in every accent's package
-                acc = accents.get(part_of(method, grp, rasters)) if raster_accent(method, grp) else None
-                key = (src, flv, acc)
-                if key in done:
-                    shutil.copyfile(done[key], out)
-                    continue
-                done[key] = out
-                if method == "anim":
-                    n, durations, loop = extra
-                    if n > 100:
-                        print(f"  recolouring {n} frames of {src.name}…", flush=True)
-                    frames = recolor.recolor_frames(
-                        anim_frames(src), *recolor.keys_plan(grp, flv, acc),
-                        quantize=out.suffix.lower() == ".gif", parallel=n > 48)
-                    save_animation(frames, n, out, durations, loop)
-                else:
-                    im = recolor.render(src, method, grp, flv, acc, a)
-                    if out.suffix.lower() in (".jpg", ".jpeg"):
-                        im.convert("RGB").save(out, quality=95)
-                    else:
-                        im.save(out)
+            def out_of(f, dst=dst):
+                if f.is_relative_to(splash):
+                    return dst / "contents/splash" / f.relative_to(splash)
+                return dst / "contents/previews/splash.png"
+            folder.write(fold, flv, accents, a, out_of, done)
             built.append(dst)
             print(f"  -> {dst}  ({name})")
-    shutil.rmtree(tmp, ignore_errors=True)
     return built or None
 
 
-def preview(a, pkg, slug, rasters, sets):
+def preview(a, fold, pkg, slug, sets):
     """--preview: the thumbnail of System Settings before and after (else a frame of
-    the longest animation, else the first image); --preview-animation: the longest
+    the longest animation, else the largest image); --preview-animation: the longest
     animation, before | after. The first flavour and accent (core.options.previewing)."""
     flv, (accents, aname) = a.flavor[0], sets[0]
-    out = a.out / "previews"
-    out.mkdir(parents=True, exist_ok=True)
-    anims = sorted((f for f, (m, _, _) in rasters.items() if m == "anim"),
-                   key=lambda f: -rasters[f][2][0])
-    def acc_of(method, grp):
-        return accents.get(part_of(method, grp, rasters)) if raster_accent(method, grp) else None
+    still = pkg / "contents/previews/splash.png"
+    dst = a.out / "previews" / f"{package_id(flv, slug, aname, a)}.{'webp' if a.preview_animation else 'png'}"
     if a.preview_animation:
-        src = anims[0]
-        method, grp, (n, durations, _) = rasters[src]
-        plan = recolor.keys_plan(grp, flv, acc_of(method, grp))
-        after = recolor.recolor_frames(anim_frames(src), *plan, quantize=False, parallel=n > 48)
-        pairs = ((recolor.on_black(b), recolor.on_black(r)) for b, r in zip(anim_frames(src), after))
-        dst = out / f"{package_id(flv, slug, aname, a)}.webp"
-        print(f"  recolouring {n} frames of {src.name}…", flush=True)
-        recolor.preview_animation(pairs, n, dst, durations)
+        folder.preview_moving(fold, flv, accents, dst)
     else:
-        still = next((f for f in rasters if f.name == "splash.png" and f.parent.name == "previews"),
-                     None)
-        dst = out / f"{package_id(flv, slug, aname, a)}.png"
-        if still or not anims:
-            src = still or next(f for f, (m, _, _) in rasters.items() if m != "anim")
-            method, grp, _ = rasters[src]
-            im = recolor.render(src, method, grp, flv, acc_of(method, grp), a)
-            recolor.side_by_side(src, im, dst, grp if method == "keys" else None)
-        else:                                  # the middle frame of the longest animation
-            src = anims[0]
-            method, grp, (n, _, _) = rasters[src]
-            frame = next(anim_frames(src, {n // 2}))
-            im = recolor.recolor_image(frame, *recolor.keys_plan(grp, flv, acc_of(method, grp)),
-                                       quantize=False)
-            recolor.side_by_side(frame, im, dst, grp)
+        folder.preview_still(fold, flv, accents, a, dst, still if still in fold.pictures else None)
     print(f"  preview: {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + aname if aname else ''})")
 
 
