@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from PIL import Image
+
 from . import __version__
 from .core import options, settings
 from .core.mapping import format_colour_report
@@ -131,6 +133,10 @@ def main(argv=None):
         run(a.target, a)
     except KeyboardInterrupt:
         raise SystemExit("\ninterrupted")
+    except Image.DecompressionBombError as e:       # not an OSError: Pillow's size limit
+        if os.environ.get("CATPPUCCINIZER_DEBUG"):
+            raise
+        raise SystemExit(f"error: image too large to open safely: {e}")
     except OSError as e:
         # missing, unreadable or unwritable files are the user's to fix: a message,
         # not a traceback (CATPPUCCINIZER_DEBUG=1 shows it)

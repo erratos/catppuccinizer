@@ -37,6 +37,15 @@ class Errors(unittest.TestCase):
         self.assertIn("cannot identify image file",
                       message("limine", "--wallpaper", self.tmp / "fake.png", "-o", out))
 
+    def test_image_too_large(self):
+        """Over Pillow's pixel limit (a decompression bomb): a message too."""
+        from unittest import mock
+        from PIL import Image
+        Image.new("RGB", (100, 100)).save(self.tmp / "big.png")
+        with mock.patch.object(Image, "MAX_IMAGE_PIXELS", 1000):       # 10 000 pixels: over twice
+            self.assertIn("error: image too large to open safely",
+                          message("image", self.tmp / "big.png", "-o", self.tmp / "out"))
+
     def test_missing_files(self):
         self.assertIn("Not found", message("image", self.tmp / "nope.png"))
         self.assertIn("Not found", message("limine", "--wallpaper", self.tmp / "nope.png"))

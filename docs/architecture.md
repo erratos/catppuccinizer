@@ -565,7 +565,8 @@ purpose (better LUT, new detection rule…), look at the result, then update
 
 User mistakes end with a one-line message, never a traceback: a target raises
 `SystemExit("...")`, and `cli.main` turns file errors (`OSError`: missing,
-unreadable or unwritable files) into `error: ...`. Set `CATPPUCCINIZER_DEBUG=1`
+unreadable or unwritable files) and images over Pillow's pixel limit
+(`DecompressionBombError`) into `error: ...`. Set `CATPPUCCINIZER_DEBUG=1`
 to get the traceback back.
 
 ## Security
