@@ -84,9 +84,18 @@ which also shows how to add a missing colour with `-m '#rrggbb=TARGET'`.
 
 ![--separation](../catppuccinizer/assets/options-separation.jpg)
 
+**`--auto-fit`** (0 to 30, default 6): how `auto` chooses. It picks `keys`
+when the colours it found rebuild the image almost exactly (mean error on the
+non-background pixels, 0 to 255, under this value), a plain background covers
+a good part of the image and its edges are crisp. Raise it when flat art with
+soft shading or noise is sent to `lut`; lower it when a photo or a gradient
+gets `keys` (a few flat colours where there were shades). `--colours` says
+which method each image gets.
+
 ## Tuning the `lut` method
 
-Two knobs change the look; try them with `--preview`.
+Four knobs change the look (also for `lut-accent`); try them with `--preview`,
+or move them in the GUI's [live preview](gui.md#live-preview).
 
 **`--keep-lum`** (0 to 1, default 0.5): lightness of the result. At `0` every
 colour takes the lightness of the palette's neutrals (`crust` → `text`): low
@@ -95,12 +104,29 @@ and bright highlights, more contrast.
 
 ![--keep-lum](../catppuccinizer/assets/options-keep-lum.jpg)
 
-**`--smooth`** (default 0.08): how far a colour looks for accents. Small values
+**`--smooth`** (0.01 to 0.5, default 0.08): how far a colour looks for accents. Small values
 snap each hue to its single closest accent (distinct bands of green, blue,
 pink in the chart); large values blend many accents together, towards a
 pastel, almost uniform tint.
 
 ![--smooth](../catppuccinizer/assets/options-smooth.jpg)
+
+**`--chroma`** (0.02 to 0.3, default 0.1): how colourful a colour must be to
+take its accent fully. A colour takes its accent in proportion to its Oklab
+chroma, fully from this value on, and is otherwise mixed with the neutral of
+its lightness (so grays stay gray). Lower values turn faint tints (a bluish
+gray, a pale sky) into plain accents; higher values keep only vivid colours
+coloured.
+
+![--chroma](../catppuccinizer/assets/options-chroma.jpg)
+
+**`--dark-fade`** (0 to 1.5, default 0.75): how much dark colours lose their
+accent. Accents are light colours, and a dark pixel given a full one glows like
+neon, so colours darker than this share of the accents' lightness get
+proportionally less of it. `0` keeps full accents in the shadows; higher values
+send more dark colours to the palette's dark grays.
+
+![--dark-fade](../catppuccinizer/assets/options-dark-fade.jpg)
 
 ## SVG / SVGZ
 
@@ -118,8 +144,11 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` |
 | `--method` | `auto` | `keys`, `lut`, `lut-accent`, `lutgen` or `auto` (`keys` or `lut`) |
 | `--separation` | `0.5` | keys: 0 = merge close colours, 1 = keep faint (and darker) ones apart |
+| `--auto-fit` | `6` | auto: error under which keys is picked (0 to 30); higher = keys more often |
 | `--keep-lum` | `0.5` | lut, lut-accent: 0 = palette lightness, 1 = original lightness |
-| `--smooth` | `0.08` | lut, lut-accent: accent blend radius; smaller = purer accents |
+| `--smooth` | `0.08` | lut, lut-accent: accent blend radius (0.01 to 0.5); smaller = purer accents |
+| `--chroma` | `0.1` | lut, lut-accent: chroma from which a colour fully takes its accent (0.02 to 0.3); lower = more colourful |
+| `--dark-fade` | `0.75` | lut, lut-accent: how much dark colours lose their accent (0 to 1.5); 0 = none |
 | `-a` | `all` | accent(s) for colours mapped to `accent` (keys, lut-accent), or `all`; `NAME=ACCENT` for one image (`-a mauve logo=peach`) |
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
 | `--preview` | | only render before/after images in `<out>/previews/`, first flavour and accent (`keys`: and the separation panel) |

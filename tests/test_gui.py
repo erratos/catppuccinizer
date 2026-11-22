@@ -184,9 +184,12 @@ class Gui(unittest.TestCase):
                 ring = out.convert("RGB").getpixel((256, 288 * 100 // 900 + 2))
                 self.assertLessEqual(max(abs(x - y) for x, y in zip(ring, (203, 166, 247))), 3, ring)
             # flavour, accent, -m (even a name being typed): rendered again, not analysed
-            for extra in ({"flavor": ["latte"]}, {"accent": ["red"]}, {"map": ["no-such=red"]}):
+            for extra in ({"flavor": ["latte"]}, {"accent": ["red"]}, {"map": ["no-such=red"]},
+                          {"auto_fit": 0}, {"method": "lut", "chroma": 0.05, "dark_fade": 0}):
                 r = self.call("/api/live", {"target": "image", "values": {**values, **extra}})
                 self.assertFalse(r["analysed"], (extra, r))
+            r = self.call("/api/live", {"target": "image", "values": {**values, "auto_fit": 0}})
+            self.assertEqual(r["method"], "lut")              # auto decides again, from what it kept
             # an option of the analysis: analysed again, then kept too
             sep = {**values, "separation": 0.8}
             self.assertTrue(self.call("/api/live", {"target": "image", "values": sep})["analysed"])

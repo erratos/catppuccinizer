@@ -901,7 +901,8 @@ function optionField(o) {
       onclick: () => { s.has(c) ? s.delete(c) : s.add(c); const l = o.choices.filter((x) => s.has(x));
         setVal(o.dest, JSON.stringify(l) === JSON.stringify(def) || !l.length ? undefined : l, true); } }, c)));
   } else if (o.kind === "int" || o.kind === "float") {
-    const step = o.kind === "int" ? 1 : (o.range && o.range[1] - o.range[0] <= 1 ? 0.05 : 0.01);
+    // about 50 to 500 steps over the range (0..1: 0.01; --chroma 0.02..0.3: 0.001)
+    const step = o.kind === "int" ? 1 : o.range ? 10 ** Math.floor(Math.log10((o.range[1] - o.range[0]) / 50)) : 0.01;
     const num = h("input", { type: "number", step, value: v ?? "", placeholder: def ?? "default", min: o.range?.[0], max: o.range?.[1],
       oninput: (e) => { const x = e.target.value; if (range) range.value = x === "" ? (def ?? o.range[0]) : x; setVal(o.dest, x === "" ? undefined : Number(x)); box.classList.toggle("set", x !== ""); } });
     let range = null;

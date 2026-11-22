@@ -247,7 +247,9 @@ last one winning.
   colour's lightness is mapped onto the flavour's neutral ramp (`crust` →
   `text`) and blended with the original (`--keep-lum`); its hue goes to a soft
   mix of the nearest accents (`--smooth`), in proportion to its original
-  chroma, so grays stay neutral and saturated colours become Catppuccin accents.
+  chroma (fully from `--chroma` on), so grays stay neutral and saturated
+  colours become Catppuccin accents; dark colours get less of the accent
+  (`--dark-fade`), so shadows do not glow.
 - **lutgen method**: `lutgen generate` builds a Hald CLUT from the flavour's 26
   colours with the chosen algorithm. catppuccinizer reads it back as a cube and
   applies it with trilinear interpolation, like its own LUT. The table is

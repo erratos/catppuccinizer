@@ -53,8 +53,9 @@ ten minutes after the page is closed. `--port N` picks the port,
    option opens a longer explanation and, for the colour options, a comparison
    picture (click it to enlarge). The flavours, the accents, the remapping and
    the system steps have one too. An option that has no effect with the
-   current choices is greyed, and hovering it says why: `--keep-lum` and
-   `--smooth` need `auto` / `lut`, the `--lutgen-*` ones `lutgen` (and each
+   current choices is greyed, and hovering it says why: `--keep-lum`,
+   `--smooth`, `--chroma` and `--dark-fade` need `auto` / `lut`, `--auto-fit`
+   `auto`, the `--lutgen-*` ones `lutgen` (and each
    algorithm's own knobs that algorithm; the whole group stays folded until
    then), `--separation` `auto` / `keys`, `--hald-level` / `--cube-size` their
    format; for Limine, the recolouring options and `--style` need a wallpaper.
@@ -95,10 +96,11 @@ The live image is rendered by the GUI server itself, without starting
 the build's recolouring, at a smaller size. The analysis of an image (its
 source colours, which method `auto` picks) is done once on the full image, as
 the build does it, and kept while the GUI runs; moving a slider then only
-renders the small copy again, in 2 to 60 ms (measured on 4K pictures). An
+renders the small copy again, in 2 to 60 ms (measured on 4K pictures); so
+does *Auto: keys tolerance*, which only decides again from what was found. An
 option that changes the analysis (*Colour separation*, the method) analyses
-the full image again the first time a value is used: up to about a second
-and a half for a 4K picture, *Analysing the image…* meanwhile. The page waits
+the full image again the first time a value is used: about 0.3 s for a 5
+megapixel picture, 0.6 s for a 4K one, *Analysing the image…* meanwhile. The page waits
 120 ms after the last change before asking, and sends one request at a time.
 
 ### Parts and remapping a colour

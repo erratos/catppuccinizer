@@ -27,8 +27,9 @@ from .mapping import NO_ACCENT, apply_maps, print_colours, uses_accent
 from .options import Option
 from .palette import ACCENTS, PALETTES, hex2rgb, oklab_to_srgb, rgb, srgb_to_oklab
 
-FIT_THRESHOLD = 6.0          # mean error (0..255) on content pixels under which "keys" is chosen
-CHROMA_REF = 0.10           # lut: Oklab chroma at which a colour fully takes its accent
+FIT_THRESHOLD = 6.0          # auto: mean error (0..255) on content pixels under which "keys" is chosen (--auto-fit)
+CHROMA_REF = 0.10            # lut: Oklab chroma at which a colour fully takes its accent (--chroma)
+DARK_FADE = 0.75             # lut: colours darker than this share of the accents' lightness lose chroma (--dark-fade)
 NEUTRALS = ["crust", "mantle", "base", "surface0", "surface1", "surface2", "overlay0",
             "overlay1", "overlay2", "subtext0", "subtext1", "text"]
 MIN_BG_SHARE = 0.35          # ... and the plain background must cover at least this share
@@ -40,8 +41,9 @@ OPTIMIZE_MAX_PIXELS = 2_000_000   # larger PNGs are saved without optimize (much
 
 
 def method_options(methods=None, help=None, needs=None, keys_always=False):
-    """The options of the recolouring methods (--method, --keep-lum, --smooth,
-    --lutgen-*), for a target that recolours images with them. methods: the ones
+    """The options of the recolouring methods (--method, --separation, --auto-fit,
+    --keep-lum, --smooth, --chroma, --dark-fade, --lutgen-*), for a target that
+    recolours images with them. methods: the ones
     it accepts, the first is the default (lut target: LUT_METHODS), with the help
     of --method that goes with them. needs: options of which one must be given for
     the methods to matter (Limine: a wallpaper to recolour). keys_always: the target
@@ -53,6 +55,7 @@ def method_options(methods=None, help=None, needs=None, keys_always=False):
     methods = method.choices
     separation = SEPARATION.replace(when={}) if keys_always else SEPARATION
     out = [method, *([separation] if "keys" in methods else []),
+           *([AUTO_FIT] if "auto" in methods else []),
            *(LUT_OPTIONS if "lut" in methods else []),
            *(lutgen.OPTIONS if "lutgen" in methods else [])]
     return [o.replace(needs=needs) for o in out] if needs else out
@@ -85,6 +88,17 @@ SEPARATION = Option("--separation", label="Colour separation", type=float, defau
                             "higher value, or its colour added with -m '#rrggbb=TARGET'. With "
                             "auto, more colours also rebuild the image better, so keys may be "
                             "picked where lut was.")
+AUTO_FIT = Option("--auto-fit", label="Auto: keys tolerance", type=float, default=FIT_THRESHOLD,
+                  range=(0, 30), scope="method", when={"method": ["auto"]},
+                  help=f"auto: how far the source colours may be from rebuilding the image for "
+                       f"keys to be picked; higher = keys more often (default: {FIT_THRESHOLD:g})",
+                  explain="auto picks keys when the colours it found rebuild the image almost "
+                          "exactly (the mean error on the non-background pixels, 0 to 255, is "
+                          "under this value), a plain background covers a good part of the image "
+                          "and its edges are crisp; otherwise lut. Raise it when flat art with soft "
+                          "shading or noise is sent to lut; lower it when a photo or a gradient "
+                          "gets keys (a few flat colours where there were shades). The method "
+                          "picked is shown by --colours and the live preview.")
 # --method when only the LUT methods are offered (the lut target)
 LUT_ONLY = {"image": "options-lut.jpg",
             "explain": "lut is the built-in table: every colour is pulled towards the palette "
@@ -99,19 +113,35 @@ LUT_OPTIONS = [
            explain="At 0 every colour takes the lightness of the palette's neutrals (crust to "
                    "text): low contrast, very Catppuccin. At 1 the original lightness is kept: "
                    "deep blacks and bright highlights, more contrast."),
-    Option("--smooth", label="Accent blending", type=float, default=0.08, metavar="R", scope="method:lut",
+    Option("--smooth", label="Accent blending", type=float, default=0.08, range=(0.01, 0.5), scope="method:lut",
            when={"method": ["auto", "lut", "lut-accent"]}, image="options-smooth.jpg",
            help="lut: blend radius in Oklab; smaller = purer palette colours (default: 0.08)",
            explain="How far a colour looks for accents. Small values snap each hue to its "
                    "closest accent (distinct bands); large values blend many accents together, "
                    "towards a pastel, almost uniform tint."),
+    Option("--chroma", label="Colour threshold", type=float, default=CHROMA_REF, range=(0.02, 0.3),
+           scope="method:lut", when={"method": ["auto", "lut", "lut-accent"]}, image="options-chroma.jpg",
+           help=f"lut: how colourful a colour must be to take its accent fully; lower = more "
+                f"colourful result, higher = more muted (default: {CHROMA_REF:g})",
+           explain="A colour takes its accent in proportion to how colourful it is (its Oklab "
+                   "chroma): at this chroma and above, fully; below, mixed with the neutral of "
+                   "its lightness, so grays stay gray. Lower values turn faint tints (a bluish "
+                   "gray, a pale sky) into plain accents; higher values keep only vivid colours "
+                   "coloured, the rest towards the palette's grays."),
+    Option("--dark-fade", label="Dark colour fade", type=float, default=DARK_FADE, range=(0, 1.5),
+           scope="method:lut", when={"method": ["auto", "lut", "lut-accent"]}, image="options-dark-fade.jpg",
+           help=f"lut: how much dark colours lose their accent; 0 = none, higher = darker "
+                f"shadows turn gray (default: {DARK_FADE:g})",
+           explain="Accents are light colours: a dark pixel given a full accent glows like neon. "
+                   "So a colour darker than this share of the accents' lightness loses chroma in "
+                   "proportion (at 0.75, those below three quarters of it). 0 keeps the full "
+                   "accent in the shadows (vivid, neon-like); higher values send more dark "
+                   "colours to the palette's dark grays (crust, mantle, base)."),
 ]
 
 
 def check_method_arguments(a):
     """Fail early on option values the methods cannot use (ranges: core.options.check)."""
-    if a.smooth <= 0:
-        raise SystemExit("--smooth must be greater than 0")
     if a.method == "lutgen":
         lutgen.options(a)
 
@@ -274,13 +304,16 @@ def dominant_hue(path):
 # 128 cubes of 33^3 (~55 MB): every flavour x accent of a run, and the GUI's live
 # preview may ask for a new one at each step of a slider
 @lru_cache(maxsize=128)
-def build_lut(flavor, smooth, keep_lum, n=33, accent=None, hue=None):
+def build_lut(flavor, smooth, keep_lum, n=33, accent=None, hue=None, chroma=CHROMA_REF,
+              dark_fade=DARK_FADE):
     """n^3 RGB grid -> Catppuccin, as float32 (n, n, n, 3).
 
     - lightness: the original lightness is mapped onto the flavour's neutral ramp
       (crust ... text), then blended with the original by keep_lum;
     - colour: the hue goes to a soft mix of the closest accents (in the a/b plane),
-      applied in proportion to the original chroma, so grays stay neutral;
+      applied in proportion to the original chroma (fully from chroma on), so grays
+      stay neutral; colours darker than dark_fade x the accents' lightness get
+      proportionally less of it (0: no fade);
     - with an accent and a hue (lut-accent): the hues around that one go to the
       accent instead, fading out ACCENT_SPREAD degrees away.
     """
@@ -310,12 +343,13 @@ def build_lut(flavor, smooth, keep_lum, n=33, accent=None, hue=None):
         dh = np.abs((np.degrees(np.arctan2(ab[:, 1], ab[:, 0])) - hue + 180) % 360 - 180)
         wt = np.exp(-0.5 * (dh / ACCENT_SPREAD) ** 2)[:, None]
         acc_ab = (1 - wt) * acc_ab + wt * target
-    k = np.clip(np.linalg.norm(ab, axis=1) / CHROMA_REF, 0, 1)[:, None]
+    k = np.clip(np.linalg.norm(ab, axis=1) / chroma, 0, 1)[:, None]
 
     out = np.empty_like(lab)
     out[:, 0] = keep_lum * L + (1 - keep_lum) * neutral[:, 0]
     # darker than the accents -> proportionally less chroma (avoids neon on dark pixels)
-    dim = np.clip(out[:, 0] / (0.75 * accents[:, 0].mean()), 0, 1)[:, None]
+    dim = (np.clip(out[:, 0] / (dark_fade * accents[:, 0].mean()), 0, 1)[:, None] if dark_fade > 0
+           else np.ones_like(out[:, :1]))
     out[:, 1:] = (1 - k) * neutral[:, 1:] + k * acc_ab * dim
     return oklab_to_srgb(out).reshape(n, n, n, 3).astype(np.float32)
 
@@ -325,9 +359,9 @@ def lut_for(method, flavor, a, n=33, accent=None, hue=None):
     lut-accent: the accent given to the dominant hue)."""
     if method == "lutgen":
         return lutgen.build(flavor, lutgen.options(a))
-    if method == "lut-accent":
-        return build_lut(flavor, a.smooth, a.keep_lum, n, accent, hue)
-    return build_lut(flavor, a.smooth, a.keep_lum, n)
+    if method != "lut-accent":
+        accent, hue = None, None
+    return build_lut(flavor, a.smooth, a.keep_lum, n, accent, hue, a.chroma, a.dark_fade)
 
 
 def recolor_lut(path, cube):
@@ -352,9 +386,10 @@ def plan(path, a, verbose=True, memo=None):
             memo[key] = analyse(path, a.separation)
         grp, err, bg_share, sharp = memo[key]
         grp = copy.deepcopy(grp)            # -m changes it
-    flat = (err is not None and err < FIT_THRESHOLD and bg_share >= MIN_BG_SHARE
-            and sharp >= MIN_SHARPNESS)
-    method = a.method if a.method != "auto" else ("keys" if flat else "lut")
+    method = a.method
+    if method == "auto":
+        flat = err < a.auto_fit and bg_share >= MIN_BG_SHARE and sharp >= MIN_SHARPNESS
+        method = "keys" if flat else "lut"
     if method == "keys":
         cfg = {"groups": {"image": grp}}
         apply_maps(cfg, a.map, strict=getattr(a, "strict_map", True))

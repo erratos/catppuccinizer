@@ -183,6 +183,18 @@ GRIDS = {
         ("0.08", "default", "lut", "mocha", O(smooth=0.08)),
         ("0.25", "soft", "lut", "mocha", O(smooth=0.25)),
     ]),
+    "chroma": ("--chroma: how colourful a colour must be to take its accent (lut)", [
+        ("original", "", "original", "mocha", O()),
+        ("0.04", "colourful", "lut", "mocha", O(chroma=0.04)),
+        ("0.1", "default", "lut", "mocha", O(chroma=0.1)),
+        ("0.25", "muted", "lut", "mocha", O(chroma=0.25)),
+    ]),
+    "dark-fade": ("--dark-fade: how much dark colours lose their accent (lut)", [
+        ("original", "", "original", "mocha", O()),
+        ("0", "no fade", "lut", "mocha", O(dark_fade=0.0)),
+        ("0.75", "default", "lut", "mocha", O(dark_fade=0.75)),
+        ("1.5", "gray shadows", "lut", "mocha", O(dark_fade=1.5)),
+    ]),
     "lutgen-algo": ("--lutgen-algo: interpolation algorithm (lutgen, defaults)", [
         ("blur", "default", "lutgen", "mocha", O(method="lutgen")),
         ("rbf", "", "lutgen", "mocha", O(lutgen_algo="rbf")),

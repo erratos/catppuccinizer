@@ -42,6 +42,7 @@ tests/
   test_architecture.py
   test_options.py     every declared option is complete and coherent
   test_gui.py         forms, command lines, access control, live preview of the GUI
+  test_tuning.py      --chroma, --dark-fade, --auto-fit: effect, defaults = the former constants
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     catalogue sections, installed themes and wallpapers, --list
   test_outputs.py     --names of every target against what the build writes
@@ -65,7 +66,7 @@ tests/
 | `recolor.run_jobs(jobs)` / `render_job(job)` | `render()` + save of many images, `(src, dst, method, grp, flavor, accent, a)` each, in worker processes when there are more than 8 |
 | `recolor.plan(path, args, memo=None)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT); `memo`: a dict the caller keeps for the file, where the analysis (per `--separation`) and the dominant hue are kept for the next call (the GUI's live preview); `render` also takes a PIL image |
 | `options.Option(...)` / `options.defaults(opts, **values)` | declare an option ([below](#options)); a namespace of defaults for scripts |
-| `recolor.method_options(methods=None, help=None, needs=None, keys_always=False)` | `--method`, `--separation`, `--keep-lum`, `--smooth`, `--lutgen-*` (only the given methods; `keys_always`: `--separation` matters whatever `--method`, for a target that also recolours with keys on its own) |
+| `recolor.method_options(methods=None, help=None, needs=None, keys_always=False)` | `--method`, `--separation`, `--auto-fit` (with `auto`), `--keep-lum`, `--smooth`, `--chroma`, `--dark-fade`, `--lutgen-*` (only the given methods; `keys_always`: `--separation` matters whatever `--method`, for a target that also recolours with keys on its own) |
 | `recolor.SEPARATION` / `side_by_side(src, im, out, grp)` / `separation_image(path, grp)` | the `--separation` option (Plymouth adds it alone); a before/after preview, with a keys group the separation panel |
 | `textscreen.TextScreen(size, background, foreground, wallpaper, margin, gradient, scale)` / `console_font()` | a text screen as a boot loader draws it (Limine's terminal: margin, fade, see-through background), in the system's VGA console font: `put(col, row, text, fg, bg)`, `image()` |
 | `options.PREVIEW_ANIMATION` / `options.previewing(args)` / `recolor.preview_animation(pairs, n, out, duration)` | `--preview-animation` (added by the targets whose result moves); whether a preview is asked for (the command line then keeps the first flavour and accent and runs no step); (before, after) frames as an animated WebP |
@@ -508,8 +509,7 @@ orders of magnitude):
 
 | Case | Time |
 |---|---|
-| `image`, 3840×2160 photo (`lut`) | 3.2 s: analysis 1.2 s (detection 1.0 s), `apply_cube` 1.8 s |
-| `image`, 3840×2160 PNG | 3.4 s (was 5.1 s with `optimize=True` on the PNG) |
+| `image`, 3840×2160 PNG photo (`auto` → `lut`) | 2.85 s: analysis 0.55 s (was 1.2 s), render 1.75 s (`apply_cube`); 5.1 s with `optimize=True` on the PNG |
 | `limine`, same photo, 4 accents | 3.3 s (was 12.2 s: analysed and rendered once per accent) |
 | `plymouth rings_2` (270 images, 800×600), 2 accents | 3.8 s in parallel; 21.5 s of CPU per accent |
 | `lut -f all` (Hald + .cube) | 1.6 s, 0.85 s of it in `build_lut` |
@@ -524,8 +524,12 @@ The three slowest points, in order:
 2. **`clut.apply_cube`**: trilinear interpolation in numpy, ~0.2 s per
    megapixel; it dominates `lut` / `lutgen` on large wallpapers.
 3. **Analysis of a large image** (`detect_group`, `fit_error`, `sharpness`):
-   about 1 s and 500 MB for a 4K picture, as `detect_group` works on the full
-   resolution in float32.
+   about 0.6 s and 500 MB for a 4K picture, as `detect_group` works on the full
+   resolution in float32: about ten passes over the pixels of 30 to 90 ms each
+   (difference to the background, distance, selections, percentile, the
+   400 000-pixel sample), none dominant. The per-pixel maximum over the three
+   channels is written as two `np.maximum` (`detect.channel_max`): numpy
+   reduces a 3-wide last axis ten times more slowly.
 
 These are the candidates for a compiled implementation.
 
@@ -534,17 +538,18 @@ These are the candidates for a compiled implementation.
 The GUI's live preview (`gui/live.py`, `/api/live`) renders in the server's
 process, on a copy reduced to 512 pixels, and keeps per file (the 8 most
 recent) that copy and the analysis `recolor.plan(memo=…)` stores: a change of
-flavour, accent, `-m`, `--keep-lum` or `--smooth` only renders again. Server
-time per update (same machine):
+flavour, accent, `-m`, `--auto-fit`, `--keep-lum`, `--smooth`, `--chroma` or
+`--dark-fade` only renders again. Server time per update (same machine):
 
 | Case | First update (analysis) | Next updates |
 |---|---|---|
-| 3840×2160 PNG photo, `auto` → `lut` | 1.3 s | 50 ms with a new cube (`build_lut` ~25 ms, `apply_cube` + PNG ~25 ms), 27 ms with a cached one |
-| 3440×1440 JPEG line art, `auto` → `keys` | 0.63 s | 2 ms; `lut-accent` 45 ms with a new accent (its cube) |
-| `--separation` moved, 4K photo | — | 1.3 s: the analysis itself changes, done again on the full image |
+| 3840×2160 PNG photo, `auto` → `lut` | 0.64 s | 50 ms with a new cube (`build_lut` ~25 ms, `apply_cube` + PNG ~25 ms), 27 ms with a cached one |
+| 3440×1440 JPEG line art, `auto` → `keys` | 0.26 s | 2 ms; `lut-accent` 45 ms with a new accent (its cube) |
+| `--separation` moved | — | the analysis itself changes, done again on the full image: 0.6 s (4K photo), 0.27 s (3440×1440) |
 
 In the page, from a change to the new image: about 200 ms, 120 of them the
 debounce. The goal (under 200 ms on the server) is met for everything but
-`--separation` and `--method`, which change the analysis; making that fast
-means analysing a reduced image (and accepting that it may differ from the
-build) or compiling `detect_group`.
+`--separation` and `--method`, which change the analysis (0.6 s on a 4K
+picture, was 1.3 s before `detect_group` was reworked); going further means
+analysing a reduced image (and accepting that it may differ from the build)
+or compiling `detect_group`.

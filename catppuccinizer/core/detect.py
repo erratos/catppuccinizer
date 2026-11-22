@@ -68,6 +68,16 @@ def detect_params(separation=DEFAULT_SEPARATION):
 
 
 # ----------------------------------------------------------------- detection
+def channel_max(d):
+    """d.max(-1) for (..., 3) arrays, ~10x faster on a large image (numpy reduces a
+    3-wide last axis slowly)."""
+    return np.maximum(np.maximum(d[..., 0], d[..., 1]), d[..., 2])
+
+
+def channel_min(d):
+    return np.minimum(np.minimum(d[..., 0], d[..., 1]), d[..., 2])
+
+
 def detect_group(paths, is_ui, params=DetectParams()):
     sample = [paths[int(i)] for i in np.linspace(0, len(paths) - 1, min(24, len(paths)))]
     imgs = [load_rgba(f) for f in sample]
@@ -84,23 +94,27 @@ def detect_group(paths, is_ui, params=DetectParams()):
 
     p = params
     # distance to the background: signed (brighter only) or both ways (p.darker)
-    dist = (lambda d: np.abs(d).max(-1)) if p.darker else (lambda d: d.max(-1))
-    ds, content = [], np.zeros((h, w), bool)
+    dist = (lambda d: np.maximum(channel_max(d), -channel_min(d))) if p.darker else channel_max
+    ds, intens, content = [], [], np.zeros((h, w), bool)
     rng = np.random.default_rng(0)
     for im, a in imgs:
         d = im - bg
-        visible = (a >= 128) if a is not None else np.ones(im.shape[:2], bool)
-        dv = d[visible]
-        dv = dv[dist(dv) > p.content]
+        dd = dist(d)
+        far = dd > p.content
+        visible = far if a is None else a >= 128
+        keep = far if a is None else visible & far
+        dv, iv = d[keep], dd[keep]
         if is_ui and len(dv) > 20_000:           # every UI image weighs the same
-            dv = dv[rng.choice(len(dv), 20_000, replace=False)]
+            pick = rng.choice(len(dv), 20_000, replace=False)
+            dv, iv = dv[pick], iv[pick]
         ds.append(dv)
+        intens.append(iv)
         if im.shape[:2] == (h, w):
-            content |= visible & ((dist(d) > p.content) if a is None else True)
-    d = np.concatenate(ds)
-    inten = dist(d)
-    ys, xs = np.nonzero(content)
-    bbox = (xs.min(), ys.min(), xs.max(), ys.max()) if len(xs) else (0, 0, w - 1, h - 1)
+            content |= visible
+    d = ds[0] if len(ds) == 1 else np.concatenate(ds)
+    inten = intens[0] if len(intens) == 1 else np.concatenate(intens)
+    rows, cols = np.nonzero(content.any(1))[0], np.nonzero(content.any(0))[0]
+    bbox = (cols[0], rows[0], cols[-1], rows[-1]) if len(cols) else (0, 0, w - 1, h - 1)
 
     on = inten > p.content
     thr = p.intensity * np.percentile(inten[on], 99) if on.any() else 255

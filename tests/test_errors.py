@@ -46,7 +46,10 @@ class Errors(unittest.TestCase):
 
     def test_option_ranges(self):
         self.assertEqual(message("lut", "--keep-lum", "5"), "--keep-lum must be between 0 and 1")
-        self.assertEqual(message("lut", "--smooth", "0"), "--smooth must be greater than 0")
+        self.assertEqual(message("lut", "--smooth", "0"), "--smooth must be between 0.01 and 0.5")
+        self.assertEqual(message("lut", "--chroma", "0.5"), "--chroma must be between 0.02 and 0.3")
+        self.assertEqual(message("lut", "--dark-fade", "-1"), "--dark-fade must be between 0 and 1.5")
+        self.assertEqual(message("image", "x.png", "--auto-fit", "50"), "--auto-fit must be between 0 and 30")
 
 
 if __name__ == "__main__":
