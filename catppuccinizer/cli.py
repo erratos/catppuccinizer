@@ -49,6 +49,8 @@ def parse(argv=None, parser=None):
     t = a.target
     if t is None:                     # gui
         return a
+    if t.root_refused and os.geteuid() == 0:
+        raise SystemExit(t.root_refused)
     for o in options.COMMON:          # those the target leaves out (unused_common): their default
         if not hasattr(a, o.dest):
             setattr(a, o.dest, False if o.switch else o.default)

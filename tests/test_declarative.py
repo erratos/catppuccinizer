@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
@@ -146,6 +147,18 @@ class Schema(Home):
         self.assertIn("is not in your home", self.load_error(
             USER_TOML.replace("~/conf/default", "/etc/default/grub")))
         self.assertIn("no '..'", self.load_error(USER_TOML.replace("~/conf/default", "~/../../etc/x")))
+        (self.home / "out").symlink_to(self.tmp)            # a link in the home that leads out of it
+        self.assertIn("is not in your home", self.load_error(USER_TOML.replace("~/conf/default", "~/out/x")))
+
+    def test_not_as_root(self):
+        """Under sudo, a user's TOML target is refused: its commands and files would be
+        root's (a file dropped in ~/.config must not become a root action)."""
+        self.write(USER_TOML + 'run = [["grub-mkconfig", "-o", "/etc/shadow"]]\n')
+        make_grub(self.tmp / "nebula")
+        with mock.patch("os.geteuid", return_value=0), self.assertRaises(SystemExit) as e:
+            cli("mygrub", self.tmp / "nebula", "-a", "mauve", "--apply", "--dry-run", "-o", self.tmp / "out")
+        self.assertIn("runs with your rights only, not as root", str(e.exception))
+        self.assertIsNone(discover()["grub"].root_refused)                 # built-in TOML: allowed
 
     def test_trust(self):
         f = self.write(USER_TOML)

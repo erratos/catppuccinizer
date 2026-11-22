@@ -114,7 +114,8 @@ def system_path(text, builtin, where):
         raise SystemExit(f"{where}: {text} is not an absolute path")
     if ".." in p.parts:
         raise SystemExit(f"{where}: {text}: no '..' in paths")
-    if not builtin and not p.is_relative_to(user_home()):
+    # resolved: a link in the home that leads out of it (~/x -> /etc) does not count as home
+    if not builtin and not p.resolve().is_relative_to(user_home().resolve()):
         raise SystemExit(f"{where}: {text} is not in your home ({user_home()}): a TOML target "
                          "of yours runs with your rights only")
     return p
@@ -150,6 +151,11 @@ class TomlTarget(Target):
     def __init__(self, spec, path, builtin):
         where = str(path)
         self.path, self.builtin = path, builtin
+        if not builtin:
+            # under sudo its commands and files would be root's: a file dropped in the
+            # user's folder must not become a root action
+            self.root_refused = (f"{path} is a TOML target of yours: it runs with your rights "
+                                 "only, not as root (run it without sudo)")
         if not NAME.fullmatch(spec["name"]):
             raise SystemExit(f"{where}: name must be lowercase letters, digits and '-'")
         self.name, self.help = spec["name"], spec["help"]

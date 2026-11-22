@@ -458,10 +458,13 @@ Allowed, because most installs need one (`grub-mkconfig` after
   may use sudo (`install.sudo = true`) and write system files.
 - TOML files of the **user** (`~/.config/catppuccinizer/targets/*.toml`, see
   [discovery](#discovery)) run with the user's rights only: `sudo = true` is
-  refused, and the install folder and the files of `set` must be in the user's
-  home. A file dropped in that folder (a download) should not become a root
-  action; a target that needs root is a Python package the user installs, or a
-  TOML file added to catppuccinizer.
+  refused, the install folder and the files of `set` must be in the user's
+  home (links followed: `~/x` leading to `/etc` is not the home), and the
+  command line refuses to run such a target as root (`Target.root_refused`),
+  as `sudo` would make its commands and files root's. A file dropped in that
+  folder (a download) should not become a root action; a target that needs
+  root is a Python package the user installs, or a TOML file added to
+  catppuccinizer.
 - A user file writable by others than its owner, or owned by someone else
   than the user (or root), is skipped with a note.
 - The schema is strict: an unknown key, a missing one or a wrong type stops
@@ -589,7 +592,7 @@ output folder goes through `core.system` (the `System` object of the steps).
 | `/etc/default/grub` + dated backups | `GRUB_TIMEOUT`, `GRUB_GFXMODE`…, then `grub-mkconfig` | configure | root |
 | `ksplashrc` | `Engine` (splash on / off), through `kwriteconfig6` | configure | the user |
 | `…/catppuccinizer/<target>-settings.json` | the values the settings replaced (for `default`) | configure | as the step |
-| what a user's TOML target names | its install folder, its `KEY="value"` files | install, apply, restore | the user, inside their home only |
+| what a user's TOML target names | its install folder, its `KEY="value"` files | install, apply, restore | the user, inside their home only (refused as root) |
 
 How:
 

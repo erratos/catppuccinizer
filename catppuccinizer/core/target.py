@@ -40,6 +40,7 @@ class Target:
     online = ()                # other sources the GUI browses itself, core.online
                                # OnlineSource objects (--list prints their page)
     tips = ()                  # system settings: tips (text), shown with the settings
+    root_refused = None        # why it may not run as root (a user's TOML target), or None
 
     def options(self):
         """The target's own options, as core.options.Option (scope "target"), plus
