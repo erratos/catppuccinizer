@@ -218,6 +218,19 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .result:hover { border-color: var(--accent); }
 .result .im { aspect-ratio: 16/10; background: var(--crust) center/cover no-repeat; display: grid; place-items: center; color: var(--overlay0); font-size: 26px; }
 .result.wide { grid-column: 1 / -1; } .result.wide .im { aspect-ratio: auto; height: 220px; background-size: contain; }
+/* live preview: the result over the original, cut where the comparison slider is */
+.compare { position: relative; background: var(--crust); border-radius: 10px; overflow: hidden; --x: 50%; }
+.compare img { display: block; width: 100%; max-height: 340px; object-fit: contain; }
+.compare #liveafter { position: absolute; inset: 0; height: 100%; clip-path: inset(0 0 0 var(--x)); transition: opacity .15s; }
+.compare.stale #liveafter { opacity: .55; }
+.compare .handle { position: absolute; top: 0; bottom: 0; left: var(--x); width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
+.compare .handle::after { content: "↔"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;
+  border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 13px; display: grid; place-items: center; }
+.compare input[type=range] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+.compare .tag { position: absolute; top: 6px; font-size: 11px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--crust) 75%, transparent); color: var(--subtext0); pointer-events: none; }
+.compare .tag.l { left: 6px; } .compare .tag.r { right: 6px; }
+.livebar { margin-top: 8px; gap: 8px; } .livebar select { max-width: 45%; }
+#livestatus.bad { color: var(--red); }
 .result .cap { padding: 6px 8px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .detected { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -299,6 +312,17 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
     <p class="intro" id="intro"></p>
   </div>
   <div class="col side">
+    <section class="card hidden" id="livecard">
+      <h2>Live preview</h2>
+      <div class="compare" id="compare">
+        <img id="livebefore" alt="Original">
+        <img id="liveafter" alt="Recoloured">
+        <i class="handle"></i><span class="tag l">before</span><span class="tag r">after</span>
+        <input type="range" id="liveslider" min="0" max="100" value="50" step="0.5" aria-label="Before / after">
+      </div>
+      <div class="row livebar"><select id="liveimg" class="hidden" title="The image shown"></select>
+        <span class="hint" id="livestatus" style="margin:0"></span></div>
+    </section>
     <section class="card">
       <h2>Command</h2>
       <!-- the buttons come first: what changes length below (command, errors) cannot move them -->
@@ -377,7 +401,7 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const $ = (id) => document.getElementById(id);
 const S = { schema: null, target: null, values: {}, sudo: {}, dry: {}, hover: null, job: null, since: 0, cmd: null, lastOut: null,
             colourCache: new Map(), colourSeq: 0, colourLoading: null, names: null, namesSeq: 0, helpOpen: new Set(),
-            btnErr: {}, stepArgs: {}, parts: {} };
+            btnErr: {}, stepArgs: {}, parts: {}, live: null, liveBusy: false, livePending: false, liveImage: {} };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...kids) {
@@ -967,7 +991,7 @@ function refreshVisibility() {
 
 // ----------------------------------------------------------------- command
 let cmdTimer = null;
-function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCommand, 120); }
+function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCommand, 120); scheduleLive(); }
 // the previews (--preview, --preview-animation): one button each, before Build
 const previews = () => cur().options.filter((o) => o.role === "preview");
 const isPreview = (step) => previews().some((o) => o.dest === step);
@@ -1050,6 +1074,59 @@ function paintButtons() {
   document.querySelectorAll("#previewbtns button").forEach((b) => paint(b, b.dataset.preview));
   document.querySelectorAll("#steps button").forEach((b) => paint(b, b.dataset.step));
 }
+
+// ------------------------------------------------------------ live preview
+// The source image recoloured as the options change (/api/live): the server renders it
+// itself on a reduced copy (the analysis of the full image is kept between updates).
+// One request at a time: changes made meanwhile are sent when it is answered.
+const LIVE_SIZE = 512;                   // as gui.live.SIZE: the original at the same size
+const liveSource = () => cur().options.find((o) => o.role === "source" && takesImages(o));
+let liveTimer = null;
+function scheduleLive() {
+  clearTimeout(liveTimer);
+  const o = liveSource(), on = !!o && vals()[o.dest] !== undefined;
+  $("livecard").classList.toggle("hidden", !on);
+  if (on) liveTimer = setTimeout(loadLive, 120);
+}
+async function loadLive() {
+  if (S.liveBusy) { S.livePending = true; return; }
+  const body = { target: S.target, values: sendVals(), image: S.liveImage[S.target] || null };
+  const key = JSON.stringify(body);
+  if (S.live && S.live.key === key) return;
+  S.liveBusy = true;
+  $("compare").classList.add("stale");
+  // a new file, or a new --separation / --method: the full image is analysed first
+  const slow = setTimeout(() => liveStatus("Analysing the image…"), 300);
+  let r;
+  try { r = await api("/api/live", body); } catch (e) { r = { error: String(e.message || e) }; }
+  clearTimeout(slow);
+  S.liveBusy = false;
+  S.live = { key, target: body.target, ...r };
+  if (body.target === S.target) drawLive();
+  if (S.livePending) { S.livePending = false; loadLive(); }
+}
+function liveStatus(text, bad = false) { const el = $("livestatus"); el.textContent = text; el.classList.toggle("bad", bad); }
+function drawLive() {
+  const r = S.live;
+  if (r.error) { liveStatus("⚠ " + r.error, true); return; }
+  const src = thumb(r.path, LIVE_SIZE, r.version);
+  if ($("livebefore").getAttribute("src") !== src) $("livebefore").src = src;
+  $("liveafter").src = r.image;
+  $("compare").classList.remove("stale");
+  const sel = $("liveimg");
+  sel.classList.toggle("hidden", r.images.length < 2);
+  if (r.images.length > 1 && sel.dataset.list !== r.images.join("\n")) {
+    sel.dataset.list = r.images.join("\n");
+    sel.replaceChildren(...r.images.map((p) => h("option", { value: p }, baseName(p))));
+  }
+  sel.value = r.path;
+  const ms = (r.ms.analysis ? `analysis ${r.ms.analysis} ms + ` : "") + `${r.ms.render} ms`;
+  liveStatus(`${r.method} · ${S.schema.flavor_titles[r.flavor]}${r.accent_ignored ? "" : " " + r.accent} · ${ms}`
+    + (r.accent_ignored ? ` · accent ignored ${r.accent_ignored}` : ""));
+  $("livestatus").title = `${tidy(r.path)}: the first flavour and accent, ${r.width}×${r.height} (Build works on the full image)`;
+}
+$("liveslider").oninput = (e) => $("compare").style.setProperty("--x", e.target.value + "%");
+$("liveimg").onchange = (e) => { S.liveImage[S.target] = e.target.value; scheduleLive(); };
 
 // ------------------------------------------------------------ output names
 // What Build would write (catppuccinize ... --names --json, through /api/names), shown

@@ -11,6 +11,7 @@ core never knows about targets. `tests/test_architecture.py` enforces it.
 catppuccinizer/
   cli.py              builds the command line from the discovered targets
   gui/                `catppuccinize gui`: local web page built from the same options
+    live.py           its live preview: render in the server's process, on a reduced image
   core/
     options.py        Option: every option declared once (CLI + GUI), the common ones
     system.py         System: every change of the install / apply / test / restore steps
@@ -40,7 +41,7 @@ tests/
   test_steps.py       System, step chaining, each target's steps in a dry run
   test_architecture.py
   test_options.py     every declared option is complete and coherent
-  test_gui.py         forms, command lines, access control of the GUI
+  test_gui.py         forms, command lines, access control, live preview of the GUI
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     catalogue sections, installed themes and wallpapers, --list
   test_outputs.py     --names of every target against what the build writes
@@ -62,7 +63,7 @@ tests/
 | `mapping.uses_accent(colors)` / `note_accent_ignored(a, reason)` | whether a colour goes to `accent`; the note printed when `-a` was given for nothing |
 | `recolor.recolor_image(path, bg, keys, targets, base)` / `keys_plan(grp, flavor, accent)` | keys method on one image (alpha kept); the `bg, keys, targets, base` of a detected group for a flavour and an accent |
 | `recolor.run_jobs(jobs)` / `render_job(job)` | `render()` + save of many images, `(src, dst, method, grp, flavor, accent, a)` each, in worker processes when there are more than 8 |
-| `recolor.plan(path, args)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT) |
+| `recolor.plan(path, args, memo=None)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT); `memo`: a dict the caller keeps for the file, where the analysis (per `--separation`) and the dominant hue are kept for the next call (the GUI's live preview); `render` also takes a PIL image |
 | `options.Option(...)` / `options.defaults(opts, **values)` | declare an option ([below](#options)); a namespace of defaults for scripts |
 | `recolor.method_options(methods=None, help=None, needs=None, keys_always=False)` | `--method`, `--separation`, `--keep-lum`, `--smooth`, `--lutgen-*` (only the given methods; `keys_always`: `--separation` matters whatever `--method`, for a target that also recolours with keys on its own) |
 | `recolor.SEPARATION` / `side_by_side(src, im, out, grp)` / `separation_image(path, grp)` | the `--separation` option (Plymouth adds it alone); a before/after preview, with a keys group the separation panel |
@@ -498,8 +499,9 @@ Work that does not depend on the accent is done once: each image is analysed
 once, and an image whose colours do not go to `accent` (LUT methods, or `keys`
 without an `accent` colour) is rendered once per flavour, then copied into the
 other accents' outputs (Limine, KDE splash, Plymouth image groups). The LUT
-cube is cached per flavour and options (`lru_cache` on `build_lut` and
-`lutgen.build`).
+cube is cached per flavour and options (`lru_cache` on `build_lut`, 128
+cubes of 33³, and `lutgen.build`, 16: bounded, as the GUI's live preview asks
+for a new one at each step of a slider).
 
 Measured with `python3 -m cProfile -s cumtime` (one machine, 32 threads, for
 orders of magnitude):
@@ -525,5 +527,24 @@ The three slowest points, in order:
    about 1 s and 500 MB for a 4K picture, as `detect_group` works on the full
    resolution in float32.
 
-These are the candidates for a real-time preview (work on a reduced image) or
-a compiled implementation.
+These are the candidates for a compiled implementation.
+
+### Live preview
+
+The GUI's live preview (`gui/live.py`, `/api/live`) renders in the server's
+process, on a copy reduced to 512 pixels, and keeps per file (the 8 most
+recent) that copy and the analysis `recolor.plan(memo=…)` stores: a change of
+flavour, accent, `-m`, `--keep-lum` or `--smooth` only renders again. Server
+time per update (same machine):
+
+| Case | First update (analysis) | Next updates |
+|---|---|---|
+| 3840×2160 PNG photo, `auto` → `lut` | 1.3 s | 50 ms with a new cube (`build_lut` ~25 ms, `apply_cube` + PNG ~25 ms), 27 ms with a cached one |
+| 3440×1440 JPEG line art, `auto` → `keys` | 0.63 s | 2 ms; `lut-accent` 45 ms with a new accent (its cube) |
+| `--separation` moved, 4K photo | — | 1.3 s: the analysis itself changes, done again on the full image |
+
+In the page, from a change to the new image: about 200 ms, 120 of them the
+debounce. The goal (under 200 ms on the server) is met for everything but
+`--separation` and `--method`, which change the analysis; making that fast
+means analysing a reduced image (and accepting that it may differ from the
+build) or compiling `detect_group`.

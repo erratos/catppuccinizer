@@ -61,7 +61,18 @@ ten minutes after the page is closed. `--port N` picks the port,
    Preview, Build and the system steps are greyed the same way when their
    command would fail (several accents for Install, no animation for
    Preview animation…): the tooltip gives the command line's own message.
-5. **Preview image** renders one before/after image (`--preview`), **Preview
+5. **Live preview**: as soon as an image is chosen (`image`, Limine's
+   wallpaper), the top of the right column shows it recoloured, updated as you
+   change the flavour, the accent, the method, the sliders or `-m`. Drag across
+   it to compare: the original on the left of the line, the result on its
+   right. A folder or several images: the list under it picks the one shown.
+   The line under it says the method used (with `auto`, what it chose), the
+   first flavour and accent (as *Preview image*), whether the accent is
+   ignored, and how long the update took
+   ([how it works](#live-preview)). It shows the picture being recoloured,
+   not a whole theme: for Limine, the wallpaper without the menu (*Preview
+   image* draws the menu); for themes and splash screens, the previews below.
+6. **Preview image** renders one before/after image (`--preview`), **Preview
    animation** the main animation of a Plymouth theme or splash screen
    (`--preview-animation`, played in the page), both for the first flavour and
    accent ([previews](colours.md#previews)); **Build** writes
@@ -76,6 +87,19 @@ step button to see its own command). Copy it to script the same thing later.
 Under it, the files and folders **Build** would write are listed as you change
 the options (`catppuccinize … --names`); those already there are marked
 *replaced*.
+
+### Live preview
+
+The live image is rendered by the GUI server itself, without starting
+`catppuccinize`, on a copy of the image reduced to 512 pixels: what you see is
+the build's recolouring, at a smaller size. The analysis of an image (its
+source colours, which method `auto` picks) is done once on the full image, as
+the build does it, and kept while the GUI runs; moving a slider then only
+renders the small copy again, in 2 to 60 ms (measured on 4K pictures). An
+option that changes the analysis (*Colour separation*, the method) analyses
+the full image again the first time a value is used: up to about a second
+and a half for a 4K picture, *Analysing the image…* meanwhile. The page waits
+120 ms after the last change before asking, and sends one request at a time.
 
 ### Parts and remapping a colour
 
@@ -145,7 +169,8 @@ What the page can reach:
 | open (`xdg-open`) | folders, images and plain text outputs (`.conf`, `.txt`, `.json`, `.cube`), never a script or a `.desktop` file |
 | folder listing | any folder you can read (the file browser) |
 | upload | images up to 200 MB, in `~/.cache/catppuccinizer/gui-uploads/<random>/` (only for you, `700`), the name reduced to letters, digits, `.`, `_`, `-` |
-| run, command, colours | a known target and its declared options only; values are text, numbers or on/off, without control characters, and never start with `-` (no value can pass for an option) |
+| run, command, colours, live | a known target and its declared options only; values are text, numbers or on/off, without control characters, and never start with `-` (no value can pass for an option) |
+| live preview | one of the still images of the target's image source, under the rules of files above; rendered in the server's process, nothing written |
 
 Non-HTML answers forbid scripts (an SVG opened on its own cannot read the
 token), and requests are limited in size (1 MB of JSON).
@@ -159,7 +184,10 @@ GUI without GUI code:
 
 - a positional argument, or an option with `source=True`, goes to the
   *Source* card; `accept` picks what the file browser offers (`image`,
-  `images`, `dir`, `file`), and `image` / `images` sources accept dropped files;
+  `images`, `dir`, `file`), and `image` / `images` sources accept dropped files
+  and get the live preview (`core.recolor.plan()` and `render()` with the
+  method options: a target whose images are recoloured otherwise should not
+  declare its source this way);
 - `choices` become buttons, a `range` a slider, `kind="colour"` a palette
   colour list;
 - `when`, `needs` and `unless` grey an option out while it has no effect, with

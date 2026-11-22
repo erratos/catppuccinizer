@@ -460,7 +460,7 @@ class GuiRequests(unittest.TestCase):
                {"images": [{"x": 1}]}, {"images": ["a.png"], "suffix": "--x"},
                {"images": ["a.png"], "map": ["white=accent", "-f"]}, ["images"]]
         for values in bad:
-            for route in ("/api/command", "/api/run", "/api/colours"):
+            for route in ("/api/command", "/api/run", "/api/colours", "/api/live"):
                 with self.subTest(values=values, route=route):
                     status, r = self.request(route, {"target": "image", "values": values})
                     self.assertEqual(status, 200)

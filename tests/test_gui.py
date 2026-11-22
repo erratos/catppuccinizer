@@ -1,4 +1,7 @@
-"""GUI: forms built from the declared options, command lines, access control, a run."""
+"""GUI: forms built from the declared options, command lines, access control, a run,
+the live preview."""
+import base64
+import io
 import json
 import sys
 import tempfile
@@ -157,6 +160,58 @@ class Gui(unittest.TestCase):
         self.assertIn("error", self.call("/api/names", {"target": "nope"}))
         self.assertIn("required", self.call("/api/names", {"target": "image", "values": {}})["error"])
         self.assertTrue(next(t for t in self.call("/api/schema")["targets"] if t["name"] == "lut")["has_outputs"])
+
+    def test_live_preview(self):
+        """/api/live: the source recoloured in the server's process, on a reduced copy;
+        the analysis of the full image is kept, so a slider only renders again."""
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            im = Image.new("RGB", (1600, 900), (8, 14, 40))
+            ImageDraw.Draw(im).ellipse([200, 100, 1400, 800], outline=(60, 220, 255), width=24)
+            im.save(d / "flat.png")
+            Image.new("RGB", (64, 64), (200, 40, 40)).save(d / "b.jpg")
+            (d / "c.svg").write_text("<svg/>")
+            values = {"images": [str(d / "flat.png")], "accent": ["mauve"]}
+            r = self.call("/api/live", {"target": "image", "values": values})
+            self.assertNotIn("error", r)
+            self.assertEqual((r["method"], r["flavor"], r["accent"], r["analysed"]), ("keys", "mocha", "mauve", True))
+            self.assertEqual((r["width"], r["height"]), (512, 288))
+            self.assertIsNone(r["accent_ignored"])
+            png = base64.b64decode(r["image"].split(",", 1)[1])
+            with Image.open(io.BytesIO(png)) as out:
+                self.assertEqual(out.size, (512, 288))
+                # its one colour goes to the accent: the ring is mauve
+                ring = out.convert("RGB").getpixel((256, 288 * 100 // 900 + 2))
+                self.assertLessEqual(max(abs(x - y) for x, y in zip(ring, (203, 166, 247))), 3, ring)
+            # flavour, accent, -m (even a name being typed): rendered again, not analysed
+            for extra in ({"flavor": ["latte"]}, {"accent": ["red"]}, {"map": ["no-such=red"]}):
+                r = self.call("/api/live", {"target": "image", "values": {**values, **extra}})
+                self.assertFalse(r["analysed"], (extra, r))
+            # an option of the analysis: analysed again, then kept too
+            sep = {**values, "separation": 0.8}
+            self.assertTrue(self.call("/api/live", {"target": "image", "values": sep})["analysed"])
+            self.assertFalse(self.call("/api/live", {"target": "image", "values": sep})["analysed"])
+            r = self.call("/api/live", {"target": "image", "values": {**values, "method": "lut", "keep_lum": 0.2}})
+            self.assertEqual((r["method"], r["analysed"]), ("lut", False))
+            self.assertIn("lut method", r["accent_ignored"])
+            # a folder: its still images, one picked by the page (the first otherwise)
+            folder = {"images": [str(d)]}
+            r = self.call("/api/live", {"target": "image", "values": folder})
+            self.assertEqual(r["images"], [str(d / "b.jpg"), str(d / "flat.png")])
+            self.assertEqual(r["path"], str(d / "b.jpg"))
+            r = self.call("/api/live", {"target": "image", "values": folder, "image": str(d / "flat.png")})
+            self.assertEqual(r["path"], str(d / "flat.png"))
+            r = self.call("/api/live", {"target": "image", "values": folder, "image": "/etc/passwd"})
+            self.assertEqual(r["path"], str(d / "b.jpg"))        # not one of the source's images
+            self.assertEqual(self.call("/api/live", {"target": "limine", "values": {
+                "wallpaper": str(d / "b.jpg")}})["method"], "lut")
+            for body in ({"target": "image", "values": {"images": [str(d / "c.svg")]}},
+                         {"target": "image", "values": {"images": [str(d / "nope.png")]}},
+                         {"target": "image", "values": {}},                 # required, as Build says
+                         {"target": "image", "values": {**values, "keep_lum": 3}},
+                         {"target": "plymouth", "values": {}}, {"target": "nope"}):
+                with self.subTest(body=body):
+                    self.assertTrue(self.call("/api/live", body).get("error"))
 
     def test_illustrations(self):
         """/api/asset serves the illustrations the options declare, nothing else."""

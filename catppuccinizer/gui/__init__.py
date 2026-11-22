@@ -5,7 +5,8 @@ from the options the targets declare (core.options), like the command line, so
 every target, built-in or added by an entry point, gets its options without
 GUI-specific code. A run is
 the equivalent `catppuccinize ...` command in a subprocess; its output is
-streamed to the page, and the files it wrote are shown as thumbnails.
+streamed to the page, and the files it wrote are shown as thumbnails. The live
+preview (gui.live) is rendered in this process instead, on a reduced image.
 
 Access (docs/gui.md, Security): it listens on 127.0.0.1 only and never runs as
 root; every request needs the random token printed with the address, a Host
@@ -44,6 +45,7 @@ from ..core.paths import cache_dir
 from ..core.options import STEPS, active, analysis, image_file
 from ..core.recolor import NO_ACCENT_METHODS
 from ..core.target import discover
+from . import live
 
 HERE = Path(__file__).resolve().parent
 PKG_PARENT = HERE.parent.parent
@@ -302,6 +304,7 @@ class App:
         self.images = {o.image: image_file(o.image) for t in self.targets.values()
                        for o in t.all_options() if o.image}
         self.jobs = {}
+        self.live_view = live.Live()
         self.last_seen = time.time()
         self.port = None
 
@@ -372,8 +375,63 @@ class App:
             return {"error": err}
         return {"items": items, "out": str(a.out), "command": command_line(argv, bool(body.get("sudo")))}
 
+    def live(self, body):
+        """The live preview: the source image recoloured with the form values, in this
+        process, on a reduced copy (gui.live), for the first flavour and accent. Only
+        for targets whose source is an image; body["image"] picks one of the source's
+        images (the first by default)."""
+        name = body.get("target")
+        if name not in self.options:
+            return {"error": f"unknown target {name}"}
+        sources = [o for o in self.options[name]
+                   if o["role"] == "source" and o["accept"] in ("image", "images")]
+        if not sources:
+            return {"error": f"{name}: no image to preview live"}
+        values = body.get("values") or {}
+        if err := check_values(values, self.options[name]):
+            return {"error": err}
+        values = {k: v for k, v in values.items() if k not in STEPS and k not in LIVE_LEFT_OUT}
+        a, err = check_argv(build_argv(name, values, self.options[name]), self.parser)
+        if err:
+            return {"error": err}
+        images = live_images(a, sources)
+        if not images:
+            return {"error": "no still image you can read in the source (an SVG or an "
+                             "animation: Preview image / Preview animation)"}
+        path = body.get("image") if body.get("image") in images else images[0]
+        a.strict_map = False            # a name being typed in -m is not an error here
+        try:
+            r = self.live_view.render(path, a)
+        except SystemExit as e:
+            return {"error": str(e)}
+        except (OSError, ValueError, Image.DecompressionBombError) as e:
+            return {"error": f"{Path(path).name}: {e}"}
+        return {**r, "path": path, "images": images, "version": version(Path(path))}
+
     def busy(self):
         return any(j.code is None and j.proc for j in self.jobs.values())
+
+
+# what the live preview leaves out of the form values: it shows the result itself
+LIVE_LEFT_OUT = {"preview", "preview_animation", "dry_run"}
+LIVE_IMAGES = 200            # images of a source the live preview offers
+
+
+def live_images(a, sources):
+    """The still images of the parsed sources (files, or the images of a folder, in
+    order) that the page may get, as strings: what the live preview can show."""
+    out = []
+    for o in sources:
+        v = getattr(a, o["dest"], None)
+        for p in (v if isinstance(v, list) else [v] if v else []):
+            p = Path(p).expanduser().absolute()
+            files = sorted(f for f in p.rglob("*") if f.suffix.lower() in live.EXTS) if p.is_dir() else [p]
+            for f in files:
+                if f.suffix.lower() in live.EXTS and servable(str(f)) and str(f) not in out:
+                    out.append(str(f))
+                if len(out) >= LIVE_IMAGES:
+                    return out
+    return out
 
 
 def listing_output(argv, sudo=False):
@@ -633,6 +691,8 @@ def make_handler(app):
                 return self.send(200, app.colours(data))
             if u.path == "/api/names":
                 return self.send(200, app.names(data))
+            if u.path == "/api/live":
+                return self.send(200, app.live(data))
             if u.path == "/api/run":
                 return self.send(200, app.run(data))
             if u.path == "/api/stop":

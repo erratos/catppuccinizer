@@ -39,7 +39,8 @@ Every command names its outputs `catppuccin-<flavor>-<source>[-<accent>][-<suffi
 ([output names](docs/colours.md#output-names)).
 
 Prefer clicking? `catppuccinize gui` opens a [graphical interface](docs/gui.md)
-in your browser: choose the source and the options, preview, run.
+in your browser: choose the source and the options, watch an image change as
+you move them (live preview), run.
 
 **New here?** Follow the [getting started guide](docs/getting-started.md).
 
