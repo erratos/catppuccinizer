@@ -187,6 +187,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .actions .sp { flex: 1; }
 .btn .badge { margin-left: 6px; vertical-align: 1px; }
 .actions.first { margin-top: 0; }
+.previews { display: contents; }
 .hint.dest { margin: 10px 0 8px; overflow-wrap: anywhere; }
 .stepgroup { display: inline-flex; gap: 8px; align-items: center; }
 .steparg { display: inline-flex; gap: 6px; align-items: center; color: var(--subtext0); font-size: 13px; margin-left: -2px; }
@@ -302,9 +303,9 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
       <h2>Command</h2>
       <!-- the buttons come first: what changes length below (command, errors) cannot move them -->
       <div class="actions first" id="mainbtns">
-        <button class="btn big" id="previewbtn" title="Only render before/after images (--preview)">Preview</button>
+        <span class="previews" id="previewbtns"></span>
         <button class="btn primary big" id="runbtn" title="Write the result into the output folder, without installing anything">Build</button>
-        <label class="check" id="sudobox" title="Run Preview and Build, and the analysis of the source colours, with sudo: to read files only root can read (Limine: the wallpaper on the ESP). The steps marked sudo always use it."><input type="checkbox" id="sudo"> with sudo</label>
+        <label class="check" id="sudobox" title="Run the previews and Build, and the analysis of the source colours, with sudo: to read files only root can read (Limine: the wallpaper on the ESP). The steps marked sudo always use it."><input type="checkbox" id="sudo"> with sudo</label>
       </div>
       <div class="actions hidden" id="steps"></div>
       <div class="actions hidden" id="stepopts">
@@ -483,7 +484,7 @@ function sendVals() {
   const parts = Object.entries(S.parts[S.target] || {}).map(([part, a]) => `${part}=${a}`);
   if (parts.length && t.default_accent.length) v.accent = [...(v.accent || []), ...parts];
   if (!t.default_accent.length) delete v.accent;
-  for (const o of t.options) if ((o.when && !shown(o)) || o.role === "step" || o.dest === "dry_run") delete v[o.dest];
+  for (const o of t.options) if ((o.when && !shown(o)) || o.role === "step" || o.role === "preview" || o.dest === "dry_run") delete v[o.dest];
   return v;
 }
 // facts from the analysis of the sources (the colour list, /api/colours) that an option's
@@ -554,7 +555,7 @@ function render() {
       : "Nothing is written outside this folder."),
     opt("suffix") ? h("div", { class: "opts", style: { marginTop: "10px" } }, optionField(opt("suffix"))) : null]));
   form.replaceChildren(...cards.filter(Boolean));
-  $("previewbtn").classList.toggle("hidden", !(sources.length && opt("preview")));
+  renderPreviews(sources.length > 0);
   renderSteps();
   renderColours();
   refreshVisibility();
@@ -680,7 +681,7 @@ function coloursCard(t, hasSource) {
 // The colours -m can remap, before any run (catppuccinize ... --colours --json, through
 // /api/colours), analysed again when the source or an option that changes the analysis
 // changes; -m itself is drawn over the list here.
-const NOT_ANALYSED = new Set(["map", "preview", "out", "suffix", "dry_run", "flavor", "accent"]);  // as the server
+const NOT_ANALYSED = new Set(["map", "preview", "preview_animation", "out", "suffix", "dry_run", "flavor", "accent"]);  // as the server
 function analysisValues() {
   const v = { ...vals() };
   for (const o of cur().options) {
@@ -967,13 +968,22 @@ function refreshVisibility() {
 // ----------------------------------------------------------------- command
 let cmdTimer = null;
 function scheduleCommand() { clearTimeout(cmdTimer); cmdTimer = setTimeout(updateCommand, 120); }
-// what a button runs: the form values, plus --preview or one step (null: Build)
+// the previews (--preview, --preview-animation): one button each, before Build
+const previews = () => cur().options.filter((o) => o.role === "preview");
+const isPreview = (step) => previews().some((o) => o.dest === step);
+function renderPreviews(hasSources) {
+  $("previewbtns").replaceChildren(...(hasSources ? previews() : []).map((o) => h("button", {
+    class: "btn big", "data-preview": o.dest, title: o.help, onclick: () => run(o.dest),
+    onmouseenter: () => { S.hover = o.dest; updateCommand(); }, onmouseleave: () => { S.hover = null; updateCommand(); } },
+    o.label)));
+}
+// what a button runs: the form values, plus a preview or one step (null: Build)
 function action(step) {
-  const values = sendVals(), o = step && step !== "preview" ? opt(step) : null;
-  if (step === "preview") values.preview = true;
+  const values = sendVals(), o = step && !isPreview(step) ? opt(step) : null;
+  if (isPreview(step)) values[step] = true;
   if (o) { values[step] = (o.kind === "optional" && stepArg(step)) || true; if (S.dry[S.target]) values.dry_run = true; }
   // a step keeps its own rights, a dry run too (it may have to read the system: the ESP);
-  // Preview and Build use sudo when asked ("with sudo", next to them)
+  // the previews and Build use sudo when asked ("with sudo", next to them)
   const sudo = o ? o.sudo === "run" : $("sudo").checked;
   return { target: S.target, values, sudo };
 }
@@ -1008,18 +1018,19 @@ async function updateCommand() {
   const parts = (r.command || "").split(" ");
   c.replaceChildren(...parts.map((p, i) => i === 0 || (i === 1 && parts[0] === "sudo") || (p === "catppuccinize") ? h("b", {}, p + " ") : (/^-/.test(p) ? h("span", { style: { color: "var(--blue)" } }, p + " ") : p + " ")));
   $("dest").textContent = !r.out ? "" : S.hover === "restore" ? "Restore only undoes Install / Apply: it builds nothing."
+    : isPreview(S.hover) ? `${label(opt(S.hover))}: the first flavour and accent only, into ${tidy(r.out)}/previews/.`
     : S.hover ? `${label(opt(S.hover))} builds into ${tidy(r.out)} first.`
     : `Build writes into ${tidy(r.out)}${$("sudo").checked ? " (with sudo, handed back to you)" : ""}: nothing installed.`;
   $("err").classList.toggle("hidden", !r.error);
   $("err").replaceChildren("⚠ ", r.error || "");
   if (!S.hover) { S.btnErr.build = r.error || null; updateButtons(); scheduleNames(); }
 }
-// Preview and the step buttons: each one asks the command line what its own command
-// would say (--preview without a Limine wallpaper, --install with several accents…);
+// The previews and the step buttons: each one asks the command line what its own command
+// would say (--preview-animation without an animation, --install with several accents…);
 // one that cannot run is greyed, its tooltip says why, a click shows it. They stay
 // hoverable (no `disabled`), so the tooltip shows everywhere.
 async function updateButtons() {
-  const acts = [...(opt("preview") ? ["preview"] : []), ...steps().map((o) => o.dest)];
+  const acts = [...previews().map((o) => o.dest), ...steps().map((o) => o.dest)];
   const answers = await Promise.all(acts.map((a) => api("/api/command", action(a)).catch(() => ({}))));
   if (S.hover) return;
   acts.forEach((a, i) => { S.btnErr[a] = answers[i].error || null; });
@@ -1036,7 +1047,7 @@ function paintButtons() {
     b.title = busy ? "A run is in progress" : err ? `Not now: ${err}` : b.dataset.help;
   };
   paint($("runbtn"), "build");
-  paint($("previewbtn"), "preview");
+  document.querySelectorAll("#previewbtns button").forEach((b) => paint(b, b.dataset.preview));
   document.querySelectorAll("#steps button").forEach((b) => paint(b, b.dataset.step));
 }
 
@@ -1087,7 +1098,7 @@ async function run(step) {
   if (r.error) { toast(r.error); return; }
   S.job = { id: r.job, done: false, out: r.out }; S.since = 0; S.accentIgnored = false;
   $("log").replaceChildren(); $("results").replaceChildren();
-  $("prog").style.width = "0"; setStatus("run", step === "preview" ? "Rendering previews…" : step ? `${label(opt(step))}${S.dry[S.target] ? " (dry run)" : ""}…` : "Building…");
+  $("prog").style.width = "0"; setStatus("run", isPreview(step) ? `${label(opt(step))}…` : step ? `${label(opt(step))}${S.dry[S.target] ? " (dry run)" : ""}…` : "Building…");
   $("stopbtn").classList.remove("hidden"); $("openout").classList.add("hidden");
   updateCommand(); poll();
 }
@@ -1127,7 +1138,8 @@ function renderResults(list) {
   const single = list.length === 1;
   $("results").replaceChildren(...list.map((o) => {
     const im = h("div", { class: "im" }, o.thumb ? "" : (o.dir ? "📁" : "📄"));
-    if (o.thumb) im.style.backgroundImage = `url("${thumb(o.thumb, single || o.preview ? 900 : 320, o.version)}")`;
+    // an animated preview plays in its card (a thumbnail would be a still)
+    if (o.thumb) im.style.backgroundImage = `url("${o.preview && /\.webp$/i.test(o.thumb) ? fileURL(o.thumb, o.version) : thumb(o.thumb, single || o.preview ? 900 : 320, o.version)}")`;
     return h("button", { class: "result" + (single || o.preview && list.length < 3 ? " wide" : ""), title: o.path,
       onclick: () => (o.thumb ? lightbox(o) : api("/api/open", { path: o.path })) },
       im, h("div", { class: "cap" }, (o.dir ? "📁 " : "") + o.name));
@@ -1275,7 +1287,6 @@ $("copy").onclick = async () => {
   catch { const r = document.createRange(); r.selectNodeContents($("cmdtext")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("Selected: Ctrl+C to copy"); }
 };
 $("runbtn").onclick = () => run(null);
-$("previewbtn").onclick = () => run("preview");
 $("dryrun").onchange = (e) => { S.dry[S.target] = e.target.checked; refreshVisibility(); scheduleCommand(); };
 $("stopbtn").onclick = () => S.job && api("/api/stop", { id: S.job.id });
 $("openout").onclick = () => S.lastOut && api("/api/open", { path: S.lastOut });

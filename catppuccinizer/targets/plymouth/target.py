@@ -10,6 +10,9 @@ template also get a "-status" variant (progress bar + latest systemd services).
 /usr/share/plymouth/themes, --apply (which installs first) makes it the default
 theme and rebuilds the initramfs, --test shows it without rebooting, --restore
 makes the previous default theme active again and removes the installed ones.
+--preview renders one image per theme (each group before and after),
+--preview-animation its main animation as an animated WebP: no sudo, nothing
+installed.
 """
 import configparser
 import re
@@ -27,12 +30,12 @@ from ...core.mapping import (apply_maps, background_of, colour_report, note_acce
                              print_colours, uses_accent)
 from ...core.palette import ACCENTS, FLAVOR_TITLES, PALETTES, color_args, hex2rgb, rgb
 from ...core.naming import output_name, planned, slug
-from ...core.options import Option, step
+from ...core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ...core.parts import accent_sets, check_parts, note_unused
 from ...core.paths import state_file
 from ...core.sources import item, section, tidy
-from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, recolor_image,
-                             recolor_job, separation_image)
+from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, preview_animation,
+                             recolor_image, recolor_job, separation_image)
 from ...core.naming import check_name
 from ...core.system import System, place, source_file, which
 from ...core.target import Target
@@ -118,6 +121,7 @@ OPTIONS = [
                 "(default: the theme in use)"),
     Option("--no-status", label="No -status variant", switch=True, help="skip the -status variants"),
     SEPARATION.replace(when={}),
+    PREVIEW_ANIMATION,
     step("install", sudo="run",
          help=f"copy the result (its -status variant if any) to {INSTALL_DIR} (sudo)"),
     step("apply", sudo="run",
@@ -137,6 +141,11 @@ OPTIONS = [
 def check_args(a):
     if not a.restore:       # no theme given: the one in use must be known (and not ours)
         themes_of(a)
+    if a.preview_animation:
+        for arg in themes_of(a):
+            if not main_animation(Theme(find_theme(arg))):
+                raise SystemExit(f"--preview-animation: {arg} has no animation (no numbered "
+                                 "images), --preview shows it")
     if (a.install or a.apply or a.test) and (len(themes_of(a)) > 1 or len(a.flavor) > 1
                                              or len(a.accent) > 1):
         raise SystemExit("--install / --apply / --test need a single theme, flavour and accent "
@@ -375,6 +384,35 @@ def preview_sheet(theme, plan, cfg, base, out):
     sheet.save(out)
 
 
+def main_animation(theme):
+    """The longest numbered sequence of images (None: only single images)."""
+    return next((g for g in theme.groups if g != UI_GROUP), None)
+
+
+def frame_ms(theme):
+    """How long Plymouth shows each image of the main animation: it refreshes 50 times
+    a second, and adi1090x's scripts move on every N refreshes (progress / N)."""
+    m = theme.script and re.search(r"Math\.Int\(\s*progress\s*/\s*(\d+)\s*\)",
+                                   theme.script.read_text())
+    return 20 * max(1, int(m.group(1))) if m else 20
+
+
+def animation_preview(theme, plan, base, out):
+    """--preview-animation: the main animation, before (over its background) | after
+    (over base), as an animated WebP."""
+    g = main_animation(theme)
+    src_bg, keys, targets = plan[g]
+    def pairs():
+        for path in theme.groups[g]:
+            im = Image.open(path).convert("RGBA")
+            before = Image.new("RGBA", im.size, tuple(int(v) for v in src_bg) + (255,))
+            before.alpha_composite(im)
+            after = Image.new("RGBA", im.size, tuple(int(v) for v in base) + (255,))
+            after.alpha_composite(recolor_image(path, src_bg, keys, targets, base).convert("RGBA"))
+            yield before.convert("RGB"), after.convert("RGB")
+    preview_animation(pairs(), len(theme.groups[g]), out, frame_ms(theme))
+
+
 def installed_themes():
     """The installed themes that have images to recolour, the default one marked."""
     active = default_theme()
@@ -495,8 +533,9 @@ def outputs(a):
         for flv in a.flavor:
             for _, aname in sets:
                 name = output_name(flv, theme.slug, aname, a.suffix)
-                if a.preview:
-                    out.append(planned(a.out / "previews" / f"{name}.png"))
+                if previewing(a):
+                    ext = ".webp" if a.preview_animation else ".png"
+                    out.append(planned(a.out / "previews" / f"{name}{ext}"))
                     continue
                 out.append(planned(a.out / name, folder=True))
                 if status:
@@ -526,7 +565,7 @@ def build(a):
                         if c["target"] in ACCENTS]
         with_status = not a.no_status and theme.adi_template
         done = {}      # (flavour, group, accent or None) -> folder whose images can be copied
-        if not a.no_status and not theme.adi_template and not a.preview:
+        if not a.no_status and not theme.adi_template and not previewing(a):
             print("  (no -status variant: only for adi1090x-style script themes)")
         for flv in a.flavor:
             base = rgb(flv, "base")
@@ -543,10 +582,16 @@ def build(a):
                     targets = np.array([rgb(flv, acc if c["target"] == "accent" else c["target"])
                                         for c in grp["colors"].values()])
                     plan[g] = (hex2rgb(grp["background"]), keys, targets)
-                if a.preview:
+                if previewing(a):
                     (a.out / "previews").mkdir(parents=True, exist_ok=True)
-                    out = a.out / "previews" / f"{out_name}.png"
-                    preview_sheet(theme, plan, cfg, base, out)
+                    if a.preview_animation:
+                        out = a.out / "previews" / f"{out_name}.webp"
+                        print(f"  recolouring {len(theme.groups[main_animation(theme)])} "
+                              "images of the main animation…", flush=True)
+                        animation_preview(theme, plan, base, out)
+                    else:
+                        out = a.out / "previews" / f"{out_name}.png"
+                        preview_sheet(theme, plan, cfg, base, out)
                     print(f"  preview: {out}")
                     continue
                 write_theme(theme, out_name, flv, aname, bar, a.out / out_name)

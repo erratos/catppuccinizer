@@ -11,9 +11,25 @@ What the options shared by every target mean, and how colours are chosen.
 | `-f, --flavor` | `latte`, `frappe`, `macchiato`, `mocha` (default) or `all`; several can be given |
 | `-a, --accent` | accent colour(s) used for colours mapped to `accent`, or `all` (the 14 accents, the default: one result per accent for what uses one; `--install` / `--apply` / `--test` need a single one); `PART=ACCENT` for one [part](#parts-an-accent-each) |
 | `-m, --map` | `NAME=TARGET …`: change where a source colour goes; repeated `-m` add up |
-| `--preview` | only render before/after images in `<out>/previews/`, nothing else |
+| `--preview` | only render one before/after image per source, for the first flavour and accent, in `<out>/previews/`, nothing else ([previews](#previews)) |
 | `-o, --out` | output folder (`themes/`, `images/` or `luts/` by default) |
 | `-s, --suffix` | extra word at the end of the output names (lowercase letters, digits, `-`) |
+
+## Previews
+
+A preview shows the result without building it, for the first flavour and the
+first accent given (`-f all -a mauve peach --preview` renders Latte, mauve):
+change them to compare. It is written into `<out>/previews/`, and no system
+step runs.
+
+| Option | What it renders | Targets |
+|---|---|---|
+| `--preview` | one image per source: the original on the left, the result on the right (and, with `keys`, [what the detection sees](#separating-colours)) | image, Plymouth (each group of images), Limine, ksplash |
+| `--preview-animation` | the main animation, before \| after, as an animated WebP that a browser plays | Plymouth (the longest numbered sequence, at its boot speed), ksplash (the longest animated GIF or WebP) |
+
+The GUI shows them as the **Preview image** and **Preview animation** buttons.
+The real thing on screen stays a system step: `--test` (Plymouth: `plymouthd`,
+sudo; ksplash: `ksplashqml`, in a window).
 
 ## Parts: an accent each
 

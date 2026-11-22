@@ -110,7 +110,7 @@ def places():
 
 # options that do not change what --colours finds: left out of the analysis (and of
 # its cache key in the page), so that picking a flavour does not analyse again
-NOT_ANALYSED = {"map", "preview", "out", "suffix", "dry_run", "flavor", "accent"}
+NOT_ANALYSED = {"map", "preview", "preview_animation", "out", "suffix", "dry_run", "flavor", "accent"}
 
 
 # ---------------------------------------------------------------- arguments

@@ -163,6 +163,7 @@ class Option:
             "scope": self.scope, "stage": self.stage,
             "sudo": self.sudo, "accept": self.accept,
             "role": ("source" if self.source else "step" if is_step(self)
+                     else "preview" if self.stage == "preview"
                      else "common" if self.scope == "common" else "option"),
         }
 
@@ -326,15 +327,34 @@ COMMON = [
                    "a theme that has several (ui.white), or a '#rrggbb' value; TARGET is a "
                    "Catppuccin colour (text, surface1, peach…) or 'accent'. Only the keys "
                    "method has source colours: a LUT has nothing to remap."),
-    Option("--preview", label="Preview only", switch=True, scope="common", stage="preview",
-           help="only render before/after images into <out>/previews/",
-           explain="Instead of the result, one image per result with the original on the "
-                   "left and the recoloured version on the right, in <out>/previews/: a "
-                   "quick way to compare flavours, accents or settings before building."),
+    Option("--preview", label="Preview image", switch=True, scope="common", stage="preview",
+           help="only render one before/after image per source, for the first flavour and "
+                "accent, into <out>/previews/",
+           explain="Instead of the result, one image to get an idea of it, with the original "
+                   "on the left and the recoloured version on the right, in <out>/previews/. "
+                   "Only the first flavour and the first accent are rendered: change them to "
+                   "compare."),
     Option("-o", "--out", label="Output folder", type=Path, accept="dir", scope="common", help="output folder"),
     Option("-s", "--suffix", label="Name suffix", default="", type=suffix_type, metavar="SUFFIX", scope="common",
            help="extra word at the end of the output names (lowercase letters, digits and '-')"),
 ]
+
+# for the targets whose result moves (Plymouth, ksplash): declared here, added by them
+PREVIEW_ANIMATION = Option(
+    "--preview-animation", label="Preview animation", switch=True, stage="preview",
+    unless=["preview"],
+    help="only render the main animation, for the first flavour and accent, as an animated "
+         "WebP into <out>/previews/",
+    explain="Instead of the result, its main animation recoloured, as an animated WebP in "
+            "<out>/previews/ that a browser (or the GUI) plays: nothing is installed and no "
+            "sudo is needed. Only the first flavour and the first accent are rendered.")
+
+
+def previewing(a):
+    """Whether a preview is asked for (--preview, --preview-animation): only the first
+    flavour and accent are rendered, and no system step runs."""
+    return bool(getattr(a, "preview", False) or getattr(a, "preview_animation", False))
+
 
 # added to the targets that have system steps
 DRY_RUN = Option("--dry-run", label="Dry run", switch=True, scope="common", stage="install",

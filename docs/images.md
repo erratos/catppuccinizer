@@ -15,7 +15,8 @@ catppuccinize image --list                       # the wallpapers installed on t
 
 Output: `images/catppuccin-<flavor>-<name>[-<accent>][-<suffix>].png` (JPEG/WebP
 photos keep their format; see [output names](colours.md#output-names)).
-`--preview` writes before/after images into `images/previews/` instead. There is
+`--preview` writes before/after images into `images/previews/` instead, for the
+first flavour and accent ([previews](colours.md#previews)). There is
 nothing to install: nothing is written outside the output folder.
 
 ## Reading the comparison images
@@ -121,7 +122,7 @@ rasterised, so the result scales like the original. `-m` works as for images
 | `--smooth` | `0.08` | lut, lut-accent: accent blend radius; smaller = purer accents |
 | `-a` | `all` | accent(s) for colours mapped to `accent` (keys, lut-accent), or `all`; `NAME=ACCENT` for one image (`-a mauve logo=peach`) |
 | `-m, --map` | | `NAME=TARGET …` overrides (keys, SVG) |
-| `--preview` | | only render before/after images in `<out>/previews/` (`keys`: and the separation panel) |
+| `--preview` | | only render before/after images in `<out>/previews/`, first flavour and accent (`keys`: and the separation panel) |
 | `--list` | | list the wallpapers of `/usr/share/wallpapers`, `/usr/share/backgrounds`, `~/.local/share/wallpapers` |
 | `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap, and the method each image would get ([details](colours.md#manual-mapping)); `--json` for JSON |

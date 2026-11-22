@@ -59,9 +59,12 @@ ten minutes after the page is closed. `--port N` picks the port,
    then), `--separation` `auto` / `keys`, `--hald-level` / `--cube-size` their
    format; for Limine, the recolouring options and `--style` need a wallpaper.
    Preview, Build and the system steps are greyed the same way when their
-   command would fail (several accents for Install, no wallpaper for a
-   Limine preview…): the tooltip gives the command line's own message.
-5. **Preview** renders the before/after images (`--preview`); **Build** writes
+   command would fail (several accents for Install, no animation for
+   Preview animation…): the tooltip gives the command line's own message.
+5. **Preview image** renders one before/after image (`--preview`), **Preview
+   animation** the main animation of a Plymouth theme or splash screen
+   (`--preview-animation`, played in the page), both for the first flavour and
+   accent ([previews](colours.md#previews)); **Build** writes
    the result into the output folder, without sudo and without installing
    anything (the line under the buttons says where). The *Output* card sets
    the folder (by default `./<target folder>` in the folder the GUI was started

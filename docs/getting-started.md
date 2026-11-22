@@ -47,14 +47,14 @@ The result lands in `./images/catppuccin-mocha-wall.jpg`. The tool decides
 on its own whether your image is flat art or a photo, and treats it
 accordingly.
 
-Want to compare before choosing? `--preview` only writes a side-by-side image,
-and `-f all` tries the four flavours at once:
+Want to see it before building? `--preview` only writes a side-by-side image
+(before | after), for the first flavour and accent given:
 
 ```bash
-catppuccinize image ~/Pictures/wall.jpg -f all --preview
+catppuccinize image ~/Pictures/wall.jpg -f macchiato --preview
 ```
 
-Look in `./images/previews/`.
+Look in `./images/previews/`; change `-f` or `-a` to compare.
 
 ## 4. Try a boot splash (Plymouth)
 

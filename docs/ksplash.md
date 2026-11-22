@@ -53,7 +53,20 @@ A new look-and-feel package (`themes/catppuccin-<flavor>-<name>[-<accent>][-<suf
 containing only the splash screen. As a derived work, its `metadata.json` keeps
 the original authors, licence and website (catppuccinizer is added as an
 author), and the original licence file is copied when there is one.
-There is no `--preview`: use `--test`.
+
+### Preview
+
+Nothing is built; only the first flavour and accent are rendered
+([previews](colours.md#previews)):
+
+- `--preview` writes the thumbnail System Settings shows
+  (`contents/previews/splash.png`) before and after, into `<out>/previews/`;
+  without one, the middle frame of the longest animation, or the first image;
+- `--preview-animation` writes the longest animated GIF or WebP, before |
+  after, as an animated WebP.
+
+A splash screen moved by its QML only (no image, no animation) has neither:
+`--test` shows it.
 
 ### Install
 

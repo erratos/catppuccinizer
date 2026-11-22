@@ -74,6 +74,10 @@ class Gui(unittest.TestCase):
         self.assertNotIn("list", ply)                           # the catalogue does it
         self.assertNotIn("detect", ply)                         # --colours, for every target
         self.assertNotIn("bar", ply)                            # -a bar=ACCENT (core.parts)
+        self.assertEqual((ply["preview"]["role"], ply["preview_animation"]["role"]),
+                         ("preview", "preview"))                 # buttons next to Build
+        self.assertEqual(kinds["preview"]["role"], "preview")
+        self.assertNotIn("preview_animation", kinds)            # a picture does not move
         lut = next(t for t in s["targets"] if t["name"] == "lut")
         self.assertFalse(lut["has_colours"])
         self.assertEqual({o["dest"]: o for o in lut["options"]}["method"]["choices"], ["lut", "lutgen"])

@@ -161,8 +161,17 @@ would copy, write and run.
 
 ### Preview
 
-`--preview` renders one before/after image per theme into `<out>/previews/`,
-nothing else.
+Nothing is installed and no sudo is needed; only the first flavour and accent
+are rendered ([previews](colours.md#previews)):
+
+- `--preview` renders one image per theme into `<out>/previews/`: each group
+  of images before (over its background), after (over `base`) and what the
+  detection sees;
+- `--preview-animation` renders the main animation (the longest numbered
+  sequence), before | after, as an animated WebP that a browser plays, at the
+  speed Plymouth shows it (50 refreshes a second, divided as the script does).
+
+The real screen is `--test` (below).
 
 ### Build (default)
 
@@ -255,7 +264,8 @@ for it.
 | `-s, --suffix` | | extra suffix for the theme names |
 | `--no-status` | | skip the `-status` variants |
 | `--separation` | `0.5` | 0 = merge close colours, 1 = keep faint (and darker) ones apart |
-| `--preview` | | only render one before/after/separation image per theme in `<out>/previews/` |
+| `--preview` | | only render one before/after/separation image per theme in `<out>/previews/` (first flavour and accent) |
+| `--preview-animation` | | only render the main animation, before \| after, as an animated WebP in `<out>/previews/` |
 | `--list` | | list the installed themes (`*` = the default one) and the adi1090x themes |
 | `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |

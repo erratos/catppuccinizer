@@ -40,6 +40,7 @@ tests/
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     catalogue sections, installed themes and wallpapers, --list
   test_outputs.py     --names of every target against what the build writes
+  test_previews.py    --preview / --preview-animation: first flavour and accent, no build
 ```
 
 ## Core API (what targets use)
@@ -58,6 +59,7 @@ tests/
 | `options.Option(...)` / `options.defaults(opts, **values)` | declare an option ([below](#options)); a namespace of defaults for scripts |
 | `recolor.method_options(methods=None, help=None, needs=None, keys_always=False)` | `--method`, `--separation`, `--keep-lum`, `--smooth`, `--lutgen-*` (only the given methods; `keys_always`: `--separation` matters whatever `--method`, for a target that also recolours with keys on its own) |
 | `recolor.SEPARATION` / `side_by_side(src, im, out, grp)` / `separation_image(path, grp)` | the `--separation` option (Plymouth adds it alone); a before/after preview, with a keys group the separation panel |
+| `options.PREVIEW_ANIMATION` / `options.previewing(args)` / `recolor.preview_animation(pairs, n, out, duration)` | `--preview-animation` (added by the targets whose result moves); whether a preview is asked for (the command line then keeps the first flavour and accent and runs no step); (before, after) frames as an animated WebP |
 | `recolor.LUT_METHODS` / `NO_ACCENT_METHODS` / `lut_for(method, flavor, args, n, accent, hue)` | the LUT methods (no source colours), those without accent (all but `lut-accent`), and their cube (`lut-accent`: the accent given to `dominant_hue(path)`) |
 | `recolor.accent_ignored_reason(method, grp)` | why the accent has no effect on an image, or None |
 | `clut.apply_cube` / `resample` / `read_hald` / `write_hald` / `write_cube` | 3D LUT application and files |
@@ -190,7 +192,7 @@ targets that have steps.
 
 | Step | Effect | Typical rights |
 |---|---|---|
-| `preview` | before/after images in `<out>/previews/` | user |
+| `preview` | before/after images (`--preview`) or an animated WebP (`--preview-animation`) in `<out>/previews/`, first flavour and accent (`options.previewing()`) | user |
 | `build` | the result in the output folder (default) | user |
 | `install` | copied where the system looks for it, not selected | often root |
 | `apply` | selected / configured | often root |
@@ -222,7 +224,7 @@ option), then:
 | `help` | one line (`--help`, the GUI) |
 | `explain`, `image` | a longer text and an illustration, shown by the GUI's **?** next to the option; `image` is a file of `catppuccinizer/assets/` (`"options-method.jpg"`, package data, made by `tools/doc_previews.py`) or an absolute path for a target from another package |
 | `scope` | `common`, `method` / `method:<name>` (core) or `target` (default) |
-| `stage` | `analyse`, `preview`, `build` (default), `install`, `apply`, `test`, `restore` |
+| `stage` | `analyse`, `preview`, `build` (default), `install`, `apply`, `test`, `restore`; the GUI makes a button of each `preview` option, next to Build |
 | `sudo` | `"run"`: the command must run as root |
 | `when` | when it matters: `{"method": ["lutgen"]}` (another option's value) or `{"analysis.remappable": [True]}` (a fact from `--colours`); `method:<name>` options get `{"method": [<name>]}` |
 | `needs` | options of which one must be given for this one to have an effect (Limine's `--style`: `["wallpaper"]`): the command line notes it, the GUI greys the option and says why; `recolor.method_options(needs=…)` puts it on every method option |

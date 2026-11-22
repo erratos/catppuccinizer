@@ -57,6 +57,11 @@ def parse(argv=None, parser=None):
     plain, a.part_accents = split_accents(a.accent)       # PART=ACCENT: core.parts
     a.accent = expand(plain or list(t.default_accent), ACCENTS, "accent")
     a.out = a.out or Path.cwd() / t.default_out
+    a.preview_of = None
+    if options.previewing(a):         # one image to get an idea: the first flavour and accent
+        if len(a.flavor) > 1 or len(a.accent) > 1:
+            a.preview_of = (a.flavor[0], a.accent[0])
+        a.flavor, a.accent = a.flavor[:1], a.accent[:1]
     if getattr(a, "json", False) and not (getattr(a, "colours", False) or getattr(a, "names", False)):
         raise SystemExit("--json only goes with --colours or --names")
     if getattr(a, "colours", False) and getattr(a, "names", False):
@@ -79,10 +84,12 @@ def run(t, a):
     if getattr(a, "restore", False):
         print(f"restore{dry}")
         return t.restore(a, system)
+    if a.preview_of:
+        print("preview: the first flavour and accent only ({}, {})".format(*a.preview_of))
     built = t.build(a)
     # under sudo, what build wrote (output, downloads) belongs to the invoking user
     give_back(a.out, cache_dir())
-    if built is None or a.preview:
+    if built is None or options.previewing(a):
         return
     asked = [s for s in t.steps if getattr(a, s) or (s == "install" and getattr(a, "apply", False))]
     for s in asked:

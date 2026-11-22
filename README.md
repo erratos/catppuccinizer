@@ -29,7 +29,8 @@ sudo catppuccinize plymouth rings_2 -a mauve --test      # boot splash, shown wi
 ```
 
 `-f` picks the flavour, `-a` the accent colour, `--preview` writes a
-before/after image instead of the result. Nothing is installed on your system
+before/after image instead of the result (`--preview-animation`: the animation
+of a boot splash, as an animated WebP). Nothing is installed on your system
 unless you pass `--install` or `--apply` (`--dry-run` lists what they would
 change, `--restore` undoes them).
 

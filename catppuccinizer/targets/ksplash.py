@@ -11,7 +11,9 @@ package: Splash.qml plus images. Colours are recoloured everywhere:
 The result is a new look-and-feel package containing only the splash screen.
 --install copies it to ~/.local/share/plasma/look-and-feel/, --apply (which
 installs first) selects it, --test shows it in a window, --restore selects the
-previous splash screen again and removes the installed ones.
+previous splash screen again and removes the installed ones. --preview shows the
+thumbnail of System Settings (or a frame of an animation) before and after,
+--preview-animation the longest animation, without building the package.
 """
 import json
 import re
@@ -29,7 +31,7 @@ from ..core.formats import (RASTER, anim_frames, anim_info, anim_sample, collect
 from ..core.mapping import (apply_maps, background_of, colour_report, map_colour_counts,
                             note_accent_ignored, print_colours, resolve_target, uses_accent)
 from ..core.palette import FLAVOR_TITLES, hex2rgb, rgb, rgb2hex
-from ..core.options import Option, step
+from ..core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ..core.parts import accent_sets, check_parts, note_unused, single
 from ..core.paths import state_file
 from ..core.naming import check_name
@@ -50,13 +52,13 @@ class KSplashTarget(Target):
     name = "ksplash"
     help = "recolour a KDE Plasma splash screen"
     accent_also = "the QML / SVG colours mapped to accent"
-    unused_common = ("preview",)                      # --test shows the result instead
 
     def options(self):
         return [
             Option("theme", label="Splash screen", nargs="?", default="org.kde.breeze.desktop", metavar="THEME",
                    accept="dir", help="look-and-feel id or folder (default: org.kde.breeze.desktop)"),
             *recolor.method_options(keys_always=True),
+            PREVIEW_ANIMATION,
             step("install", help=f"copy the result to {USER_DIR}"),
             step("apply", help="install, then select it as the splash screen",
                  explain="Here: it becomes the splash screen in ksplashrc (kwriteconfig6), "
@@ -73,6 +75,12 @@ class KSplashTarget(Target):
         if (a.install or a.apply or a.test) and (len(a.flavor) > 1 or not single(a, PARTS)):
             raise SystemExit("--install / --apply / --test need a single flavour and a single accent "
                              "(-f FLAVOR -a ACCENT)")
+        if a.preview_animation and not animations(resolve(a.theme)):
+            raise SystemExit("--preview-animation: this splash screen has no animated GIF or "
+                             "WebP (its QML moves it: see it with --test)")
+        if a.preview and not stills(resolve(a.theme)):
+            raise SystemExit("--preview: this splash screen has no image to show (only QML and "
+                             "SVG: see it with --test)")
 
     def build(self, a):
         return build(a)
@@ -190,6 +198,20 @@ def preview_group(preview, rasters):
         return None
     err, grp = min(scored, key=lambda x: x[0])
     return grp if err < 2 * recolor.FIT_THRESHOLD else None
+
+
+def animations(pkg):
+    """The animated GIFs and WebPs of the splash screen."""
+    splash = pkg / "contents/splash"
+    return [f for f in sorted(splash.rglob("*")) if source_file(f, splash) and is_animated(f)]
+
+
+def stills(pkg):
+    """What --preview can show: the preview (contents/previews/splash.png), or images."""
+    splash = pkg / "contents/splash"
+    return ([pkg / "contents/previews/splash.png"] if source_file(pkg / "contents/previews/splash.png", pkg)
+            else []) + [f for f in sorted(splash.rglob("*"))
+                        if f.suffix.lower() in RASTER and source_file(f, splash)]
 
 
 # ---------------------------------------------------------------------- main
@@ -312,6 +334,10 @@ def outputs(a):
         _, sets = results(a, *analyse(a, pkg, tmp))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    if previewing(a):
+        ext = ".webp" if a.preview_animation else ".png"
+        return [naming.planned(a.out / "previews" / f"{package_id(flv, slug, name, a)}{ext}")
+                for flv in a.flavor for _, name in sets]
     return [naming.planned(a.out / package_id(flv, slug, name, a), folder=True)
             for flv in a.flavor for _, name in sets]
 
@@ -331,6 +357,12 @@ def build(a):
     if not using:
         note_accent_ignored(a)
     note_unused(a, using)
+    if previewing(a):
+        try:
+            preview(a, pkg, slug, rasters, sets)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        return None
     built = []
     done = {}      # (image, flavour, accent or None) -> recoloured file, copied for other accents
     for flv in a.flavor:
@@ -390,6 +422,52 @@ def build(a):
             print(f"  -> {dst}  ({name})")
     shutil.rmtree(tmp, ignore_errors=True)
     return built or None
+
+
+def anim_plan(grp, flv, acc):
+    """(source background, keys, targets, base) of an animation."""
+    keys = np.array([hex2rgb(c["source"]) for c in grp["colors"].values()])
+    targets = np.array([resolve_target(flv, acc, c["target"]) for c in grp["colors"].values()])
+    return hex2rgb(grp["background"]), keys, targets, rgb(flv, "base")
+
+
+def preview(a, pkg, slug, rasters, sets):
+    """--preview: the thumbnail of System Settings before and after (else a frame of
+    the longest animation, else the first image); --preview-animation: the longest
+    animation, before | after. The first flavour and accent (core.options.previewing)."""
+    flv, (accents, aname) = a.flavor[0], sets[0]
+    out = a.out / "previews"
+    out.mkdir(parents=True, exist_ok=True)
+    anims = sorted((f for f, (m, _, _) in rasters.items() if m == "anim"),
+                   key=lambda f: -rasters[f][2][0])
+    def acc_of(method, grp):
+        return accents.get(part_of(method, grp, rasters)) if raster_accent(method, grp) else None
+    if a.preview_animation:
+        src = anims[0]
+        method, grp, (n, durations, _) = rasters[src]
+        plan = anim_plan(grp, flv, acc_of(method, grp))
+        after = recolor.recolor_frames(anim_frames(src), *plan, quantize=False, parallel=n > 48)
+        pairs = ((recolor.on_black(b), recolor.on_black(r)) for b, r in zip(anim_frames(src), after))
+        dst = out / f"{package_id(flv, slug, aname, a)}.webp"
+        print(f"  recolouring {n} frames of {src.name}…", flush=True)
+        recolor.preview_animation(pairs, n, dst, durations)
+    else:
+        still = next((f for f in rasters if f.name == "splash.png" and f.parent.name == "previews"),
+                     None)
+        dst = out / f"{package_id(flv, slug, aname, a)}.png"
+        if still or not anims:
+            src = still or next(f for f, (m, _, _) in rasters.items() if m != "anim")
+            method, grp, _ = rasters[src]
+            im = recolor.render(src, method, grp, flv, acc_of(method, grp), a)
+            recolor.side_by_side(src, im, dst, grp if method == "keys" else None)
+        else:                                  # the middle frame of the longest animation
+            src = anims[0]
+            method, grp, (n, _, _) = rasters[src]
+            frame = next(anim_frames(src, {n // 2}))
+            im = recolor.recolor_image(frame, *anim_plan(grp, flv, acc_of(method, grp)),
+                                       quantize=False)
+            recolor.side_by_side(frame, im, dst, grp)
+    print(f"  preview: {dst}  (Catppuccin {FLAVOR_TITLES[flv]}{' ' + aname if aname else ''})")
 
 
 TARGET = KSplashTarget()

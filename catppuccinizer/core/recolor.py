@@ -20,6 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 from . import lutgen, mapping
 from .clut import apply_cube as apply_lut
 from .detect import DEFAULT_SEPARATION, detect_group, detect_params, load_rgba
+from .formats import save_animation
 from .mapping import NO_ACCENT, apply_maps, print_colours, uses_accent
 from .options import Option
 from .palette import ACCENTS, PALETTES, hex2rgb, oklab_to_srgb, rgb, srgb_to_oklab
@@ -434,16 +435,34 @@ def draw_legend(im, items):
     return im
 
 
+def sheet(panels):
+    """Panels of one size side by side, SHEET_GAP apart (the GUI's picker finds the
+    gap after the first one: the original)."""
+    w, h = panels[0].size
+    out = Image.new("RGB", (len(panels) * (w + SHEET_GAP) - SHEET_GAP, h), SHEET_GAP_COLOUR)
+    for i, p in enumerate(panels):
+        out.paste(p, (i * (w + SHEET_GAP), 0))
+    return out
+
+
 def side_by_side(src, im, out, grp=None):
-    """before | after, and with a keys group (grp) the separation panel."""
-    before = Image.open(src).convert("RGB")
+    """before | after, and with a keys group (grp) the separation panel. src: a path
+    or a PIL image (a frame of an animation)."""
+    before = (src if isinstance(src, Image.Image) else Image.open(src)).convert("RGB")
     before.thumbnail((900, 900))
     panels = [before, on_black(im).resize(before.size)]
     if grp is not None:
         sep, legend = separation_image(src, grp)
         panels.append(draw_legend(sep.resize(before.size), legend))
-    sheet = Image.new("RGB", (len(panels) * (before.width + SHEET_GAP) - SHEET_GAP, before.height),
-                      SHEET_GAP_COLOUR)
-    for i, p in enumerate(panels):
-        sheet.paste(p, (i * (before.width + SHEET_GAP), 0))
-    sheet.save(out)
+    sheet(panels).save(out)
+
+
+def preview_animation(pairs, n, out, duration, size=480):
+    """--preview-animation: n (before, after) frames (RGB images) as an animated WebP
+    of before | after, each panel at most size pixels; duration: ms per frame."""
+    def frames():
+        for before, after in pairs:
+            scale = min(1, size / max(before.size))
+            dims = (max(1, round(before.width * scale)), max(1, round(before.height * scale)))
+            yield sheet([before.resize(dims), after.resize(dims)])
+    save_animation(frames(), n, out, duration if isinstance(duration, list) else [duration] * n, 0)
