@@ -1,6 +1,6 @@
 """Plymouth target: recolour a Plymouth theme: the one in use by default, any
 installed theme by name, or any theme folder (script, two-step, fade-throbber,
-..., such as the 80 animations of adi1090x/plymouth-themes, once downloaded).
+..., such as the 80 animations of adi1090x/plymouth-themes, which the GUI downloads).
 
 Colours are detected per group of images (each numbered sequence, plus "ui"
 for single images) at each run; -m changes them. Themes built on adi1090x's script
@@ -31,11 +31,11 @@ from ...core.naming import output_name, planned, slug
 from ...core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ...core.parts import accent_sets, check_parts, note_unused
 from ...core.paths import state_file
-from ...core.sources import item, link, section, theme_folders
+from ...core.sources import item, section, theme_folders
 from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, keys_plan,
                              preview_animation, recolor_image, run_jobs, separation_image)
 from ...core.naming import check_name
-from ...core.online import Ocs
+from ...core.online import GithubRelease, Ocs
 from ...core.system import System, source_file, which
 from ...core.target import Target
 
@@ -48,13 +48,13 @@ INSTALL_DIR = "/usr/share/plymouth/themes"
 class PlymouthTarget(Target):
     name = "plymouth"
     help = "recolour Plymouth themes (installed ones, or theme folders)"
-    links = [
-        link("adi1090x/plymouth-themes", "https://github.com/adi1090x/plymouth-themes",
-             "80 animated themes, previewed in its README, in pack_1 to pack_4: download "
-             "the repository (Code, Download ZIP), extract it, then choose a theme folder"),
+    online = [
+        GithubRelease("adi1090x/plymouth-themes", "adi1090x: Plymouth themes", marker="*.plymouth",
+                      note="80 animated themes (GPL-3.0), previewed in its README (animated "
+                           "GIFs of a few MB each: no thumbnails here)"),
+        Ocs("gnome-look", 108, "Gnome-look: Plymouth themes", marker="*.plymouth",
+            note="themes with screenshots, each with its own licence"),
     ]
-    online = [Ocs("gnome-look", 108, "Gnome-look: Plymouth themes", marker="*.plymouth",
-                  note="themes with screenshots, each with its own licence")]
 
     def options(self):
         return OPTIONS

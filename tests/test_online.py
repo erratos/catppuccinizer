@@ -22,7 +22,8 @@ sys.dont_write_bytecode = True
 
 from catppuccinizer.core import archives, online  # noqa: E402
 from catppuccinizer.core.archives import ArchiveError  # noqa: E402
-from catppuccinizer.core.online import KDE_WALLPAPERS, WALLHAVEN, NetworkError, Ocs  # noqa: E402
+from catppuccinizer.core.online import (KDE_WALLPAPERS, WALLHAVEN, GithubRelease,  # noqa: E402
+                                        NetworkError, Ocs)
 
 
 def png_bytes(size=(8, 8), fmt="PNG"):
@@ -121,10 +122,10 @@ class Requests(Tmp):
         f = self.tmp / "f.bin"
         f.write_bytes(b"theme")
         good = hashlib.md5(b"theme").hexdigest()
-        self.assertEqual(online.check_md5(f, good.upper()), f)
-        self.assertEqual(online.check_md5(f, ""), f)                     # not given: not checked
+        self.assertEqual(online.check_digest(f, good.upper()), f)
+        self.assertEqual(online.check_digest(f, ""), f)                     # not given: not checked
         with self.assertRaisesRegex(NetworkError, "checksum"):
-            online.check_md5(f, "0" * 32)
+            online.check_digest(f, "0" * 32)
         self.assertFalse(f.exists())
 
     def test_redirects_stay_on_the_hosts(self):
@@ -348,6 +349,64 @@ class OcsStore(Tmp):
                 KDE_WALLPAPERS.fetch("41-1")
         self.assertEqual(p, self.tmp / "cache/downloads/kde-store-299/41-2-x/blue-sky.png")
         self.assertEqual(p.read_bytes(), img)
+
+
+ADI = GithubRelease("adi1090x/plymouth-themes", "adi1090x", marker="*.plymouth")
+RELEASES = "https://api.github.com/repos/adi1090x/plymouth-themes/releases"
+
+
+def release(assets, tag="v1.0"):
+    return json.dumps({"tag_name": tag, "assets": [
+        {"name": n, "size": size, "download_count": count, "digest": digest}
+        for n, size, count, digest in assets]}).encode()
+
+
+class Github(Tmp):
+    def test_declared(self):
+        self.assertEqual((ADI.name, ADI.home, ADI.accept), ("github-adi1090x-plymouth-themes",
+                                                            "https://github.com/adi1090x/plymouth-themes", "dir"))
+        for repo in ("adi1090x", "a/b/c", "../x", "a/..", "https://github.com/a/b"):
+            with self.subTest(repo=repo), self.assertRaises(ValueError):
+                GithubRelease(repo, "x", marker="*.plymouth")
+
+    def test_search(self):
+        assets = [("rings.tar.gz", 2 << 20, 50, None), ("abstract_ring.tar.gz", 3 << 20, 900, None),
+                  ("cuts_alt.tar.gz", 1 << 20, 10, None), ("notes.txt", 10, 999, None),
+                  ("bad name.tar.gz", 10, 5, None)]
+        fake, asked = answers({f"{RELEASES}/latest": release(assets)})
+        with mock.patch.object(online, "_open", fake):
+            r = ADI.search("")
+            self.assertEqual([i["label"] for i in ADI.search("RING")["items"]], ["Abstract ring", "Rings"])
+            self.assertEqual(ADI.search("cuts alt")["items"][0]["id"], "v1.0/cuts_alt.tar.gz")
+        self.assertEqual((r["page"], r["pages"]), (1, 1))
+        self.assertEqual([i["id"] for i in r["items"]],             # most downloaded first
+                         ["v1.0/abstract_ring.tar.gz", "v1.0/rings.tar.gz", "v1.0/cuts_alt.tar.gz"])
+        self.assertEqual(r["items"][0]["note"], "3.0 MB · 900 downloads")
+        self.assertIsNone(r["items"][0]["thumb"])
+        self.assertEqual(len(asked), 3)
+
+    def test_fetch(self):
+        arc = tar_bytes([("rings/rings.plymouth", b"[Plymouth Theme]"), ("rings/progress-1.png", png_bytes())])
+        good = "sha256:" + hashlib.sha256(arc).hexdigest()
+        fake, asked = answers({f"{RELEASES}/tags/v1.0": release([("rings.tar.gz", len(arc), 1, good)]),
+                               "https://github.com/adi1090x/plymouth-themes/releases/download/v1.0/rings.tar.gz": arc})
+        with mock.patch.object(online, "_open", fake):
+            (theme,) = ADI.fetch("v1.0/rings.tar.gz")
+            self.assertEqual(ADI.fetch("v1.0/rings.tar.gz"), [theme])      # kept: no request at all
+        self.assertEqual(theme, self.tmp / "cache/downloads/github-adi1090x-plymouth-themes/v1-0/rings/rings")
+        self.assertEqual(len(asked), 2)
+        bad = "sha256:" + "0" * 64
+        fake, _ = answers({f"{RELEASES}/tags/v1.0": release([("cuts.tar.gz", 10, 1, bad)]),
+                           "https://github.com/": arc})
+        with mock.patch.object(online, "_open", fake), self.assertRaisesRegex(NetworkError, "checksum"):
+            ADI.fetch("v1.0/cuts.tar.gz")
+        fake, _ = answers({f"{RELEASES}/tags/v1.0": release([])})
+        with mock.patch.object(online, "_open", fake), self.assertRaisesRegex(NetworkError, "no lone.tar.gz"):
+            ADI.fetch("v1.0/lone.tar.gz")
+        for iid in ("rings.tar.gz", "v1.0/../x.tar.gz", "v1.0/a/b.tar.gz", "../v1.0/x.tar.gz",
+                    "v1.0/notes.txt", "v1.0/-x.tar.gz"):
+            with self.subTest(id=iid), self.assertRaisesRegex(NetworkError, "not a theme"):
+                ADI.fetch(iid)
 
 
 class Archives(Tmp):

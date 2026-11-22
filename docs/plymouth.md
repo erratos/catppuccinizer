@@ -24,12 +24,13 @@ Three places to take a theme from (the GUI has a button for each):
 - **System locations**: the themes installed in `/usr/share/plymouth/themes`,
   given by name (`spinner`); `--list` shows them, `*` before the one in use.
 - **Any folder** holding a `.plymouth` file, given by its path.
-- **Other sources** (`--list` prints them too): the
-  [Gnome-look Plymouth themes](https://www.gnome-look.org/browse?cat=108),
-  which the [GUI](gui.md) browses itself (a click downloads, unpacks and
-  chooses the theme), and
+- **Other sources** (`--list` prints them too):
   [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes)
-  (80 animations, previewed in its README): download, extract the archive,
+  (80 animations, previewed in its README, one archive per theme in its
+  release) and the
+  [Gnome-look Plymouth themes](https://www.gnome-look.org/browse?cat=108).
+  The [GUI](gui.md) browses both itself: a click downloads one theme, unpacks
+  it and fills the field. On the command line, download, extract the archive,
   then give the theme folder.
 
 The examples below use the adi1090x themes: on its GitHub page, *Code →

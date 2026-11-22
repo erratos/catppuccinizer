@@ -28,12 +28,12 @@ ten minutes after the page is closed. `--port N` picks the port,
      Downloads folders are in its places); images can also be dropped on the
      page;
    - *Other sources…*: more on the web. Some sources are browsed right in the
-     panel (*online sources*: Wallhaven, Gnome-look, the KDE Store), one tab
-     each: search, pages of thumbnails, and a click downloads the file into
-     `~/.cache/catppuccinizer/downloads/`, unpacks an archive and fills the
-     field (one or more for a source that takes several). An item with several
-     files (variants) first lists them; an archive holding several themes
-     lists them too. The others are web pages, opened in your browser:
+     panel (*online sources*: Wallhaven, Gnome-look, the KDE Store,
+     adi1090x's release), one tab each: search, pages of thumbnails, and a
+     click downloads the file into `~/.cache/catppuccinizer/downloads/`,
+     unpacks an archive and fills the field (one or more for a source that
+     takes several). An item with several files (variants) first lists them;
+     an archive holding several themes lists them too. The others are web pages, opened in your browser:
      download there, extract an archive, then choose what you downloaded with
      *Browse…*.
 
@@ -44,8 +44,10 @@ ten minutes after the page is closed. `--port N` picks the port,
      safe for work images only), the KDE Store wallpapers (in the panel, its
      images: wallpaper packages are left out), Unsplash;
    - Plymouth: left empty, the theme in use is recoloured. The installed themes;
-     other sources: the Gnome-look Plymouth themes (in the panel) and
-     [adi1090x/plymouth-themes](plymouth.md#getting-themes) (80 animations);
+     other sources: [adi1090x/plymouth-themes](plymouth.md#getting-themes) (80
+     animations, in the panel without thumbnails: its previews are animated
+     GIFs of a few MB, shown on its page) and the Gnome-look Plymouth themes (in
+     the panel);
    - KDE splash: the splash screens installed for you and for the system;
      other sources: the KDE Store splash screens (in the panel);
    - Limine: the wallpaper is optional: left empty, only the menu colours
@@ -199,11 +201,11 @@ server, only when the panel asks:
 
 | Online sources | Rule |
 |---|---|
-| hosts | `https://` only, to the hosts the source declares (Wallhaven: `wallhaven.cc`, `w.wallhaven.cc`, `th.wallhaven.cc`; Gnome-look and the KDE Store: their API host, `*.pling.com` and the storage host their downloads are sent to), redirects included; 20 s per request |
+| hosts | `https://` only, to the hosts the source declares (Wallhaven: `wallhaven.cc`, `w.wallhaven.cc`, `th.wallhaven.cc`; Gnome-look and the KDE Store: their API host, `*.pling.com` and the storage host their downloads are sent to; a GitHub release: `api.github.com`, `github.com` and its release storage hosts), redirects included; 20 s per request |
 | search | the source's API, its answer read as data (4 MB at most) |
 | thumbnails | fetched by the server (4 MB at most), decoded and written again as JPEG: the page still loads images from the server only |
-| downloads | an item the source lists, by its id (checked), up to 200 MB, written in full then renamed, only for you (`700` / `600`); checked against the store's MD5 when it gives one; a file already there is used again; a download that is not an image is removed |
-| archives | (Gnome-look, the KDE Store) `.zip` and `.tar.*` only, unpacked in a new folder: no absolute name or `..`, no link or device, 5000 files and 500 MB at most; the archive is then removed, and so is what holds no theme folder |
+| downloads | an item the source lists, by its id (checked), up to 200 MB, written in full then renamed, only for you (`700` / `600`); checked against the digest the site gives (the stores' MD5, GitHub's SHA-256 of newer assets); a file already there is used again; a download that is not an image is removed |
+| archives | (Gnome-look, the KDE Store, a GitHub release) `.zip` and `.tar.*` only, unpacked in a new folder: no absolute name or `..`, no link or device, 5000 files and 500 MB at most; the archive is then removed, and so is what holds no theme folder |
 
 ## For target authors
 

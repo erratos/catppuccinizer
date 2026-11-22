@@ -29,7 +29,7 @@ catppuccinizer/
     target.py         Target base class + discovery (Python, TOML, entry points, the user's TOML)
     declarative.py    targets described in TOML (a theme folder, install, KEY="value" settings)
     sources.py        where sources come from: system locations (sections, items), links
-    online.py         online sources the GUI browses (Wallhaven, OCS stores), https requests, downloads
+    online.py         online sources the GUI browses (Wallhaven, OCS stores, GitHub releases), downloads
     archives.py       archives unpacked safely (no '..', no links, limits)
   targets/
     plymouth/         Plymouth themes (+ preview script)
@@ -47,7 +47,7 @@ tests/
   test_tuning.py      --chroma, --dark-fade, --auto-fit: effect, defaults = the former constants
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     system locations, installed themes and wallpapers, links, --list
-  test_online.py      online sources, request rules, Wallhaven, OCS, safe archives (no network)
+  test_online.py      online sources, request rules, Wallhaven, OCS, GitHub, safe archives (no network)
   test_outputs.py     --names of every target against what the build writes
   test_previews.py    --preview / --preview-animation: first flavour and accent, no build
   test_folder.py      core.folder (parts of a theme folder) and the "hex" colour syntax
@@ -179,7 +179,7 @@ def installed():
 `section(title, make)` calls `make()` and turns a failure (`SystemExit`, no
 rights) into the section's `error`, so one section that cannot be read does not
 hide the others. `link(name, url, note)` takes `https://` addresses only.
-Plymouth: the installed themes, Gnome-look (online) and adi1090x (a link);
+Plymouth: the installed themes, adi1090x and Gnome-look (online);
 image: the wallpapers, Wallhaven and the KDE Store wallpapers (online),
 Unsplash (`WALLPAPER_LINKS`); Limine: the wallpaper of `limine.conf` + the
 wallpapers, the same sites; KDE splash: the user's and the system's splash
@@ -195,10 +195,11 @@ shows their thumbnails; a click downloads the item into the cache and puts its
 path in the source argument, as a file chosen with the browser would be.
 
 ```python
-from ..core.online import KDE_WALLPAPERS, WALLHAVEN, Ocs
+from ..core.online import KDE_WALLPAPERS, WALLHAVEN, GithubRelease, Ocs
 
 online = [WALLHAVEN, KDE_WALLPAPERS]                       # image, limine
-online = [Ocs("gnome-look", 108, "Gnome-look: Plymouth themes", marker="*.plymouth")]
+online = [GithubRelease("adi1090x/plymouth-themes", "adi1090x: Plymouth themes", marker="*.plymouth"),
+          Ocs("gnome-look", 108, "Gnome-look: Plymouth themes", marker="*.plymouth")]
 ```
 
 `Ocs(store, category, title, note, accept="dir", marker=…)` is a category of a
@@ -211,6 +212,13 @@ images for an image), asks for the file's link again when it is chosen (a
 token that expires), checks it against the MD5 the store gives, and unpacks an
 archive; the theme folders are those holding `marker`, as for `--list`. A TOML
 target declares one with [`[[source.online]]`](#format).
+
+`GithubRelease(repo, title, note, marker=…)` is the latest release of a GitHub
+repository whose assets are one theme archive each (adi1090x/plymouth-themes):
+listed through the API (one request per search, 60 an hour without a key),
+most downloaded first, without thumbnails; a chosen theme is downloaded from
+the release (checked against the SHA-256 GitHub gives for newer assets),
+unpacked and kept under its tag, asking nothing more the next time.
 
 An `OnlineSource` declares its `name`, `title`, `home`, `note`, the `hosts` it
 reaches (and `thumb_hosts`; `"*.example.org"` for the site's own subdomains),

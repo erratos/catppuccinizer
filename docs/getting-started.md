@@ -62,8 +62,9 @@ Plymouth draws the animation shown while your computer boots. The tool
 recolours the one you use, an installed one by name (`catppuccinize plymouth
 --list` shows them, and web pages to download more from), or any theme folder.
 To try one of the 80 animations of
-[adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes): on
-that page, *Code → Download ZIP*, extract it in `~/Downloads`, then:
+[adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes), pick
+it in the GUI (`catppuccinize gui`, *Other sources…*), or, on that page,
+*Code → Download ZIP*, extract it in `~/Downloads`, then:
 
 ```bash
 sudo catppuccinize plymouth ~/Downloads/plymouth-themes-master/pack_4/rings_2 -a mauve --test

@@ -193,17 +193,21 @@ def thumbnail(source, url, size=256):
     return buf.getvalue()
 
 
-def check_md5(path, md5):
-    """path when its MD5 is md5 (when the site gives one: 32 hex digits), else
-    NetworkError (the file removed): a download cut short or changed on the way."""
-    md5 = str(md5 or "").lower()
-    if not re.fullmatch(r"[0-9a-f]{32}", md5):
+DIGESTS = {"md5": 32, "sha256": 64}           # hex digits
+
+
+def check_digest(path, digest, algo="md5"):
+    """path when its digest (algo: md5, sha256) is digest, when the site gives one
+    (hex digits), else NetworkError (the file removed): a download cut short or
+    changed on the way."""
+    digest = str(digest or "").lower()
+    if not re.fullmatch(rf"[0-9a-f]{{{DIGESTS[algo]}}}", digest):
         return path
-    h = hashlib.md5(usedforsecurity=False)
+    h = hashlib.new(algo, usedforsecurity=False)
     with open(path, "rb") as f:
         for b in iter(lambda: f.read(1 << 20), b""):
             h.update(b)
-    if h.hexdigest() != md5:
+    if h.hexdigest() != digest:
         path.unlink(missing_ok=True)
         raise NetworkError(f"{path.name}: the download does not match its checksum")
     return path
@@ -280,17 +284,18 @@ class OnlineSource:
     def fetch(self, item_id):
         raise NotImplementedError
 
-    def unpacked(self, url, hosts, dest, filename, md5=None):
+    def unpacked(self, url, hosts, dest, filename, digest=None, algo="md5"):
         """The theme folders (marker) of the archive at url, unpacked once into
-        dest/<archive_stem(filename)>/: downloaded next to it, checked against md5
-        when given, unpacked (core.archives.extract), then the archive removed. An
-        archive without a theme folder is removed too, with a NetworkError."""
+        dest/<archive_stem(filename)>/: downloaded next to it, checked against
+        digest when given (check_digest), unpacked (core.archives.extract), then the
+        archive removed. An archive without a theme folder is removed too, with a
+        NetworkError."""
         dest = Path(dest)
         root = dest / archive_stem(filename)
         if not root.is_dir():
             arc = dest / f".download{suffix(filename)}"
             try:
-                check_md5(download(url, hosts, arc), md5)
+                check_digest(download(url, hosts, arc), digest, algo)
                 extract(arc, root)
             finally:
                 arc.unlink(missing_ok=True)
@@ -483,9 +488,81 @@ class Ocs(OnlineSource):
         kept = dest / f"{slug(Path(name).stem, 'image')}{Path(name).suffix.lower()}"
         if kept.is_file() and not kept.is_symlink():
             return [kept]
-        return [check_image(check_md5(download(url, self.hosts, kept), md5))]
+        return [check_image(check_digest(download(url, self.hosts, kept), md5))]
 
 
 KDE_WALLPAPERS = Ocs("kde-store", 299, "KDE Store: wallpapers", accept="image",
                      note="wallpapers shared by the KDE community, each with its own licence "
                           "(its images only: wallpaper packages are left out)")
+
+
+# ------------------------------------------------------------ GitHub release
+GITHUB_HOSTS = frozenset({"api.github.com", "github.com", "release-assets.githubusercontent.com",
+                          "objects.githubusercontent.com"})
+GITHUB_PAGE = 60
+REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}")
+ASSET = re.compile(r"([A-Za-z0-9][A-Za-z0-9._+-]{0,99})/([A-Za-z0-9][A-Za-z0-9._+-]{0,199})")
+
+
+class GithubRelease(OnlineSource):
+    """The archives of a GitHub repository's latest release, one theme each
+    (adi1090x/plymouth-themes: one .tar.gz per theme): listed through the API
+    (one request, without a key: 60 an hour), downloaded from the release, checked
+    against the digest GitHub gives (newer assets), unpacked. No thumbnails: a
+    release has none (a repository's README may show previews: its page is the
+    item's link)."""
+    thumb_hosts = frozenset()
+    hosts = GITHUB_HOSTS
+
+    def __init__(self, repo, title, note="", marker=None):
+        if not REPO.fullmatch(repo) or ".." in repo:
+            raise ValueError(f"not a GitHub repository: {repo!r} (owner/name)")
+        if not marker:
+            raise ValueError("a GitHub release source gives theme folders: give their marker")
+        self.repo, self.title, self.marker, self.accept = repo, title, marker, "dir"
+        self.name = "github-" + slug(repo)
+        self.home = f"https://github.com/{repo}"
+        self.note = note or f"the themes of {repo}'s latest release"
+
+    def search(self, query="", page=1):
+        query = re.sub(r"[\s_-]+", " ", str(query).strip().lower())[:200]
+        page = min(max(_int(page, 1), 1), 1000)
+        r = _dict(self.json(f"https://api.github.com/repos/{self.repo}/releases/latest"))
+        tag = str(r.get("tag_name") or "")
+        assets = []
+        for a in r.get("assets") if isinstance(r.get("assets"), list) else []:
+            a = _dict(a)
+            name = a.get("name")
+            if not isinstance(name, str) or not is_archive(name) or not ASSET.fullmatch(f"{tag}/{name}"):
+                continue
+            label = re.sub(r"[_-]+", " ", archive_stem(name)).capitalize()
+            if query in label.lower():
+                assets.append((-_int(a.get("download_count"), 0), label, name, _int(a.get("size"), 0)))
+        assets.sort()
+        pages = max(-(-len(assets) // GITHUB_PAGE), 1)
+        page = min(page, pages)
+        items = [item(f"{tag}/{name}", label, " · ".join(
+                     v for v in (_size(size) if size else "", f"{-count:,} downloads" if count else "") if v),
+                     url=self.home)
+                 for count, label, name, size in assets[(page - 1) * GITHUB_PAGE:page * GITHUB_PAGE]]
+        return {"items": items, "page": page, "pages": pages}
+
+    def fetch(self, item_id):
+        m = ASSET.fullmatch(str(item_id))
+        if not m or ".." in item_id or not is_archive(m.group(2)):
+            raise NetworkError(f"not a theme of {self.title}: {item_id}")
+        tag, name = m.groups()
+        dest = self.folder() / slug(tag, "release")
+        url = digest = None
+        if not (dest / archive_stem(name)).is_dir():   # not kept: its size and digest first
+            r = _dict(self.json(f"https://api.github.com/repos/{self.repo}/releases/tags/"
+                                f"{urllib.parse.quote(tag)}"))
+            a = next((_dict(a) for a in r.get("assets") or [] if _dict(a).get("name") == name), None)
+            if a is None:
+                raise NetworkError(f"{self.title}: no {name} in release {tag}")
+            if _int(a.get("size"), 0) > MAX_DOWNLOAD:
+                raise NetworkError(f"{name}: over {MAX_DOWNLOAD >> 20} MB")
+            algo, _, value = str(a.get("digest") or "").partition(":")
+            digest = value if algo == "sha256" else None
+            url = f"https://github.com/{self.repo}/releases/download/{urllib.parse.quote(tag)}/{name}"
+        return self.unpacked(url, self.hosts, dest, name, digest, "sha256")

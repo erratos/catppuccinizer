@@ -70,7 +70,9 @@ class Gui(unittest.TestCase):
         self.assertEqual(s["no_accent_methods"], ["lut", "lutgen"])
         plymouth = next(t for t in s["targets"] if t["name"] == "plymouth")
         self.assertTrue(plymouth["has_locations"])
-        self.assertIn("https://github.com/adi1090x/plymouth-themes", [ln["url"] for ln in plymouth["links"]])
+        self.assertEqual([(o["name"], o["home"]) for o in plymouth["online"]],     # browsed in the page
+                         [("github-adi1090x-plymouth-themes", "https://github.com/adi1090x/plymouth-themes"),
+                          ("gnome-look-108", "https://www.gnome-look.org/browse?cat=108")])
         ply = {o["dest"]: o for o in plymouth["options"]}
         self.assertEqual(ply["test"]["kind"], "optional")
         self.assertEqual((ply["install"]["sudo"], ply["install"]["role"]), ("run", "step"))
