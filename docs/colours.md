@@ -24,7 +24,7 @@ step runs.
 
 | Option | What it renders | Targets |
 |---|---|---|
-| `--preview` | one image per source: the original on the left, the result on the right (and, with `keys`, [what the detection sees](#separating-colours)) | image, Plymouth (each group of images), Limine (the [boot menu as it will look](limine.md#preview)), ksplash |
+| `--preview` | one image per source: the original on the left, the result on the right (and, with `keys`, [what the detection sees](#separating-colours)) | image, Plymouth (each group of images), Limine (the [boot menu as it will look](limine.md#preview)), ksplash, GRUB (the largest image) |
 | `--preview-animation` | the main animation, before \| after, as an animated WebP that a browser plays | Plymouth (the longest numbered sequence, at its boot speed), ksplash (the longest animated GIF or WebP) |
 
 The GUI shows them as the **Preview image** and **Preview animation** buttons.
@@ -40,6 +40,7 @@ A result is made of parts, each recoloured on its own:
 | `limine` | `menu` (title and highlighted help in the accent, text in the flavour's `text`), `wallpaper` |
 | `plymouth` | each group of images (`animation`, `throbber`, `progress`… biggest first, `ui`), `bar` (the progress bar, when the theme has one) |
 | `ksplash` | `vector` (QML / SVG colours), `animations` (with the preview when it is a still of one), `images` |
+| `grub` | `text` (`theme.txt` colours), `icons`, `images` |
 | `image` | each image, by its file name (`photo` for `photo.jpg`) |
 
 `--colours` lists them, each with what uses the accent. A part takes the
@@ -117,6 +118,7 @@ effect:
 | `image` (SVG) | vector, colours replaced in the file | nothing is rasterised | when a colour goes to `accent` (the most used saturated colour, by default) | yes |
 | `limine` | menu: fixed colours; wallpaper: `auto`, like `image` | | always, for the menu (branding and highlighted help); the wallpaper as for `image` | wallpaper, with `keys` |
 | `ksplash` | QML / SVG colours replaced; images `auto`, like `image`; animations `keys` | | when a QML / SVG colour or an image recoloured with `keys` goes to `accent` | everywhere, except images recoloured with a LUT |
+| `grub` | `theme.txt` colours replaced; images `auto`, like `image` | | when a `theme.txt` colour or an image recoloured with `keys` goes to `accent` | everywhere, except images recoloured with a LUT |
 | `lut` | `lut` (or `lutgen`; `keys`, `lut-accent` are refused) | it writes the LUT itself, without an image to find a dominant hue in | never | never |
 
 When the accent is not used, a single result is written per flavour (no

@@ -4,18 +4,24 @@ A target is a subcommand of `catppuccinize`. It subclasses Target and uses only
 catppuccinizer.core. It writes its result with build(); the steps that touch the
 system (install, apply, test, restore) are separate, optional methods, each with
 its option (core.options.step), run in that order by the command line. Built-in targets live in catppuccinizer/targets/<name>
-(module attribute TARGET); other packages can add targets with an entry point:
+(module attribute TARGET), or are TOML files there (core.declarative); other packages
+can add targets with an entry point:
 
     [project.entry-points."catppuccinizer.targets"]
-    grub = "my_package.grub:TARGET"
+    sddm = "my_package.sddm:TARGET"
+
+and the user with TOML files in ~/.config/catppuccinizer/targets/ (core.paths.config_dir).
 """
 import sys
 from importlib import import_module
 from importlib.metadata import entry_points
+from pathlib import Path
 
 from . import options as opts
+from .paths import config_dir
 
 BUILTIN = ["plymouth", "image", "limine", "ksplash", "lut"]
+BUILTIN_DIR = Path(__file__).resolve().parent.parent / "targets"     # + its *.toml files
 
 
 class Target:
@@ -117,15 +123,36 @@ class Target:
         """Undo apply and install (without building anything)."""
 
 
+def user_targets_dir():
+    """Where the user's TOML targets are."""
+    return config_dir() / "targets"
+
+
 def discover():
-    """{name: Target instance}, built-in first, then entry points."""
+    """{name: Target instance}: the built-in targets (Python, then TOML), the entry
+    points, then the user's TOML targets. A name already taken, or a user's TOML file
+    that is not valid, is skipped with a note (on stderr)."""
+    from . import declarative               # it subclasses Target
     targets = {}
     for name in BUILTIN:
         t = import_module(f"catppuccinizer.targets.{name}").TARGET
+        targets[t.name] = t
+    for f in declarative.files(BUILTIN_DIR):
+        t = declarative.load(f, builtin=True)
         targets[t.name] = t
     for ep in entry_points(group="catppuccinizer.targets"):
         if ep.name in targets:
             continue
         t = ep.load()
         targets[ep.name] = t() if isinstance(t, type) else t
+    for f in declarative.files(user_targets_dir()):
+        try:
+            t = declarative.load(f)
+        except (SystemExit, OSError) as e:
+            print(f"note: {f} skipped: {e}", file=sys.stderr)
+            continue
+        if t.name in targets:
+            print(f"note: {f} skipped: a target named '{t.name}' exists already", file=sys.stderr)
+            continue
+        targets[t.name] = t
     return targets

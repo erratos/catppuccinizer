@@ -1,0 +1,52 @@
+# GRUB target, declared (core.declarative; docs/architecture.md, "Declarative targets").
+name = "grub"
+help = "recolour a GRUB theme"
+description = """GRUB target: recolour a GRUB theme (theme.txt + images).
+
+A GRUB theme is a folder with theme.txt, images and fonts. The colours written
+in theme.txt ("#rrggbb" strings) go to Catppuccin roles; the images are
+recoloured like the image target (keys for flat art, LUT for photos), the
+icons apart (-a icons=ACCENT); fonts and the rest are copied as they are.
+
+--install copies the result to /boot/grub/themes, --apply (which installs
+first) sets GRUB_THEME in /etc/default/grub and runs grub-mkconfig, --restore
+puts the previous GRUB_THEME back and removes the installed themes. --preview
+shows the largest image (the background) before and after."""
+
+[source]
+marker = "theme.txt"
+search = ["/boot/grub/themes", "/boot/grub2/themes", "/usr/share/grub/themes"]
+label = "Theme"
+help = "installed theme name (see --list) or theme folder"
+
+[[parts]]
+name = "text"
+kind = "text"
+files = ["*.txt"]
+syntax = "hex"
+label = "theme.txt"
+
+[[parts]]
+name = "icons"
+kind = "image"
+files = ["icons/*"]
+
+[[parts]]
+name = "images"
+kind = "image"
+
+[install]
+to = "/boot/grub/themes"
+sudo = true
+help = "copy the result to /boot/grub/themes"
+
+[apply]
+help = "install, then set GRUB_THEME in /etc/default/grub and run grub-mkconfig"
+explain = """Here: GRUB_THEME in /etc/default/grub points to the installed theme.txt (a \
+backup of the file is made), then grub-mkconfig -o /boot/grub/grub.cfg writes the menu \
+again; seen at the next boot."""
+set = [{ file = "/etc/default/grub", key = "GRUB_THEME", value = "{installed}/theme.txt" }]
+run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
+
+[restore]
+help = "put the previous GRUB_THEME back, run grub-mkconfig, remove the installed themes"

@@ -25,7 +25,8 @@ catppuccinizer/
     textscreen.py     a boot menu's text screen (bitmap font, cells, margin), for previews
     paths.py          cache / restore state, sudo-aware home and ownership
     naming.py         output names (catppuccin-<flavor>-<source>[-<accent>][-<suffix>])
-    target.py         Target base class + discovery
+    target.py         Target base class + discovery (Python, TOML, entry points, the user's TOML)
+    declarative.py    targets described in TOML (a theme folder, install, KEY="value" settings)
     sources.py        ready-made sources (catalogue, --list): sections, items, wallpapers
   targets/
     plymouth/         Plymouth themes (+ adi1090x fetcher, scripts)
@@ -33,6 +34,7 @@ catppuccinizer/
     limine.py         Limine boot menu
     ksplash.py        KDE Plasma splash screen
     lut.py            LUT export (Hald CLUT, .cube)
+    grub.toml         GRUB themes: a declarative target
 tests/
   test_regression.py  every target on small fixtures, compared with golden.json
   test_steps.py       System, step chaining, each target's steps in a dry run
@@ -44,6 +46,7 @@ tests/
   test_outputs.py     --names of every target against what the build writes
   test_previews.py    --preview / --preview-animation: first flavour and accent, no build
   test_folder.py      core.folder (parts of a theme folder) and the "hex" colour syntax
+  test_declarative.py TOML targets: schema, trust, discovery, steps in a temporary home
 ```
 
 ## Core API (what targets use)
@@ -77,6 +80,9 @@ tests/
 | `paths.state_file(target, system)` | where a step keeps what `restore` needs (the theme in use before…) |
 | `system.System` | `copy_tree`, `copy_file`, `write_text(…, backup=True)`, `remove`, `run`, `load_state` / `save_state`: every change a step makes, printed (only listed with `--dry-run`) |
 | `System.install_tree(src, base, state)` / `keep_previous(state, current, name)` / `restore_state(state)` / `uninstall(state, base, names)` | results installed as folders of one system folder: copied and remembered; what apply replaced, remembered once; for restore, the state and the installed names (checked); removed |
+| `system.get_variable(text, key)` / `set_variable(text, key, value, raw)` / `unquote(raw)` | a `KEY="value"` file (`/etc/default/grub`): the raw value; the text with it set (checked and quoted), restored (`raw`) or removed (`None`), the rest byte for byte |
+| `paths.config_dir()` | the user's configuration folder (`~/.config/catppuccinizer`, the invoking user's under sudo) |
+| `declarative.load(path, builtin)` | the `Target` a TOML file describes ([below](#declarative-targets-toml)) |
 | `sources.theme_folders(base, marker)` | the theme folders of a folder: those with a file matching `marker` (`"*.plymouth"`) |
 | `system.place(base, name)` / `naming.check_name(name)` | a system path built from a theme or package name, checked first (no `/`, `..`, leading `-`) |
 | `system.copy_folder(src, dst)` / `source_file(path, root)` | copy a source theme without following links out of it; the file to read for a theme file, or None |
@@ -89,9 +95,13 @@ tests/
 
 ## Writing a target
 
+A target that recolours a theme folder, copies it and sets a `KEY="value"`
+line may need no code: see [declarative targets](#declarative-targets-toml).
+Otherwise, in Python:
+
 ```python
-# catppuccinizer/targets/grub.py   (or any package, see below)
-"""GRUB target: recolour a GRUB theme (theme.txt + images)."""
+# catppuccinizer/targets/sddm.py   (or any package, see below)
+"""SDDM target: recolour an SDDM login theme (Main.qml + images)."""
 from pathlib import Path
 
 from ..core import recolor
@@ -99,9 +109,9 @@ from ..core.options import Option, step
 from ..core.target import Target
 
 
-class GrubTarget(Target):
-    name = "grub"
-    help = "recolour a GRUB theme"
+class SddmTarget(Target):
+    name = "sddm"
+    help = "recolour an SDDM login theme"
     accent_also = "the menu colours"   # optional: what uses -a even with --method lut
     # unused_common = ("preview",)     # optional: common options that mean nothing here
 
@@ -109,8 +119,8 @@ class GrubTarget(Target):
         return [
             Option("theme", accept="dir", help="theme folder"),
             *recolor.method_options(),
-            step("install", sudo="run", help="copy the theme to /boot/grub/themes (sudo)"),
-            step("apply", sudo="run", help="install, then select it in /etc/default/grub (sudo)"),
+            step("install", sudo="run", help="copy the theme to /usr/share/sddm/themes (sudo)"),
+            step("apply", sudo="run", help="install, then select it in /etc/sddm.conf.d/ (sudo)"),
             step("restore", sudo="run", help="select the previous theme again (sudo)"),
         ]
 
@@ -122,7 +132,7 @@ class GrubTarget(Target):
         return a.out / name
 
     def install(self, a, built, system):
-        system.copy_tree(built, Path("/boot/grub/themes") / built.name)
+        system.install_tree(built, "/usr/share/sddm/themes", state_file("sddm", system=True))
 
     def apply(self, a, built, system):
         ...                      # system.write_text(..., backup=True), system.run([...])
@@ -131,7 +141,7 @@ class GrubTarget(Target):
         ...
 
 
-TARGET = GrubTarget()
+TARGET = SddmTarget()
 ```
 
 Optionally, `def sources(self)` returns ready-made sources for the source
@@ -142,11 +152,11 @@ to the target's options to print them.
 from ..core.sources import item, section, wallpaper_sections
 
 def sources(self):
-    return [section("Installed (/boot/grub/themes)", installed),   # installed() yields items
+    return [section("Installed (/usr/share/sddm/themes)", installed),   # installed() yields items
             *wallpaper_sections()]                             # the system's wallpapers
 
 def installed():
-    for d in sorted(Path("/boot/grub/themes").iterdir()):
+    for d in theme_folders("/usr/share/sddm/themes", "metadata.desktop"):
         yield item(d, label=d.name, note="", current=d.name == active_theme(), thumb=d)
 ```
 
@@ -182,12 +192,12 @@ listed too). It may analyse (whether the accent is used decides the names) but
 writes nothing. It adds `--names` (and `--json`) and fills the GUI's list under
 the command; `tests/test_outputs.py` checks it against a real build.
 
-Then add `"grub"` to `BUILTIN` in `core/target.py`, or, from another package,
+Then add `"sddm"` to `BUILTIN` in `core/target.py`, or, from another package,
 declare an entry point and install it next to catppuccinizer:
 
 ```toml
 [project.entry-points."catppuccinizer.targets"]
-grub = "my_package.grub:TARGET"
+sddm = "my_package.sddm:TARGET"
 ```
 
 ### Theme folders
@@ -305,8 +315,8 @@ A TOML target can say:
   (`/etc/default/grub`), each written atomically with a dated backup, then run
   commands;
 - **restore**: generated: the variables get back their previous values (or
-  their lines are removed when they had none), the commands run again, the
-  installed results are removed.
+  their lines are removed when they had none), the commands that name no
+  `{…}` run again, the installed results are removed.
 
 What needs a decision about the content stays in Python: files generated from
 scratch (KDE's `metadata.json`), formats edited by rules (Plymouth scripts, the
@@ -383,7 +393,9 @@ run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
 help = "…"
 ```
 
-`{installed}` is `<to>/<output name>`, `{name}` the output name. A value of
+`{installed}` is `<to>/<output name>`, `{name}` the output name; paths are
+absolute, `~/` being the user's home (the invoking user's under sudo), and
+never hold `..`. A value of
 `set` cannot hold `"`, `$`, `` ` ``, `\` or a line break, so it reads the same
 in any shell. The previous values go into the target's state file
 (`paths.state_file`): `restore` puts them back, and `apply` does not record a
@@ -424,6 +436,9 @@ output folder goes through `core.system` (the `System` object of the steps).
 | `<ESP>/…/limine.conf` + dated backups | the theme block | apply, restore | root, rights of the existing file |
 | `~/.local/share/plasma/look-and-feel/<id>/` | KDE splash packages | install | the user, 644 / 755 |
 | `ksplashrc`, Plymouth default theme | through `kwriteconfig6`, `plymouth-set-default-theme -R` | apply, restore | the user / root |
+| `/boot/grub/themes/<name>/` | GRUB themes | install | root, 644 / 755 |
+| `/etc/default/grub` + dated backups | `GRUB_THEME`, then `grub-mkconfig` | apply, restore | root, rights of the existing file |
+| what a user's TOML target names | its install folder, its `KEY="value"` files | install, apply, restore | the user, inside their home only |
 
 How:
 
@@ -452,6 +467,13 @@ How:
   comes back as the backup of the first `apply`, and later changes (new kernel
   entries) are kept. A wallpaper path of `limine.conf` that leaves the ESP
   (`boot():/../…`) is refused.
+- **`KEY="value"` files** (`/etc/default/grub`) change only the line that sets
+  the variable (or one line added at the end); a value is quoted and cannot
+  hold `"`, `$`, `` ` ``, `\` or a line break, so no shell reads more into it;
+  `restore` writes back the line's old value as it was.
+- **TOML targets** of the user cannot use sudo and only install or configure
+  inside the user's home; their commands, like those of the built-in TOML
+  files, come from an allow list ([trust](#trust)).
 - **Commands** are lists, never a shell. Run as root, a command is looked up in
   the system folders only (`/usr/sbin`, `/usr/bin`…, not `$PATH`) and run by
   its absolute path. `plymouth/scripts/preview.sh` sets its own `PATH` and

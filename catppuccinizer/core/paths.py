@@ -20,6 +20,13 @@ def cache_dir():
     return Path(base)
 
 
+def config_dir():
+    """The user's configuration (their TOML targets): $XDG_CONFIG_HOME/catppuccinizer, or
+    ~/.config/catppuccinizer, the invoking user's under sudo."""
+    base = os.environ.get("XDG_CONFIG_HOME")
+    return Path(base if base else user_home() / ".config") / "catppuccinizer"
+
+
 def state_file(target, system=False):
     """What restore needs to undo a target's install / apply: $CATPPUCCINIZER_STATE/<target>.json,
     else /var/lib/catppuccinizer/<target>.json for system-wide changes (made as root),

@@ -15,6 +15,7 @@ transparency are preserved, and any colour can be remapped by hand.
 | `catppuccinize image` | images: wallpapers, photos, flat art, SVG logos | [Images](docs/images.md) |
 | `catppuccinize limine` | the Limine boot menu, with its wallpaper | [Limine](docs/limine.md) |
 | `catppuccinize ksplash` | the KDE Plasma splash screen shown after login | [KDE splash](docs/ksplash.md) |
+| `catppuccinize grub` | GRUB themes (`theme.txt`, images, icons) | [GRUB](docs/grub.md) |
 | `catppuccinize lut` | a colour table (`.cube`, Hald CLUT) for ffmpeg, GIMP, OBS… | [LUT export](docs/lut.md) |
 
 ## Quick start
@@ -53,8 +54,10 @@ images) are published in [catppuccinized-themes](https://github.com/erratos/catp
 - [Images](docs/images.md): photo vs flat art, SVG, built-in `lut` vs lutgen,
   every option shown side by side
 - [Plymouth](docs/plymouth.md) ·
-  [Limine](docs/limine.md) · [KDE splash](docs/ksplash.md) · [LUT export](docs/lut.md)
+  [Limine](docs/limine.md) · [KDE splash](docs/ksplash.md) · [GRUB](docs/grub.md) ·
+  [LUT export](docs/lut.md)
 - [Architecture](docs/architecture.md): code layout, core API, writing a new target
+  (in Python, or in TOML for a theme folder)
 
 ## Requirements
 

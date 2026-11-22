@@ -109,6 +109,7 @@ The list of colour names you can use is in [Colours and mapping](colours.md).
 - [Images](images.md): wallpapers and logos, methods for photos vs flat art, SVG, lutgen;
 - [Limine](limine.md): boot menu colours;
 - [KDE splash screen](ksplash.md): the splash shown after login;
+- [GRUB](grub.md): GRUB themes;
 - [LUT export](lut.md): use the same colours in ffmpeg, GIMP, OBS…;
 - [Colours and mapping](colours.md): every colour name and how detection works.
 

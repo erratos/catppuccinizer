@@ -61,7 +61,7 @@ Nothing is built; only the first flavour and accent are rendered
 
 - `--preview` writes the thumbnail System Settings shows
   (`contents/previews/splash.png`) before and after, into `<out>/previews/`;
-  without one, the middle frame of the longest animation, or the first image;
+  without one, the middle frame of the longest animation, or the largest image;
 - `--preview-animation` writes the longest animated GIF or WebP, before |
   after, as an animated WebP.
 

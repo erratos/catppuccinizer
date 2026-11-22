@@ -21,7 +21,7 @@ catppuccinize-gui = "catppuccinizer.gui:main"
 # Built-in targets are found without entry points; other packages can add
 # their own targets here, e.g.:
 # [project.entry-points."catppuccinizer.targets"]
-# grub = "my_package.grub:TARGET"
+# sddm = "my_package.sddm:TARGET"
 
 [tool.setuptools.dynamic]
 version = { attr = "catppuccinizer.__version__" }
@@ -30,6 +30,7 @@ version = { attr = "catppuccinizer.__version__" }
 include = ["catppuccinizer*"]
 
 [tool.setuptools.package-data]
+"catppuccinizer.targets" = ["*.toml"]
 "catppuccinizer.targets.plymouth" = ["extras.script", "scripts/*.sh"]
 "catppuccinizer.gui" = ["index.html"]
 "catppuccinizer" = ["assets/*.jpg"]

@@ -107,6 +107,41 @@ def make_splash(d):
     frames[1].filter(ImageFilter.GaussianBlur(8)).save(d / "contents/previews/splash.png")
 
 
+GRUB_THEME_TXT = """# GRUB theme for tests
+desktop-image: "background.png"
+desktop-color: "#0b1020"
+title-text: ""
++ boot_menu {
+  left = 20%
+  width = 60%
+  item_color = "#c0c8d8"
+  selected_item_color = "white"
+  selected_item_pixmap_style = "select_*.png"
+}
++ label { id = "__timeout__" text = "Booting in %d seconds" color = "#3daee9" }
++ progress_bar { id = "__timeout__" fg_color = "#3daee9" bg_color = "#1b2030" }
+"""
+
+
+def make_grub(d):
+    """A GRUB theme: theme.txt, a photo-like background, a flat highlight box, an
+    icon, a font (copied as it is)."""
+    (d / "icons").mkdir(parents=True)
+    (d / "theme.txt").write_text(GRUB_THEME_TXT)
+    y = np.linspace(0, 1, 90)[:, None, None]
+    grad = (1 - y) * np.array([20, 30, 70]) + y * np.array([200, 120, 60])
+    arr = np.broadcast_to(grad, (90, 160, 3)) + np.random.default_rng(2).normal(0, 5, (90, 160, 3))
+    Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8)).save(d / "background.png")
+    im = Image.new("RGBA", (12, 12), (0, 0, 0, 0))
+    ImageDraw.Draw(im).rectangle([1, 1, 10, 10], outline=(61, 174, 233, 255), width=2)
+    im.save(d / "select_c.png")
+    im = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+    ImageDraw.Draw(im).ellipse([2, 2, 30, 30], fill=(23, 147, 209, 255))
+    ImageDraw.Draw(im).ellipse([11, 11, 21, 21], fill=(255, 255, 255, 255))
+    im.save(d / "icons/arch.png")
+    (d / "unifont.pf2").write_bytes(b"FILE\x00\x00\x00\x04PFF2")
+
+
 LIMINE_CONF = """timeout: 3
 wallpaper: boot():/limine-splash.png
 wallpaper_style: centered
@@ -231,12 +266,18 @@ def run_all():
         cli("ksplash", tmp / "splash-src", "-a", "peach", "mauve", "-o", tmp / "ksplash")
         cli("ksplash", tmp / "splash-src", "-a", "mauve", "-m", "green=lavender", "-s", "lav", "-o", tmp / "ksplash")
         out["ksplash"] = tree(tmp / "ksplash", tmp)
+        make_grub(tmp / "grub-src")
+        cli("grub", tmp / "grub-src", "-a", "mauve", "peach", "-o", tmp / "grub")
+        cli("grub", tmp / "grub-src" / "theme.txt", "-a", "mauve", "icons=peach", "-m", "blue=sapphire",
+            "-s", "mapped", "-o", tmp / "grub")
+        out["grub"] = tree(tmp / "grub", tmp)
         out["colours"] = {
             "image": colours(tmp, "image", tmp / "img"),
             "image_mapped": colours(tmp, "image", tmp / "img/flat.png", "-m", "pink=peach"),
             "plymouth": colours(tmp, "plymouth", FIXTURES / "glow_mini", "-m", "throbber.white=accent"),
             "ksplash": colours(tmp, "ksplash", tmp / "splash-src", "-m", "green=lavender"),
             "limine": colours(tmp, "limine", "--wallpaper", tmp / "img/speck.png"),
+            "grub": colours(tmp, "grub", tmp / "grub-src"),
         }
         pv = next((tmp / "ksplash").glob("*-lav/contents/previews/splash.png"))
         r, g, b = np.asarray(Image.open(pv).convert("RGB"), np.int32)[18, 19]   # centre of the bar
@@ -283,6 +324,9 @@ class Regression(unittest.TestCase):
         self.check("limine")
         self.check("limine_out")
         self.assertTrue(self.result["limine"]["removed_is_original"])
+
+    def test_grub(self):
+        self.check("grub")         # a TOML target (core.declarative)
 
     def test_ksplash(self):
         self.check("ksplash")      # the rain.webp digest includes its frame count

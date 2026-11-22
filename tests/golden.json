@@ -1,5 +1,102 @@
 {
  "colours": {
+  "grub": [
+   {
+    "accent": true,
+    "background": null,
+    "colours": [
+     {
+      "name": "blue",
+      "share": 0.333,
+      "source": "#3daee9",
+      "target": "accent"
+     },
+     {
+      "name": "black",
+      "share": 0.167,
+      "source": "#0b1020",
+      "target": "base"
+     },
+     {
+      "name": "white",
+      "share": 0.167,
+      "source": "#c0c8d8",
+      "target": "subtext1"
+     },
+     {
+      "name": "blue-2",
+      "share": 0.167,
+      "source": "#1b2030",
+      "target": "blue"
+     },
+     {
+      "name": "white-2",
+      "share": 0.167,
+      "source": "#ffffff",
+      "target": "text"
+     }
+    ],
+    "group": null,
+    "method": "text",
+    "note": null,
+    "part": "text",
+    "remap": true,
+    "source": "theme.txt"
+   },
+   {
+    "accent": false,
+    "background": null,
+    "colours": [],
+    "group": null,
+    "method": "lut",
+    "note": "the lut method uses no source colours",
+    "part": "images",
+    "remap": false,
+    "source": "background.png"
+   },
+   {
+    "accent": false,
+    "background": "transparent",
+    "colours": [
+     {
+      "name": "white",
+      "share": 0.148,
+      "source": "#ffffff",
+      "target": "text"
+     },
+     {
+      "name": "blue",
+      "share": 0.852,
+      "source": "#1793d1",
+      "target": "sapphire"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": null,
+    "part": "icons",
+    "remap": true,
+    "source": "icons/arch.png"
+   },
+   {
+    "accent": true,
+    "background": "transparent",
+    "colours": [
+     {
+      "name": "blue",
+      "share": 1.0,
+      "source": "#3daee9",
+      "target": "accent"
+     }
+    ],
+    "group": null,
+    "method": "keys",
+    "note": null,
+    "part": "images",
+    "remap": true,
+    "source": "select_c.png"
+   }
+  ],
   "image": [
    {
     "accent": false,
@@ -353,6 +450,23 @@
     "source": "glow_mini"
    }
   ]
+ },
+ "grub": {
+  "catppuccin-mocha-grub-src-mapped/background.png": "2adaeeddbfc44241",
+  "catppuccin-mocha-grub-src-mapped/icons/arch.png": "8271cf6a99470cf1",
+  "catppuccin-mocha-grub-src-mapped/select_c.png": "4cf45463c4861ee1",
+  "catppuccin-mocha-grub-src-mapped/theme.txt": "006eec2686d802e1",
+  "catppuccin-mocha-grub-src-mapped/unifont.pf2": "3b786fb2ed2c4dcc",
+  "catppuccin-mocha-grub-src-mauve/background.png": "2adaeeddbfc44241",
+  "catppuccin-mocha-grub-src-mauve/icons/arch.png": "8271cf6a99470cf1",
+  "catppuccin-mocha-grub-src-mauve/select_c.png": "22d05a33d6bdc08f",
+  "catppuccin-mocha-grub-src-mauve/theme.txt": "be7d6d102f0100ac",
+  "catppuccin-mocha-grub-src-mauve/unifont.pf2": "3b786fb2ed2c4dcc",
+  "catppuccin-mocha-grub-src-peach/background.png": "2adaeeddbfc44241",
+  "catppuccin-mocha-grub-src-peach/icons/arch.png": "8271cf6a99470cf1",
+  "catppuccin-mocha-grub-src-peach/select_c.png": "820603eef864cc75",
+  "catppuccin-mocha-grub-src-peach/theme.txt": "e28fdf2108f43c67",
+  "catppuccin-mocha-grub-src-peach/unifont.pf2": "3b786fb2ed2c4dcc"
  },
  "image": {
   "catppuccin-frappe-blobs.png": "243ea686e79fdac4",

@@ -19,7 +19,7 @@ ten minutes after the page is closed. `--port N` picks the port,
 ## Using it
 
 1. **Target**: the tabs at the top (`plymouth`, `image`, `limine`, `ksplash`,
-   `lut`).
+   `lut`, `grub`, and your [TOML targets](architecture.md#declarative-targets-toml)).
 2. **Source**
    - images: *Browse files…* (several at once, or a whole folder), drop them on
      the page, or type a path; *Choose from catalogue…* shows the wallpapers
@@ -107,7 +107,7 @@ editor is hidden and the list says why.
 
 ### Install, apply, test, restore
 
-Targets that can change the system (Plymouth, Limine, KDE splash) get one
+Targets that can change the system (Plymouth, Limine, KDE splash, GRUB) get one
 button per step under *Preview* and *Build*: **Install**, **Apply** (installs
 first), **Test**, **Restore** ([what each one does](architecture.md#steps)).
 Each button builds, then runs its step; *Restore* only undoes. Their settings

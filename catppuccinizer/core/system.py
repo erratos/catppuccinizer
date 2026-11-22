@@ -299,3 +299,48 @@ class System:
 
 def glob_escape(name):
     return re.sub(r"([*?\[])", r"[\1]", name)
+
+
+# ------------------------------------------------- KEY="value" files
+# Configuration files made of shell assignments (/etc/default/grub): read and
+# changed line by line, the rest of the file kept byte for byte.
+VARIABLE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+UNSAFE_VALUE = re.compile(r'["$`\\\r\n]')
+
+
+def _assignments(text, key):
+    if not VARIABLE.fullmatch(key):
+        raise SystemExit(f"Not a variable name: {key!r}")
+    return list(re.finditer(rf"^([ \t]*(?:export[ \t]+)?{key}=)([^\r\n]*)(\r?\n|$)", text, re.M))
+
+
+def unquote(raw):
+    """The value of a raw assignment value: "a b" / 'a b' / a -> a b."""
+    raw = raw.strip()
+    return raw[1:-1] if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'" else raw
+
+
+def get_variable(text, key):
+    """The raw value of KEY=… (the last line that sets it, quotes included), or None."""
+    found = _assignments(text, key)
+    return found[-1].group(2) if found else None
+
+
+def set_variable(text, key, value, raw=False):
+    """text with KEY="value": the last line that sets it changed, else a line added at
+    the end; value None: the lines that set it removed. raw: value is written as it
+    is (a value read with get_variable), else quoted, once checked: no ", $, `, \\ or
+    line break."""
+    found = _assignments(text, key)
+    if value is None:
+        for m in reversed(found):
+            text = text[:m.start()] + text[m.end():]
+        return text
+    if (UNSAFE_VALUE.search(value) if not raw else re.search(r"[\r\n]", value)):
+        raise SystemExit(f"{key}: the value {value!r} cannot be written safely "
+                         "(no \", $, `, \\ or line break)")
+    new = value if raw else f'"{value}"'
+    if found:
+        m = found[-1]
+        return text[:m.start(2)] + new + text[m.end(2):]
+    return text + ("" if not text or text.endswith("\n") else "\n") + f"{key}={new}\n"
