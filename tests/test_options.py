@@ -80,7 +80,7 @@ class Declarations(unittest.TestCase):
 
     def test_lists_are_not_in_the_gui(self):
         ply = {o.dest: o for o in TARGETS["plymouth"].all_options()}
-        self.assertFalse(ply["list"].gui)          # the catalogue
+        self.assertFalse(ply["list"].gui)          # the page has its own buttons
         self.assertFalse(ply["colours"].gui)       # the page shows the colours by itself
         self.assertEqual(TARGETS["limine"].steps, ["install", "apply", "restore"])
 

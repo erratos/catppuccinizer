@@ -58,19 +58,22 @@ Look in `./images/previews/`; change `-f` or `-a` to compare.
 
 ## 4. Try a boot splash (Plymouth)
 
-Plymouth draws the animation shown while your computer boots. The tool can
-fetch 80 ready-made animations by name (list them, with the themes already
-installed, with `catppuccinize plymouth --list`) and recolour them:
+Plymouth draws the animation shown while your computer boots. The tool
+recolours the one you use, an installed one by name (`catppuccinize plymouth
+--list` shows them, and web pages to download more from), or any theme folder.
+To try one of the 80 animations of
+[adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes): on
+that page, *Code → Download ZIP*, extract it in `~/Downloads`, then:
 
 ```bash
-sudo catppuccinize plymouth rings_2 -a mauve --test
+sudo catppuccinize plymouth ~/Downloads/plymouth-themes-master/pack_4/rings_2 -a mauve --test
 ```
 
 `--test` shows the result for 10 seconds, right now, without rebooting. If you
 like it, make it your boot splash:
 
 ```bash
-sudo catppuccinize plymouth rings_2 -a mauve --apply
+sudo catppuccinize plymouth ~/Downloads/plymouth-themes-master/pack_4/rings_2 -a mauve --apply
 ```
 
 `--apply` copies the theme into `/usr/share/plymouth/themes/` (that is
@@ -98,7 +101,8 @@ Rings 2 [script]
 Use those names with `-m` to send a colour elsewhere:
 
 ```bash
-catppuccinize plymouth rings_2 -m pink=mauve green=peach blue=lavender --test
+sudo catppuccinize plymouth ~/Downloads/plymouth-themes-master/pack_4/rings_2 \
+    -m pink=mauve green=peach blue=lavender --test
 ```
 
 The list of colour names you can use is in [Colours and mapping](colours.md).

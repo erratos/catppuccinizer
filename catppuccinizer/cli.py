@@ -12,7 +12,7 @@ from .core.mapping import format_colour_report
 from .core.naming import dedupe, format_planned
 from .core.palette import ACCENTS, FLAVORS, TARGETS, expand
 from .core.parts import split_accents
-from .core.paths import cache_dir, give_back
+from .core.paths import give_back
 from .core.system import System
 from .core.target import discover
 
@@ -87,8 +87,8 @@ def run(t, a):
     if a.preview_of:
         print("preview: the first flavour and accent only ({}, {})".format(*a.preview_of))
     built = t.build(a)
-    # under sudo, what build wrote (output, downloads) belongs to the invoking user
-    give_back(a.out, cache_dir())
+    # under sudo, what build wrote belongs to the invoking user
+    give_back(a.out)
     if built is None or options.previewing(a):
         return
     asked = [s for s in t.steps if getattr(a, s) or (s == "install" and getattr(a, "apply", False))]

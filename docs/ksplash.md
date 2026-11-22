@@ -6,7 +6,7 @@ The Plasma splash screen (KSplash, shown after login) is the `contents/splash/`
 folder of a look-and-feel package. Any of them can be recoloured:
 
 ```bash
-catppuccinize ksplash --list                           # installed splash screens (* = selected)
+catppuccinize ksplash --list                           # installed splash screens (* = selected), the KDE Store
 catppuccinize ksplash org.kde.breeze.desktop -a mauve --test
 catppuccinize ksplash CachyOS-Nord -f macchiato -a teal --apply
 catppuccinize ksplash --restore                        # your previous splash screen

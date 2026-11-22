@@ -35,6 +35,8 @@ class Target:
                                # colours"); None: a LUT method leaves the accent unused
     unused_common = ()         # common options that mean nothing here (lut: "accent", "map",
                                # "preview"): left out of the command line and the GUI
+    links = ()                 # other sources: web pages to download sources from, as
+                               # core.sources.link() (the GUI's "Other sources", --list)
 
     def options(self):
         """The target's own options, as core.options.Option (scope "target"), plus
@@ -49,7 +51,7 @@ class Target:
         listing = [*([opts.COLOURS] if self.has_colours else []),
                    *([opts.NAMES] if self.has_outputs else [])]
         common = [o for o in opts.COMMON if o.dest not in self.unused_common]
-        return [*common, *self.options(), *([opts.LIST] if self.has_sources else []),
+        return [*common, *self.options(), *([opts.LIST] if self.has_locations or self.links else []),
                 *listing, *([opts.JSON] if listing else []),
                 *([opts.DRY_RUN] if self.steps else [])]
 
@@ -59,9 +61,9 @@ class Target:
         return [s for s in opts.STEPS if getattr(type(self), s) is not getattr(Target, s)]
 
     @property
-    def has_sources(self):
-        """Whether the target defines sources() (--list, the GUI's catalogue)."""
-        return type(self).sources is not Target.sources
+    def has_locations(self):
+        """Whether the target defines locations() (--list, the GUI's system locations)."""
+        return type(self).locations is not Target.locations
 
     @property
     def has_outputs(self):
@@ -81,9 +83,10 @@ class Target:
     def check(self, args):
         """Validate options before running (raise SystemExit on error)."""
 
-    def sources(self):
-        """Ready-made sources for the source argument (the GUI's catalogue, --list):
-        sections of items, made with core.sources.section() and item()."""
+    def locations(self):
+        """System locations: what this computer has for the source argument (installed
+        themes, wallpaper folders), for the GUI and --list, as sections of items
+        made with core.sources.section() and item()."""
         raise NotImplementedError
 
     def colours(self, args):

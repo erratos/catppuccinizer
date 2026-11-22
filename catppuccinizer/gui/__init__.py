@@ -83,7 +83,7 @@ def schema(targets):
             "name": name, "help": t.help, "summary": summary(t.doc),
             "description": t.doc or "", "default_out": t.default_out,
             "default_accent": list(t.default_accent), "accent_also": t.accent_also,
-            "has_sources": t.has_sources,
+            "has_locations": t.has_locations, "links": list(t.links),
             "has_colours": t.has_colours, "has_outputs": t.has_outputs,
             "options": [o.schema() for o in t.all_options() if o.gui],
         })
@@ -609,14 +609,14 @@ def make_handler(app):
             if u.path == "/api/ls":
                 return self.send(200, listing((q.get("path") or [""])[0],
                                               (q.get("hidden") or ["0"])[0] == "1"))
-            if u.path == "/api/sources":
+            if u.path == "/api/locations":
                 name = (q.get("target") or [""])[0]
                 t = app.targets.get(name)
                 if t is None:
                     return self.send(404, {"error": "unknown target"})
                 try:
                     with contextlib.redirect_stdout(io.StringIO()):
-                        return self.send(200, {"sections": t.sources()})
+                        return self.send(200, {"sections": t.locations()})
                 except (SystemExit, Exception) as e:  # noqa: BLE001 - shown in the page
                     return self.send(200, {"sections": [], "error": str(e) or type(e).__name__})
             if u.path == "/api/job":

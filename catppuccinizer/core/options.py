@@ -34,13 +34,11 @@ what a front-end needs to show it:
   folders, "dir", "file");
 - range: (low, high), checked after parsing ("--keep-lum must be between 0 and 1");
 - gui: False keeps it out of the GUI forms (--colours: the GUI shows that list
-  by itself; --list repeats the GUI's catalogue);
+  by itself; --list repeats its system locations and other sources);
 - action: an argparse Action class, for an option that does its work while the
   command line is parsed (--list, like --version).
 """
 import argparse
-import contextlib
-import sys
 from pathlib import Path
 
 from .naming import suffix_type
@@ -367,24 +365,23 @@ DRY_RUN = Option("--dry-run", label="Dry run", switch=True, scope="common", stag
                       "commands they would run (reading the system may still need sudo)")
 
 class ListSources(argparse.Action):
-    """--list: print the target's ready-made sources (core.sources) and exit, during
-    parsing, so that a required source argument is not asked for."""
+    """--list: print the target's system locations and other sources (core.sources)
+    and exit, during parsing, so that a required source argument is not asked for."""
     def __init__(self, option_strings, dest, **kw):
         kw.pop("nargs", None)
         super().__init__(option_strings, dest, nargs=0, default=False, **kw)
 
     def __call__(self, parser, namespace, values, option_string=None):
         from .sources import format_sources
-        with contextlib.redirect_stdout(sys.stderr):      # "Fetching …": not the list
-            sections = namespace.target.sources()
-        print(format_sources(sections))
+        t = namespace.target
+        print(format_sources(t.locations() if t.has_locations else [], t.links))
         parser.exit()
 
 
-# added to the targets that define sources() (core.target.Target.sources)
+# added to the targets that define locations() or links (core.target.Target)
 LIST = Option("--list", switch=True, action=ListSources, scope="common", stage="analyse", gui=False,
-              help="list the ready-made sources (installed themes, wallpapers…, '*' = in use) "
-                   "and exit")
+              help="list what this computer has (installed themes, wallpapers…, '*' = in use) "
+                   "and the web pages to download more from, then exit")
 
 # added to the targets that define colours() (core.target.Target.colours)
 COLOURS = Option("--colours", switch=True, scope="common", stage="analyse", gui=False,

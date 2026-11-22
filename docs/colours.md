@@ -220,7 +220,7 @@ shown is the one a run would use. `--json` prints the same list as JSON.
 `-m` takes those names, or a `#rrggbb` source colour:
 
 ```bash
-catppuccinize plymouth rings_2 -m pink=mauve green=peach blue=lavender
+catppuccinize plymouth ~/Downloads/plymouth-themes-master/pack_4/rings_2 -m pink=mauve green=peach blue=lavender
 catppuccinize image logo.svg -m '#3daee9=peach'
 catppuccinize plymouth /usr/share/plymouth/themes/glow \
     -m throbber.white=accent ui.white=lavender      # per group of images (Plymouth)

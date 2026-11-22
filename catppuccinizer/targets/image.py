@@ -29,7 +29,7 @@ from ..core.naming import output_name, planned, slug
 from ..core.options import Option
 from ..core.parts import accent_sets, check_parts
 from ..core.palette import FLAVOR_TITLES
-from ..core.sources import wallpaper_sections
+from ..core.sources import WALLPAPER_LINKS, wallpaper_sections
 from ..core.target import Target
 
 VECTOR = {".svg", ".svgz"}
@@ -51,6 +51,7 @@ def collect(paths):
 class ImageTarget(Target):
     name = "image"
     help = "recolour wallpapers and other images"
+    links = WALLPAPER_LINKS
     default_out = "images"
 
     def options(self):
@@ -58,7 +59,7 @@ class ImageTarget(Target):
                        help="image file(s) or folder(s)"),
                 *recolor.method_options()]
 
-    def sources(self):
+    def locations(self):
         return wallpaper_sections()
 
     def colours(self, a):

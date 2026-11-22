@@ -29,7 +29,7 @@ from ..core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ..core.parts import check_parts, note_unused, single
 from ..core.paths import state_file
 from ..core.naming import check_name
-from ..core.sources import item, section, theme_folders, tidy
+from ..core.sources import item, link, section, theme_folders, tidy
 from ..core.system import copy_folder, source_file, which
 from ..core.target import Target
 
@@ -48,6 +48,9 @@ PARTS = tuple(p.name for p in FILES)
 class KSplashTarget(Target):
     name = "ksplash"
     help = "recolour a KDE Plasma splash screen"
+    links = [link("KDE Store: splash screens", "https://store.kde.org/browse?cat=488",
+                  "Plasma splash screens with previews; also in System Settings, "
+                  "Splash Screen, Get New…, which installs them for you")]
     accent_also = "the QML / SVG colours mapped to accent"
 
     def options(self):
@@ -106,7 +109,7 @@ class KSplashTarget(Target):
     def outputs(self, a):
         return outputs(a)
 
-    def sources(self):
+    def locations(self):
         try:
             active = read_setting("Theme")
         except SystemExit:                         # no kreadconfig6: nothing marked

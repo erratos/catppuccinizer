@@ -467,6 +467,9 @@ class GuiRequests(unittest.TestCase):
                     self.assertTrue(r.get("error"), r)
                     self.assertNotIn("job", r)
         self.assertIn("unknown target", self.request("/api/run", {"target": "../x"})[1]["error"])
+        self.assertEqual(self.request("/api/locations?target=../x")[0], 404)
+        status, r = self.request("/api/locations?target=image")
+        self.assertEqual((status, set(r)), (200, {"sections"}))
         # unknown keys never reach the command line; a negative number is a value
         status, r = self.request("/api/command", {"target": "image", "values": {
             "images": ["a.png"], "apply": True, "shell": "rm -rf ~", "keep_lum": "-0.5"}})

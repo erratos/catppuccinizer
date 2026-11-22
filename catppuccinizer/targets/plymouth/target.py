@@ -1,6 +1,6 @@
 """Plymouth target: recolour a Plymouth theme: the one in use by default, any
-installed theme by name, any theme folder (script, two-step, fade-throbber, ...),
-or one of the 80 themes of the adi1090x catalogue, fetched by name.
+installed theme by name, or any theme folder (script, two-step, fade-throbber,
+..., such as the 80 animations of adi1090x/plymouth-themes, once downloaded).
 
 Colours are detected per group of images (each numbered sequence, plus "ui"
 for single images) at each run; -m changes them. Themes built on adi1090x's script
@@ -31,14 +31,12 @@ from ...core.naming import output_name, planned, slug
 from ...core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ...core.parts import accent_sets, check_parts, note_unused
 from ...core.paths import state_file
-from ...core.sources import item, section, tidy
+from ...core.sources import item, link, section, theme_folders
 from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, keys_plan,
                              preview_animation, recolor_image, run_jobs, separation_image)
-from ...core.sources import theme_folders
 from ...core.naming import check_name
 from ...core.system import System, source_file, which
 from ...core.target import Target
-from .upstream import SRC_ENV, local_src, resolve_theme, upstream_themes
 
 HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE / "scripts"
@@ -48,7 +46,14 @@ INSTALL_DIR = "/usr/share/plymouth/themes"
 
 class PlymouthTarget(Target):
     name = "plymouth"
-    help = "recolour Plymouth themes (installed, folders, or the adi1090x catalogue)"
+    help = "recolour Plymouth themes (installed ones, or theme folders)"
+    links = [
+        link("adi1090x/plymouth-themes", "https://github.com/adi1090x/plymouth-themes",
+             "80 animated themes, previewed in its README, in pack_1 to pack_4: download "
+             "the repository (Code, Download ZIP), extract it, then choose a theme folder"),
+        link("Gnome-look: Plymouth themes", "https://www.gnome-look.org/browse?cat=108",
+             "themes with screenshots; download, then extract the archive"),
+    ]
 
     def options(self):
         return OPTIONS
@@ -92,19 +97,14 @@ class PlymouthTarget(Target):
     def outputs(self, a):
         return outputs(a)
 
-    def sources(self):
-        src = local_src()
-        return [section(f"Installed themes ({INSTALL_DIR})", installed_themes),
-                section("Extra catalogue: adi1090x themes, "
-                        + (f"from {tidy(src)} (${SRC_ENV})" if src else "downloaded when chosen"),
-                        catalogue)]
+    def locations(self):
+        return [section(f"Installed themes ({INSTALL_DIR})", installed_themes)]
 
 
 OPTIONS = [
     Option("themes", label="Themes", nargs="*", default=[], metavar="THEME", accept="dir",
            empty="the theme in use is recoloured",
-           help="installed theme name, theme folder, or adi1090x theme name "
-                "(default: the theme in use)"),
+           help="installed theme name or theme folder (default: the theme in use)"),
     Option("--no-status", label="No -status variant", switch=True, help="skip the -status variants"),
     SEPARATION.replace(when={}),
     PREVIEW_ANIMATION,
@@ -413,20 +413,17 @@ def installed_themes():
                        current=d.name == active, thumb=d)
 
 
-def catalogue():
-    """The adi1090x themes, by name (fetched when chosen)."""
-    for name, path in sorted(upstream_themes().items(), key=lambda kv: kv[1]):
-        yield item(name, name, path.rpartition("/")[0])
-
-
 def find_theme(arg):
-    """Folder of a theme given as a folder, the name of an installed theme
-    (/usr/share/plymouth/themes/<name>), or an adi1090x name (fetched on demand)."""
-    if "/" not in arg and not Path(arg).expanduser().is_dir():
-        d = Path(INSTALL_DIR) / arg
-        if (d / f"{arg}.plymouth").is_file() or any(d.glob("*.plymouth")):
-            return d
-    return resolve_theme(arg)
+    """Folder of a theme given as a folder, or as the name of an installed theme
+    (/usr/share/plymouth/themes/<name>)."""
+    p = Path(arg).expanduser()
+    if p.is_dir():
+        return p.resolve()
+    d = Path(INSTALL_DIR) / arg
+    if "/" not in arg and d.is_dir() and any(d.glob("*.plymouth")):
+        return d
+    raise SystemExit(f"Theme not found: {arg} (give a theme folder, or an installed theme "
+                     "name: see --list)")
 
 
 def themes_of(a):

@@ -28,9 +28,9 @@ catppuccinizer/
     naming.py         output names (catppuccin-<flavor>-<source>[-<accent>][-<suffix>])
     target.py         Target base class + discovery (Python, TOML, entry points, the user's TOML)
     declarative.py    targets described in TOML (a theme folder, install, KEY="value" settings)
-    sources.py        ready-made sources (catalogue, --list): sections, items, wallpapers
+    sources.py        where sources come from: system locations (sections, items), links
   targets/
-    plymouth/         Plymouth themes (+ adi1090x fetcher, scripts)
+    plymouth/         Plymouth themes (+ preview script)
     image.py          images (wallpapers, logos…)
     limine.py         Limine boot menu
     ksplash.py        KDE Plasma splash screen
@@ -44,7 +44,7 @@ tests/
   test_gui.py         forms, command lines, access control, live preview of the GUI
   test_tuning.py      --chroma, --dark-fade, --auto-fit: effect, defaults = the former constants
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
-  test_sources.py     catalogue sections, installed themes and wallpapers, --list
+  test_sources.py     system locations, installed themes and wallpapers, links, --list
   test_outputs.py     --names of every target against what the build writes
   test_previews.py    --preview / --preview-animation: first flavour and accent, no build
   test_folder.py      core.folder (parts of a theme folder) and the "hex" colour syntax
@@ -146,14 +146,22 @@ class SddmTarget(Target):
 TARGET = SddmTarget()
 ```
 
-Optionally, `def sources(self)` returns ready-made sources for the source
-argument, in sections: the GUI shows them as a catalogue, and `--list` is added
-to the target's options to print them.
+A source comes from one of three places: the **system locations** (what
+this computer has), a **folder or file** anywhere (the GUI's file browser, a
+path), or **other sources**, web pages to download from. A target describes the
+first and the last; with either, `--list` is added to its options to print them.
+
+Optionally, `def locations(self)` returns the system locations, in sections
+(the GUI's *System locations…*), and `links` lists the other sources (the GUI's
+*Other sources…*, opened in the browser; what is downloaded is then given as a
+path):
 
 ```python
-from ..core.sources import item, section, wallpaper_sections
+from ..core.sources import item, link, section, wallpaper_sections
 
-def sources(self):
+links = [link("SDDM themes", "https://example.org/sddm", "what is found there")]
+
+def locations(self):
     return [section("Installed (/usr/share/sddm/themes)", installed),   # installed() yields items
             *wallpaper_sections()]                             # the system's wallpapers
 
@@ -166,10 +174,14 @@ def installed():
 (a path or a name), `current` marks what the system uses now (shown *in use*,
 `*` in `--list`), `thumb` is an image or folder for the GUI's thumbnail.
 `section(title, make)` calls `make()` and turns a failure (`SystemExit`, no
-network, no rights) into the section's `error`, so one section that cannot be
-read does not hide the others. Plymouth: installed themes + adi1090x; image:
-the wallpapers; Limine: the wallpaper of `limine.conf` + the wallpapers; KDE
-splash: the user's and the system's splash screens. The GUI needs nothing else:
+rights) into the section's `error`, so one section that cannot be read does not
+hide the others. `link(name, url, note)` takes `https://` addresses only.
+Plymouth: the installed themes, and adi1090x and Gnome-look as links; image:
+the wallpapers, and wallpaper sites (`WALLPAPER_LINKS`); Limine: the wallpaper
+of `limine.conf` + the wallpapers, the same sites; KDE splash: the user's and
+the system's splash screens, the KDE Store; GRUB (TOML): its `search` folders,
+Gnome-look and Gorgeous GRUB. Nothing is downloaded by the tool itself. The GUI
+needs nothing else:
 its forms come from `options()`
 (see [Graphical interface](gui.md#for-target-authors)).
 
@@ -260,8 +272,8 @@ to them.
 ### Options
 
 `options()` returns the target's own options only; the common ones (`-f -a -m
---preview -o -s`; `--list`, `--colours`, `--names`, `--json` when `sources()`,
-`colours()`, `outputs()` are defined) are
+--preview -o -s`; `--list`, `--colours`, `--names`, `--json` when `locations()`
+or `links`, `colours()`, `outputs()` are defined) are
 declared once in `core/options.py`, the method ones in `core/recolor.py` and
 `core/lutgen.py`. An `Option` takes the flags and the argparse fields (`type`,
 `choices`, `default`, `nargs`, `metavar`, `const`; `switch=True` for an on/off
@@ -304,8 +316,9 @@ it). GRUB is written this way: [`targets/grub.toml`](../catppuccinizer/targets/g
 A TOML target can say:
 
 - **where its sources are**: a file every theme folder has (`marker`), the
-  folders where themes are looked up by name (`search`, also the catalogue of
-  `--list` and the GUI), a default;
+  folders where themes are looked up by name (`search`, also the system
+  locations of `--list` and the GUI), web pages to download themes from
+  (`[[source.links]]`, the other sources), a default;
 - **what is recoloured**: its parts, each a `core.folder.Part` (name, kind
   `text` / `image` / `animation`, globs, colour syntax of the text files);
   everything else in the folder is copied as it is, except the `ignore` globs;
@@ -368,10 +381,15 @@ ignore = ["*.bak"]                    # files left out of the result (optional)
 
 [source]
 marker = "theme.txt"                  # glob of a file every theme folder has
-search = ["/boot/grub/themes", "/usr/share/grub/themes"]   # names, catalogue (optional)
+search = ["/boot/grub/themes", "/usr/share/grub/themes"]   # names, system locations (optional)
 default = "…"                         # when no source is given (optional)
 label = "Theme"                       # the GUI's label (optional)
 help = "installed theme name or theme folder"              # (optional)
+
+[[source.links]]                      # other sources, any number (optional)
+name = "Gnome-look: GRUB themes"
+url = "https://www.gnome-look.org/browse?cat=109"          # https:// only
+note = "download, then extract the archive"                # (optional)
 
 [[parts]]                             # in order: a file goes to the first that takes it
 name = "text"                         # -a text=ACCENT, -m text.NAME
@@ -430,7 +448,7 @@ output folder goes through `core.system` (the `System` object of the steps).
 | Where | What | Step | Rights |
 |---|---|---|---|
 | output folder (`-o`) | the results | build | the user; under sudo, handed back to them |
-| `~/.cache/catppuccinizer/` | adi1090x themes (git), GUI uploads | build, GUI | the user |
+| `~/.cache/catppuccinizer/` | GUI uploads | GUI | the user |
 | `/usr/share/plymouth/themes/<name>/` | Plymouth themes | install | root, files 644, folders 755 |
 | `/var/lib/catppuccinizer/<target>.json` | what `restore` needs (system-wide steps) | install, apply | root, 644 |
 | `~/.local/state/catppuccinizer/<target>.json` | the same, for the user's steps | install, apply | the user |

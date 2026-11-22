@@ -11,7 +11,7 @@ transparency are preserved, and any colour can be remapped by hand.
 
 | Command | What | Guide |
 |---|---|---|
-| `catppuccinize plymouth` | boot splash themes, including the 80 of [adi1090x](https://github.com/adi1090x/plymouth-themes) | [Plymouth](docs/plymouth.md) |
+| `catppuccinize plymouth` | boot splash themes: yours, or downloaded ones such as the 80 of [adi1090x](https://github.com/adi1090x/plymouth-themes) | [Plymouth](docs/plymouth.md) |
 | `catppuccinize image` | images: wallpapers, photos, flat art, SVG logos | [Images](docs/images.md) |
 | `catppuccinize limine` | the Limine boot menu, with its wallpaper | [Limine](docs/limine.md) |
 | `catppuccinize ksplash` | the KDE Plasma splash screen shown after login | [KDE splash](docs/ksplash.md) |
@@ -26,7 +26,7 @@ pipx install git+https://github.com/erratos/catppuccinizer.git
 
 ```bash
 catppuccinize image ~/Pictures/wall.jpg -f macchiato     # -> ./images/
-sudo catppuccinize plymouth rings_2 -a mauve --test      # boot splash, shown without rebooting
+sudo catppuccinize plymouth -a mauve --test              # your boot splash, shown without rebooting
 ```
 
 `-f` picks the flavour, `-a` the accent colour, `--preview` writes a
@@ -62,7 +62,7 @@ images) are published in [catppuccinized-themes](https://github.com/erratos/catp
 
 ## Requirements
 
-Python 3.11+ with `numpy` and `Pillow`; `git` for adi1090x themes. Optional:
+Python 3.11+ with `numpy` and `Pillow`. Optional:
 [lutgen](https://github.com/ozwaldorf/lutgen-rs) for the
 [`lutgen` method](docs/images.md#lutgen-method), `rsvg-convert` for SVG
 previews.

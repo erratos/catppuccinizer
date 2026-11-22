@@ -13,7 +13,7 @@ written (check_insert): the rest of the file stays as it was.
 Without --wallpaper only the menu colours change (text, highlight, frame): the
 wallpaper set in limine.conf is kept (the menu background becomes see-through
 over it). --wallpaper IMAGE recolours IMAGE and uses it instead; --wallpaper
-current recolours the wallpaper limine.conf sets (the catalogue offers it).
+current recolours the wallpaper limine.conf sets (the system locations offer it).
 
 --preview draws the boot menu as Limine lays it out (branding, help lines, the
 entries of limine.conf, the countdown, the terminal frame over the wallpaper),
@@ -37,7 +37,7 @@ from ..core.naming import output_name, planned
 from ..core.options import Option, previewing, step
 from ..core.parts import accent_sets, check_parts, note_unused, single
 from ..core.palette import FLAVOR_TITLES, PALETTES, hex2rgb
-from ..core.sources import item, section, wallpaper_sections
+from ..core.sources import WALLPAPER_LINKS, item, section, wallpaper_sections
 from ..core.system import place, read_text, which
 from ..core.target import Target
 from ..core.textscreen import TextScreen
@@ -59,6 +59,7 @@ PARTS = ("menu", "wallpaper")            # -a menu=ACCENT wallpaper=ACCENT (core
 class LimineTarget(Target):
     name = "limine"
     help = "Catppuccin colours + wallpaper for the Limine boot menu"
+    links = WALLPAPER_LINKS
     accent_also = "the menu colours"
 
     def options(self):
@@ -102,7 +103,7 @@ class LimineTarget(Target):
     def colours(self, a):
         return colours(a)
 
-    def sources(self):
+    def locations(self):
         return [section("Set in limine.conf", current_wallpapers), *wallpaper_sections()]
 
     def outputs(self, a):

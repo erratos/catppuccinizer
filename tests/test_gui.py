@@ -69,12 +69,13 @@ class Gui(unittest.TestCase):
         self.assertEqual(lim["esp"]["accept"], "dir")
         self.assertEqual(s["no_accent_methods"], ["lut", "lutgen"])
         plymouth = next(t for t in s["targets"] if t["name"] == "plymouth")
-        self.assertTrue(plymouth["has_sources"])
+        self.assertTrue(plymouth["has_locations"])
+        self.assertIn("https://github.com/adi1090x/plymouth-themes", [ln["url"] for ln in plymouth["links"]])
         ply = {o["dest"]: o for o in plymouth["options"]}
         self.assertEqual(ply["test"]["kind"], "optional")
         self.assertEqual((ply["install"]["sudo"], ply["install"]["role"]), ("run", "step"))
         self.assertEqual(ply["dry_run"]["role"], "common")
-        self.assertNotIn("list", ply)                           # the catalogue does it
+        self.assertNotIn("list", ply)          # the page's system locations and other sources do it
         self.assertNotIn("detect", ply)                         # --colours, for every target
         self.assertNotIn("bar", ply)                            # -a bar=ACCENT (core.parts)
         self.assertEqual((ply["preview"]["role"], ply["preview_animation"]["role"]),
@@ -82,6 +83,7 @@ class Gui(unittest.TestCase):
         self.assertEqual(kinds["preview"]["role"], "preview")
         self.assertNotIn("preview_animation", kinds)            # a picture does not move
         lut = next(t for t in s["targets"] if t["name"] == "lut")
+        self.assertEqual((lut["has_locations"], lut["links"]), (False, []))
         self.assertFalse(lut["has_colours"])
         self.assertEqual({o["dest"]: o for o in lut["options"]}["method"]["choices"], ["lut", "lutgen"])
         self.assertNotIn("boot_delay", [o["dest"] for o in plymouth["options"]])

@@ -3,20 +3,39 @@
 [← Back to the README](../README.md) · [Getting started](getting-started.md)
 
 Recolours a Plymouth boot splash theme: the one in use by default, any
-installed theme by name, any theme folder (`script`, `two-step`,
-`fade-throbber`…), or, as an extra catalogue, any of the 80 animations of
-[adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes), fetched
-by name (needs `git`, or a [local copy](#using-a-local-copy-of-the-adi1090x-themes)).
+installed theme by name, or any theme folder (`script`, `two-step`,
+`fade-throbber`…), such as one [downloaded](#getting-themes) from the 80
+animations of [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes).
 
 ```bash
 catppuccinize plymouth -a mauve                        # the theme in use
 catppuccinize plymouth spinner -a mauve                # an installed theme, by name
-catppuccinize plymouth --list                          # installed themes, then the adi1090x ones
-catppuccinize plymouth rings_2 -a mauve                # build it into themes/
-sudo catppuccinize plymouth rings_2 -a mauve --test    # build it and show it, no reboot
-sudo catppuccinize plymouth rings_2 -a mauve --apply   # install, make it the default
+catppuccinize plymouth --list                          # installed themes, and where to get more
+catppuccinize plymouth $ADI/pack_4/rings_2 -a mauve    # a downloaded theme folder ($ADI: below)
+sudo catppuccinize plymouth spinner -a mauve --test    # build it and show it, no reboot
+sudo catppuccinize plymouth spinner -a mauve --apply   # install, make it the default
 sudo catppuccinize plymouth --restore                  # back to your previous theme
-catppuccinize plymouth /usr/share/plymouth/themes/spinner -a mauve   # a theme you have
+```
+
+## Getting themes
+
+Three places to take a theme from (the GUI has a button for each):
+
+- **System locations**: the themes installed in `/usr/share/plymouth/themes`,
+  given by name (`spinner`); `--list` shows them, `*` before the one in use.
+- **Any folder** holding a `.plymouth` file, given by its path.
+- **Other sources**, web pages to download themes from (`--list` prints them
+  too): [adi1090x/plymouth-themes](https://github.com/adi1090x/plymouth-themes)
+  (80 animations, previewed in its README) and the
+  [Gnome-look Plymouth themes](https://www.gnome-look.org/browse?cat=108).
+  Download, extract the archive, then give the theme folder.
+
+The examples below use the adi1090x themes: on its GitHub page, *Code →
+Download ZIP*, extract `plymouth-themes-master.zip` in `~/Downloads`, then:
+
+```bash
+ADI=~/Downloads/plymouth-themes-master        # its themes are in pack_1 … pack_4
+ls $ADI/pack_*                                # their names
 ```
 
 ## Examples
@@ -26,7 +45,7 @@ Left: original. Right: generated theme.
 ### Automatic detection: `angular` in Macchiato
 
 ```bash
-catppuccinize plymouth angular -f macchiato
+catppuccinize plymouth $ADI/pack_1/angular -f macchiato
 ```
 
 ```
@@ -47,7 +66,7 @@ Even a rainbow is split into hue clusters, each mapped to the closest Catppuccin
 ### Manual mapping: `rings_2` with your own colours
 
 ```bash
-catppuccinize plymouth rings_2 -m pink=mauve green=peach blue=lavender
+catppuccinize plymouth $ADI/pack_4/rings_2 -m pink=mauve green=peach blue=lavender
 ```
 
 ![rings_2](../assets/demo-rings-2.gif)
@@ -55,7 +74,7 @@ catppuccinize plymouth rings_2 -m pink=mauve green=peach blue=lavender
 ### Accent mode: `cyanide` in Frappé peach
 
 ```bash
-catppuccinize plymouth cyanide -f frappe -m cyan=accent -a peach
+catppuccinize plymouth $ADI/pack_2/cyanide -f frappe -m cyan=accent -a peach
 ```
 
 ![cyanide](../assets/demo-cyanide.gif)
@@ -94,7 +113,7 @@ rewritten too.
 [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
 
 ```bash
-catppuccinize plymouth hexa_retro infinite_seal -f latte -a mauve blue
+catppuccinize plymouth $ADI/pack_3/hexa_retro $ADI/pack_3/infinite_seal -f latte -a mauve blue
 ```
 
 ## Supported themes
@@ -130,9 +149,9 @@ To change it, use the colour names listed by `--colours`, prefixed by the group
 when the theme has several (`ui.white`), or a `#rrggbb` source colour:
 
 ```bash
-catppuccinize plymouth hexa_retro -m yellow=red white=lavender -s alt   # -s: name suffix
-catppuccinize plymouth owl -m white=accent -a mauve
-catppuccinize plymouth rings_2 -m '#32bcff=sky' --preview               # quick before/after image
+catppuccinize plymouth $ADI/pack_3/hexa_retro -m yellow=red white=lavender -s alt   # -s: name suffix
+catppuccinize plymouth $ADI/pack_3/owl -m white=accent -a mauve
+catppuccinize plymouth $ADI/pack_4/rings_2 -m '#32bcff=sky' --preview      # quick before/after image
 ```
 
 See [Colours and mapping](colours.md) for the list of targets.
@@ -220,23 +239,6 @@ enabled in your initramfs (e.g. `HOOKS=(… plymouth …)` in `/etc/mkinitcpio.c
 
 ## Tips
 
-### Using a local copy of the adi1090x themes
-
-Themes given by name are fetched with git into
-`~/.cache/catppuccinizer/plymouth-themes/`, one at a time. To use a copy you
-already have instead (a clone of the repository, an extracted archive, or any
-folder of themes), point `CATPPUCCINIZER_PLYMOUTH_SRC` to it:
-
-```bash
-export CATPPUCCINIZER_PLYMOUTH_SRC=~/src/plymouth-themes
-catppuccinize plymouth --list            # the themes found there
-catppuccinize plymouth rings_2 -a mauve  # taken from that folder, nothing fetched
-catppuccinize gui                        # the catalogue lists the same themes
-```
-
-Every folder holding a `.plymouth` file counts, in `pack_N/` or at the top.
-To recolour a single theme folder, just give its path instead.
-
 ### Seeing the splash on a fast machine
 
 On a fast machine the splash may vanish before you see it. A systemd drop-in
@@ -257,7 +259,7 @@ for it.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `THEME …` | the theme in use | installed theme name(s), theme folder(s) or adi1090x theme name(s); when the theme in use is a catppuccinizer result, the one it replaced |
+| `THEME …` | the theme in use | installed theme name(s) or theme folder(s); when the theme in use is a catppuccinizer result, the one it replaced |
 | `-f, --flavor` | `mocha` | `latte`, `frappe`, `macchiato`, `mocha` or `all` |
 | `-a, --accent` | `all` | accent(s) for colours mapped to `accent`, or `all`; `GROUP=ACCENT` / `bar=ACCENT` for one [part](colours.md#parts-an-accent-each) (the progress bar: `-status` variants, two-step bar) |
 | `-m, --map` | | `[GROUP.]NAME=TARGET …` overrides for this run |
@@ -266,7 +268,7 @@ for it.
 | `--separation` | `0.5` | 0 = merge close colours, 1 = keep faint (and darker) ones apart |
 | `--preview` | | only render one before/after/separation image per theme in `<out>/previews/` (first flavour and accent) |
 | `--preview-animation` | | only render the main animation, before \| after, as an animated WebP in `<out>/previews/` |
-| `--list` | | list the installed themes (`*` = the default one) and the adi1090x themes |
+| `--list` | | list the installed themes (`*` = the default one) and the web pages to download more from |
 | `--names` | | only list the files and folders the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | | only list the colours `-m` can remap (per group), save nothing; `--json` for JSON |
 | `-o, --out` | `themes/` | output folder |

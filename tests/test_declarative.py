@@ -99,6 +99,19 @@ class Schema(Home):
         self.assertIn("it needs [install]", self.load_error(
             USER_TOML.replace('[install]\nto = "~/installed"\n', "")))
 
+    def test_links(self):
+        """[[source.links]]: the other sources, https:// pages only."""
+        links = ('[source]\nmarker = "theme.txt"\n\n[[source.links]]\nname = "Site"\n'
+                 'url = "{}"\nnote = "themes"\n')
+        t = declarative.load(self.write(USER_TOML.replace('[source]\nmarker = "theme.txt"\n',
+                                                          links.format("https://example.org/t"))))
+        self.assertEqual(t.links, [{"name": "Site", "url": "https://example.org/t", "note": "themes"}])
+        self.assertIn("--list", [f for o in t.all_options() for f in o.flags])
+        self.assertIn("must be an https:// address", self.load_error(USER_TOML.replace(
+            '[source]\nmarker = "theme.txt"\n', links.format("http://example.org/t"))))
+        self.assertIn("'url' is missing", self.load_error(USER_TOML.replace(
+            '[source]\nmarker = "theme.txt"\n', '[source]\nmarker = "theme.txt"\n\n[[source.links]]\nname = "x"\n')))
+
     def test_commands(self):
         text = USER_TOML + 'run = [["rm", "-rf", "{installed}"]]\n'
         self.assertIn("rm is not a command apply may run", self.load_error(text))

@@ -10,7 +10,7 @@ catppuccinize grub ~/Downloads/some-theme -a mauve --preview
 catppuccinize grub ~/Downloads/some-theme -f macchiato -a teal
 sudo catppuccinize grub ~/Downloads/some-theme -a teal --apply --dry-run
 sudo catppuccinize grub --restore                   # your previous theme
-sudo catppuccinize grub --list                      # installed themes
+sudo catppuccinize grub --list                      # installed themes, sites to get more
 ```
 
 This target is written in TOML, not in Python

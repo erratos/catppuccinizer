@@ -1,17 +1,24 @@
-"""Ready-made sources a target offers (Target.sources()): the GUI's catalogue and
-`--list` on the command line.
+"""Where a target's sources come from, besides the file browser:
 
-sources() returns sections, each with its items:
+- system locations (Target.locations()): what is on this computer, the installed
+  themes, the wallpaper folders;
+- other sources (Target.links): web pages where themes or wallpapers can be seen
+  and downloaded, to be chosen afterwards with the file browser (or a path).
 
-    [{"section": "Installed (/usr/share/plymouth/themes)", "items": [item, ...]},
-     {"section": "adi1090x themes", "items": [], "error": "git: not found"}]
+The GUI offers both next to its file browser; `--list` prints them.
+
+locations() returns sections, each with its items:
+
+    [{"section": "Installed themes (/usr/share/plymouth/themes)", "items": [item, ...]},
+     {"section": "Installed (/boot/grub/themes)", "items": [], "error": "only root can read it"}]
 
 An item (item()) is {"value", "label", "note", "current", "thumb"}: value is what
 goes into the source argument (a path or a name), current marks what the
 system uses now (the active theme), thumb is an image or folder the GUI shows.
 A section is made with section(), which turns a failure into its "error": one
-section that cannot be read (no network, an ESP only root can read) does not
-hide the others.
+section that cannot be read (an ESP only root can read) does not hide the others.
+
+A link (link()) is {"name", "url", "note"}: an https:// page, and what is found there.
 """
 import json
 import os
@@ -39,8 +46,15 @@ def section(title, make):
         return {"section": title, "items": [], "error": str(msg or type(e).__name__)}
 
 
-def format_sources(sections):
-    """The text of --list: a heading per section, '*' before what is in use."""
+def link(name, url, note=""):
+    if not url.startswith("https://"):
+        raise ValueError(f"{name}: a link must be an https:// address, not {url}")
+    return {"name": name, "url": url, "note": note}
+
+
+def format_sources(sections, links=()):
+    """The text of --list: a heading per section, '*' before what is in use, then the
+    other sources (links)."""
     lines = []
     for sec in sections:
         if not sec["items"] and not sec.get("error"):
@@ -53,6 +67,12 @@ def format_sources(sections):
                                           f"({it['note']})" if it["note"] else "") if x)
             lines.append(f"  {'*' if it['current'] else ' '} {it['value']}" + (f"  {extra}" if extra else ""))
         lines.append("")
+    if links:
+        lines.append("Other sources (download there, then give the downloaded folder or file)")
+        for ln in links:
+            lines.append(f"  {ln['name']}  {ln['url']}")
+            if ln["note"]:
+                lines.append(f"      {ln['note']}")
     return "\n".join(lines).rstrip() or "Nothing found."
 
 
@@ -79,6 +99,16 @@ def wallpaper_dirs():
     return [("System wallpapers", Path("/usr/share/wallpapers")),
             ("Backgrounds", Path("/usr/share/backgrounds")),
             ("Your wallpapers", user_home() / ".local/share/wallpapers")]
+
+
+WALLPAPER_LINKS = [
+    link("Wallhaven", "https://wallhaven.cc",
+         "a large wallpaper collection, searchable by tag, colour and resolution"),
+    link("Unsplash", "https://unsplash.com/wallpapers",
+         "photos free to use (Unsplash licence)"),
+    link("KDE Store: wallpapers", "https://store.kde.org/browse?cat=299",
+         "wallpapers shared by the KDE community, each with its own licence"),
+]
 
 
 def wallpaper_sections():

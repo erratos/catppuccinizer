@@ -281,17 +281,22 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 .lightbox img { display: block; max-width: 100%; max-height: calc(100vh - 160px); margin: 0 auto; }
 .lightbox img.pick { cursor: crosshair; }
 .lightbox .pickhint { margin: 0; padding: 8px 12px 0; }
-.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
-.catalog button { text-align: left; border: 1px solid var(--surface0); background: var(--base); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
-.catalog button:hover { border-color: var(--accent); }
-.catalog button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--base)); }
-.catalog .note { display: block; color: var(--overlay1); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.catalog img { display: block; width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 6px; background: var(--crust); margin-bottom: 6px; }
-.catalog .badge.cur { margin-left: 6px; background: color-mix(in srgb, var(--green) 22%, transparent); color: var(--green); }
-.catsec + .catsec { margin-top: 14px; }
-.catsec h4 { margin: 0 0 8px; font-size: 13px; color: var(--subtext1); display: flex; gap: 8px; align-items: baseline; }
-.catsec h4 .count { color: var(--overlay0); font-weight: 400; }
-.catsec .warn { margin: 0 0 8px; }
+.locs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.locs button { text-align: left; border: 1px solid var(--surface0); background: var(--base); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.locs button:hover { border-color: var(--accent); }
+.locs button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--base)); }
+.locs .note { display: block; color: var(--overlay1); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.locs img { display: block; width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 6px; background: var(--crust); margin-bottom: 6px; }
+.locs .badge.cur { margin-left: 6px; background: color-mix(in srgb, var(--green) 22%, transparent); color: var(--green); }
+.locsec + .locsec { margin-top: 14px; }
+.locsec h4 { margin: 0 0 8px; font-size: 13px; color: var(--subtext1); display: flex; gap: 8px; align-items: baseline; }
+.locsec h4 .count { color: var(--overlay0); font-weight: 400; }
+.locsec .warn { margin: 0 0 8px; }
+.links { display: grid; gap: 8px; }
+.links a { display: block; border: 1px solid var(--surface0); background: var(--base); border-radius: 8px; padding: 10px 12px; color: var(--text); text-decoration: none; }
+.links a:hover { border-color: var(--accent); }
+.links .host { margin-left: 8px; color: var(--accent); font-size: 12px; }
+.links .note { display: block; margin-top: 3px; color: var(--overlay1); font-size: 12.5px; }
 .empty { color: var(--overlay1); padding: 20px; text-align: center; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface0); border: 1px solid var(--surface1);
          padding: 8px 16px; border-radius: 999px; opacity: 0; transition: .2s; pointer-events: none; z-index: 99; }
@@ -374,12 +379,21 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
   </div>
 </dialog>
 
-<dialog id="catalog">
+<dialog id="locations">
   <div class="dlg">
-    <header><h3 id="cattitle">Catalogue</h3><input type="text" id="catsearch" placeholder="Filter…" style="width:220px"></header>
-    <div class="body single"><div class="files" id="catlist"></div></div>
-    <footer><span class="hint" id="cathint" style="margin:0"></span><span class="sp"></span>
-      <button class="btn" id="catcancel">Close</button><button class="btn primary" id="catok">Use selection</button></footer>
+    <header><h3 id="loctitle">System locations</h3><input type="text" id="locsearch" placeholder="Filter…" style="width:220px"></header>
+    <div class="body single"><div class="files" id="loclist"></div></div>
+    <footer><span class="hint" id="lochint" style="margin:0"></span><span class="sp"></span>
+      <button class="btn" id="loccancel">Close</button><button class="btn primary" id="locok">Use selection</button></footer>
+  </div>
+</dialog>
+
+<dialog id="others">
+  <div class="dlg">
+    <header><h3 id="othtitle">Other sources</h3></header>
+    <div class="body single"><div class="files" id="othlist" style="min-height:0"></div></div>
+    <footer><span class="hint" id="othhint" style="margin:0"></span><span class="sp"></span>
+      <button class="btn" id="othclose">Close</button></footer>
   </div>
 </dialog>
 
@@ -615,9 +629,11 @@ function sourceField(o) {
     const manual = h("input", { type: "text", class: "grow mono", placeholder: o.multiple ? "Type a path or a name, then Enter" : "Path or name", spellcheck: "false",
       onkeydown: (e) => { if (e.key === "Enter" && e.target.value.trim()) { add([e.target.value.trim()]); } } });
     const buttons = h("div", { class: "row" },
-      t.has_sources ? h("button", { class: "btn primary", onclick: () => openCatalog(o, add) }, "Choose from catalogue…") : null,
+      // the three ways to a source: what this computer has, the file browser, the web
+      t.has_locations ? h("button", { class: "btn primary", onclick: () => openLocations(o, add) }, "System locations…") : null,
       h("button", { class: "btn", onclick: async () => add(await browse({ accept, multiple: o.multiple, start: V()[0] })) },
         accept === "dir" ? "Browse folders…" : "Browse files…"),
+      t.links.length ? h("button", { class: "btn", onclick: () => openOthers(o) }, "Other sources…") : null,
       manual);
     const def = Array.isArray(o.default) ? o.default.join(", ") : o.default;
     const kids = [h("div", { class: "label" }, h("span", {}, nice(o)), o.multiple ? h("span", {}, list.length ? `${list.length} selected` : "") : null),
@@ -1311,19 +1327,19 @@ $("fbfolder").onclick = () => fbDone([fb.path]);
 $("fbok").onclick = () => fbDone([...fb.sel]);
 $("browser").addEventListener("cancel", () => { if (fb) { const r = fb.resolve; fb = null; r([]); } });
 
-// ---------------------------------------------------------------- catalogue
-const catalogCache = {};
-async function openCatalog(o, add) {
+// --------------------------------------------------------- system locations
+const locationsCache = {};
+async function openLocations(o, add) {
   const sel = new Set();
-  $("cattitle").textContent = `${cur().name}: ${nice(o)}`;
-  $("catsearch").value = "";
-  $("catlist").replaceChildren(h("div", { class: "empty" }, "Loading… (an extra catalogue may be downloaded the first time)"));
-  $("cathint").textContent = o.multiple ? "Click to select one or more, then “Use selection”." : "Click one to use it.";
-  $("catok").classList.toggle("hidden", !o.multiple);
-  $("catalog").showModal();
-  let r = catalogCache[S.target];
-  if (!r) { r = await api(`/api/sources?target=${S.target}`); if (!r.error) catalogCache[S.target] = r; }
-  if (r.error) { $("catlist").replaceChildren(h("div", { class: "empty" }, r.error)); return; }
+  $("loctitle").textContent = `${cur().name}: ${nice(o)}`;
+  $("locsearch").value = "";
+  $("loclist").replaceChildren(h("div", { class: "empty" }, "Loading…"));
+  $("lochint").textContent = o.multiple ? "Click to select one or more, then “Use selection”." : "Click one to use it.";
+  $("locok").classList.toggle("hidden", !o.multiple);
+  $("locations").showModal();
+  let r = locationsCache[S.target];
+  if (!r) { r = await api(`/api/locations?target=${S.target}`); if (!r.error) locationsCache[S.target] = r; }
+  if (r.error) { $("loclist").replaceChildren(h("div", { class: "empty" }, r.error)); return; }
   // sections (core.sources): a heading, its error if it could not be read, its items
   // (thumbnail when there is one, "in use" for what the system uses now)
   const button = (s) => {
@@ -1331,30 +1347,45 @@ async function openCatalog(o, add) {
     if (img) img.onerror = () => img.remove();
     return h("button", { class: sel.has(s.value) ? "on" : "", title: [s.value, s.note].filter(Boolean).join("\n"),
       onclick: (e) => {
-        if (!o.multiple) { $("catalog").close(); add([s.value]); return; }
+        if (!o.multiple) { $("locations").close(); add([s.value]); return; }
         sel.has(s.value) ? sel.delete(s.value) : sel.add(s.value); e.currentTarget.classList.toggle("on");
-        $("catok").textContent = sel.size ? `Use ${sel.size}` : "Use selection";
+        $("locok").textContent = sel.size ? `Use ${sel.size}` : "Use selection";
       } }, img, s.label, s.current ? h("span", { class: "badge cur" }, "in use") : null,
       h("span", { class: "note" }, s.label !== s.value && !s.value.includes("/") ? s.value + " · " : "", s.note || ""));
   };
   const draw = () => {
-    const q = $("catsearch").value.toLowerCase();
+    const q = $("locsearch").value.toLowerCase();
     const blocks = r.sections.map((sec) => {
       const items = sec.items.filter((s) => !q || (s.value + " " + s.label + " " + s.note).toLowerCase().includes(q));
       if (!items.length && (q || !sec.error)) return null;
-      return h("section", { class: "catsec" }, h("h4", {}, sec.section, h("span", { class: "count" }, items.length || "")),
+      return h("section", { class: "locsec" }, h("h4", {}, sec.section, h("span", { class: "count" }, items.length || "")),
         sec.error ? h("p", { class: "warn" }, sec.error) : null,
-        items.length ? h("div", { class: "catalog" }, items.map(button)) : null);
+        items.length ? h("div", { class: "locs" }, items.map(button)) : null);
     }).filter(Boolean);
-    $("catlist").replaceChildren(...(blocks.length ? blocks : [h("div", { class: "empty" }, q ? "Nothing matches" : "Nothing found")]));
+    $("loclist").replaceChildren(...(blocks.length ? blocks : [h("div", { class: "empty" }, q ? "Nothing matches" : "Nothing found")]));
   };
-  $("catsearch").oninput = draw;
-  $("catok").textContent = "Use selection";
-  $("catok").onclick = () => { $("catalog").close(); add([...sel]); };
+  $("locsearch").oninput = draw;
+  $("locok").textContent = "Use selection";
+  $("locok").onclick = () => { $("locations").close(); add([...sel]); };
   draw();
-  $("catsearch").focus();
+  $("locsearch").focus();
 }
-$("catcancel").onclick = () => $("catalog").close();
+$("loccancel").onclick = () => $("locations").close();
+
+// ------------------------------------------------------------ other sources
+// web pages to download sources from (Target.links): opened in a new tab; what is
+// downloaded is then chosen with the file browser (Downloads is one of its places)
+function openOthers(o) {
+  const t = cur(), host = (url) => { try { return new URL(url).host; } catch { return ""; } };
+  $("othtitle").textContent = `${t.name}: other sources`;
+  $("othlist").replaceChildren(h("div", { class: "links" }, t.links.map((l) =>
+    h("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" },
+      h("b", {}, l.name), h("span", { class: "host" }, host(l.url), " ↗"),
+      l.note ? h("span", { class: "note" }, l.note) : null))));
+  $("othhint").textContent = `Download there (extract an archive first), then choose it with “${browseAccept(o, "dir") === "dir" ? "Browse folders…" : "Browse files…"}”: your Downloads folder is in its places.` + (takesImages(o) ? " Or drag it onto “Drop images here”." : "");
+  $("others").showModal();
+}
+$("othclose").onclick = () => $("others").close();
 $("lbclose").onclick = () => $("lightbox").close();
 $("lightbox").addEventListener("click", (e) => { if (e.target === $("lightbox")) $("lightbox").close(); });
 

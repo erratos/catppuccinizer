@@ -1,5 +1,6 @@
-"""Ready-made sources (core.sources, Target.sources): sections of items for the
-GUI's catalogue and --list, with what is installed on the system."""
+"""Where sources come from (core.sources): the system locations (Target.locations,
+sections of items: what is installed on the system) and the other sources
+(Target.links, web pages), for the GUI and --list."""
 import contextlib
 import io
 import os
@@ -50,24 +51,49 @@ class Sections(unittest.TestCase):
             {"section": "Installed", "items": [sources.item("/t/a", "A", "two-step", current=True),
                                                sources.item("b")]},
             {"section": "Empty", "items": []},
-            {"section": "Catalogue", "items": [], "error": "no network"}])
-        self.assertEqual(text, "Installed\n  * /t/a  A  (two-step)\n    b\n\nCatalogue\n  (no network)")
+            {"section": "Installed (/boot)", "items": [], "error": "only root can read it"}],
+            [sources.link("Site", "https://example.org/themes", "many themes"), sources.link("Bare", "https://b.example")])
+        self.assertEqual(text, "Installed\n  * /t/a  A  (two-step)\n    b\n\nInstalled (/boot)\n  (only root can read it)\n\n"
+                               "Other sources (download there, then give the downloaded folder or file)\n"
+                               "  Site  https://example.org/themes\n      many themes\n  Bare  https://b.example")
         self.assertEqual(sources.format_sources([]), "Nothing found.")
 
+    def test_links_are_https(self):
+        for url in ("http://example.org", "javascript:alert(1)", "file:///etc/passwd", "//example.org"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                sources.link("x", url)
+
     def test_every_target(self):
-        """Every target that offers sources gives sections of well-formed items."""
+        """Every target that offers system locations gives sections of well-formed
+        items; every target with a source (lut has none) has other sources, https."""
         for name, t in discover().items():
-            if not t.has_sources:
-                continue
-            with self.subTest(target=name), contextlib.redirect_stdout(io.StringIO()), \
-                    mock.patch.object(plymouth, "upstream_themes", return_value={"glow": "pack_1/glow"}):
-                secs = t.sources()
+            with self.subTest(target=name):
+                flags = [f for o in t.all_options() for f in o.flags]
+                if name == "lut":
+                    self.assertEqual((t.has_locations, tuple(t.links), "--list" in flags), (False, (), False))
+                    continue
+                self.assertTrue(t.links)
+                for ln in t.links:
+                    self.assertEqual(set(ln), {"name", "url", "note"})
+                    self.assertTrue(ln["url"].startswith("https://"))
+                self.assertIn("--list", flags)
+                if not t.has_locations:
+                    continue
+                with contextlib.redirect_stdout(io.StringIO()):
+                    secs = t.locations()
                 self.assertIsInstance(secs, list)
                 for sec in secs:
                     self.assertTrue(sec["section"])
                     for it in sec["items"]:
                         self.assertEqual(set(it), ITEM_KEYS)
-                self.assertIn("--list", [f for o in t.all_options() for f in o.flags])
+
+    def test_list_shows_other_sources(self):
+        with mock.patch.object(plymouth, "INSTALL_DIR", "/nonexistent"), \
+                contextlib.redirect_stdout(io.StringIO()) as out, self.assertRaises(SystemExit) as e:
+            main(["plymouth", "--list"])
+        self.assertEqual(e.exception.code, 0)
+        self.assertIn("Other sources", out.getvalue())
+        self.assertIn("https://github.com/adi1090x/plymouth-themes", out.getvalue())
 
 
 class Wallpapers(Tmp):
@@ -129,6 +155,9 @@ class Installed(Tmp):
                 contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(plymouth.themes_of(a), ["glow_mini"])
             self.assertEqual(plymouth.find_theme("glow_mini"), self.tmp / "glow_mini")
+            with self.assertRaises(SystemExit) as e:
+                plymouth.find_theme("angular")                  # not installed, not a folder
+            self.assertIn("Theme not found: angular", str(e.exception))
         self.assertIn("Theme in use: glow_mini", out.getvalue())
         self.assertEqual(plymouth.themes_of(argparse.Namespace(themes=["x"])), ["x"])
         (self.tmp / "state").mkdir()

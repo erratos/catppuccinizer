@@ -20,7 +20,7 @@ from .options import PREVIEW_ANIMATION, Option, previewing, step
 from .palette import FLAVOR_TITLES
 from .parts import check_parts, note_unused, single
 from .paths import state_file, user_home
-from .sources import item, section, theme_folders, tidy
+from .sources import item, link, section, theme_folders, tidy
 from .system import copy_folder, get_variable, place, read_text, set_variable, unquote
 from .target import Target
 
@@ -39,7 +39,8 @@ SCHEMA = {                 # key: (type, required)
          "parts": (TABLES, True), "install": (TABLE, False), "apply": (TABLE, False),
          "restore": (TABLE, False)},
     "source": {"marker": (STR, True), "search": (STRS, False), "default": (STR, False),
-               "label": (STR, False), "help": (STR, False)},
+               "label": (STR, False), "help": (STR, False), "links": (TABLES, False)},
+    "links": {"name": (STR, True), "url": (STR, True), "note": (STR, False)},
     "parts": {"name": (STR, True), "kind": (STR, True), "files": (STRS, False),
               "syntax": (STR, False), "label": (STR, False)},
     "install": {"to": (STR, True), "sudo": (BOOL, False), "help": (STR, False)},
@@ -149,6 +150,14 @@ class TomlTarget(Target):
         self.search = [system_path(d, True, f"{where} [source]") for d in src.get("search", [])]
         self.source_label = src.get("label", "Theme")
         self.source_help = src.get("help", "theme name (see --list) or theme folder")
+        self.links = []
+        for k, ln in enumerate(src.get("links", [])):
+            w = f"{where} [[source.links]] #{k + 1}"
+            check_table(ln, "links", w)
+            try:
+                self.links.append(link(ln["name"], ln["url"], ln.get("note", "")))
+            except ValueError as e:
+                raise SystemExit(f"{w}: {e}") from None
 
         self.parts = []
         for k, p in enumerate(spec["parts"]):
@@ -214,7 +223,7 @@ class TomlTarget(Target):
         return [s for s in ("install", "apply", "restore") if s in self.step_help]
 
     @property
-    def has_sources(self):
+    def has_locations(self):
         return bool(self.search)
 
     def state(self):
@@ -260,7 +269,7 @@ class TomlTarget(Target):
             raise SystemExit(f"{arg} is not a {self.source_label.lower()}: no {self.marker} in it")
         raise SystemExit(f"No {self.source_label.lower()} '{arg}' (see --list, or give a folder)")
 
-    def sources(self):
+    def locations(self):
         """A section per search folder; those only root can read, in one section that
         says so."""
         found, hidden = [], []

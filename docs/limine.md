@@ -29,7 +29,7 @@ with `lut-accent`). `-a mauve wallpaper=peach` gives the wallpaper its own
 accent.
 
 `--wallpaper current` recolours the wallpaper `limine.conf` sets (the GUI's
-catalogue offers it as the *in use* one; when only root can read the ESP, it is
+system locations offer it as the *in use* one; when only root can read the ESP, it is
 read when the command runs, with sudo).
 
 Building writes into the output folder only; `--install`, `--apply` and
@@ -139,7 +139,7 @@ is refused, to be fixed by hand.
 | `--wallpaper IMAGE` | image to recolour and use as the Limine wallpaper |
 | `--style` | `stretched`, `centered` or `tiled` (with `--wallpaper`) |
 | `--preview` | only draw the boot menu as it will look (first flavour and accent) in `<out>/previews/`: [Preview](#preview) |
-| `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP) and the installed wallpapers |
+| `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP), the installed wallpapers and wallpaper sites to download more from |
 | `--names` | only list the folders and files the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | only list the wallpaper colours `-m` can remap (the menu has none); `--json` for JSON |
 | `-s, --suffix` | extra word at the end of the folder and wallpaper names |

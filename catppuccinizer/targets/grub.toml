@@ -19,6 +19,16 @@ search = ["/boot/grub/themes", "/boot/grub2/themes", "/usr/share/grub/themes"]
 label = "Theme"
 help = "installed theme name (see --list) or theme folder"
 
+[[source.links]]
+name = "Gnome-look: GRUB themes"
+url = "https://www.gnome-look.org/browse?cat=109"
+note = "hundreds of themes with screenshots; download, then extract the archive"
+
+[[source.links]]
+name = "Gorgeous GRUB"
+url = "https://github.com/Jacksaur/Gorgeous-GRUB"
+note = "a hand-picked list of community GRUB themes, each linking to its page"
+
 [[parts]]
 name = "text"
 kind = "text"

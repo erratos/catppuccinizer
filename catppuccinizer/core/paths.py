@@ -13,7 +13,7 @@ def user_home():
 
 
 def cache_dir():
-    """Downloads (e.g. upstream themes): $CATPPUCCINIZER_CACHE or ~/.cache/catppuccinizer."""
+    """What can be made again (the GUI's uploads): $CATPPUCCINIZER_CACHE or ~/.cache/catppuccinizer."""
     base = os.environ.get("CATPPUCCINIZER_CACHE")
     if not base:
         base = Path(os.environ.get("XDG_CACHE_HOME", user_home() / ".cache")) / "catppuccinizer"

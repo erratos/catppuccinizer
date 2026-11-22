@@ -20,28 +20,35 @@ ten minutes after the page is closed. `--port N` picks the port,
 
 1. **Target**: the tabs at the top (`plymouth`, `image`, `limine`, `ksplash`,
    `lut`, `grub`, and your [TOML targets](architecture.md#declarative-targets-toml)).
-2. **Source**
-   - images: *Browse files…* (several at once, or a whole folder), drop them on
-     the page, or type a path; *Choose from catalogue…* shows the wallpapers
-     installed in `/usr/share/wallpapers`, `/usr/share/backgrounds` and
-     `~/.local/share/wallpapers` (a KDE wallpaper package: its largest image);
-   - Plymouth: left empty, the theme in use is recoloured. The catalogue shows
-     the installed themes first (the one in use marked *in use*), then an extra
-     catalogue, the 80 adi1090x themes (fetched with git when chosen, or those
-     of your [local copy](plymouth.md#using-a-local-copy-of-the-adi1090x-themes));
-     or browse to any theme folder;
-   - KDE splash: the catalogue lists the splash screens installed for you and
-     for the system, the selected one marked *in use*;
+2. **Source**, from three places, a button each (or type a path):
+   - *System locations…*: what this computer has, in sections, with what the
+     system uses now marked *in use*; a section that cannot be read (an ESP
+     only root can read) says why, the others are still there;
+   - *Browse files…* / *Browse folders…*: any file or folder (your Pictures and
+     Downloads folders are in its places); images can also be dropped on the
+     page;
+   - *Other sources…*: web pages to see and download more (opened in your
+     browser); download there, extract an archive, then choose what you
+     downloaded with *Browse…*.
+
+   What each target offers:
+   - images: the wallpapers installed in `/usr/share/wallpapers`,
+     `/usr/share/backgrounds` and `~/.local/share/wallpapers` (a KDE wallpaper
+     package: its largest image); other sources: Wallhaven, Unsplash, the KDE
+     Store wallpapers;
+   - Plymouth: left empty, the theme in use is recoloured. The installed themes;
+     other sources: [adi1090x/plymouth-themes](plymouth.md#getting-themes) (80
+     animations) and the Gnome-look Plymouth themes;
+   - KDE splash: the splash screens installed for you and for the system;
+     other sources: the KDE Store splash screens;
    - Limine: the wallpaper is optional: left empty, only the menu colours
      change and the current wallpaper is kept (the card says so). The
-     catalogue shows the wallpaper set in `limine.conf` (*in use*: choose it
-     to recolour it) and the installed wallpapers; when only root can read the
-     ESP, *Current Limine wallpaper* (`--wallpaper current`) is read when the
-     command runs, with sudo.
-
-   The catalogue is grouped in sections; one that cannot be read (no network
-   for the adi1090x themes, an ESP only root can read) shows why, the others
-   are still there.
+     wallpaper set in `limine.conf` (*in use*: choose it to recolour it) and the
+     installed wallpapers; when only root can read the ESP, *Current Limine
+     wallpaper* (`--wallpaper current`) is read when the command runs, with
+     sudo. Other sources: as for images;
+   - GRUB: the installed themes; other sources: the Gnome-look GRUB themes and
+     Gorgeous GRUB.
 3. **Colours**: click a flavour (Ctrl/Shift+click for several, one result
    each) and an accent. The page itself takes the colours you choose. Both are
    kept when you switch targets. When the chosen method cannot use the accent
@@ -177,6 +184,11 @@ What the page can reach:
 Non-HTML answers forbid scripts (an SVG opened on its own cannot read the
 token), and requests are limited in size (1 MB of JSON).
 
+The page itself reaches nothing outside the server: the other sources are
+plain `https://` links (a target cannot declare another kind), opened in a new
+tab, without the page's address (`noopener`, `noreferrer`: the token stays
+here).
+
 ## For target authors
 
 The forms are built from the options the target declares (`Target.options()`,
@@ -213,8 +225,9 @@ GUI without GUI code:
 - `explain` and `image` fill the **?** panel of an option (a step's text starts
   with what every target's step does);
 - `gui=False` keeps an option out of the forms (`--colours`: the page shows
-  that list by itself; `--list` repeats the catalogue);
-- `Target.sources()` fills the catalogue, by sections, with thumbnails and
-  what is *in use* (see [Architecture](architecture.md#writing-a-target));
+  that list by itself; `--list` repeats the system locations and other sources);
+- `Target.locations()` fills *System locations…*, by sections, with thumbnails
+  and what is *in use*, and `Target.links` *Other sources…* (see
+  [Architecture](architecture.md#writing-a-target));
 - `Target.accent_also` names what still uses the accent when `--method` is a
   LUT (Limine: the menu colours); without it, the accents are dimmed then.
