@@ -35,6 +35,7 @@ from ...core.sources import item, link, section, theme_folders
 from ...core.recolor import (SEPARATION, SHEET_GAP, SHEET_GAP_COLOUR, draw_legend, keys_plan,
                              preview_animation, recolor_image, run_jobs, separation_image)
 from ...core.naming import check_name
+from ...core.online import Ocs
 from ...core.system import System, source_file, which
 from ...core.target import Target
 
@@ -51,9 +52,9 @@ class PlymouthTarget(Target):
         link("adi1090x/plymouth-themes", "https://github.com/adi1090x/plymouth-themes",
              "80 animated themes, previewed in its README, in pack_1 to pack_4: download "
              "the repository (Code, Download ZIP), extract it, then choose a theme folder"),
-        link("Gnome-look: Plymouth themes", "https://www.gnome-look.org/browse?cat=108",
-             "themes with screenshots; download, then extract the archive"),
     ]
+    online = [Ocs("gnome-look", 108, "Gnome-look: Plymouth themes", marker="*.plymouth",
+                  note="themes with screenshots, each with its own licence")]
 
     def options(self):
         return OPTIONS

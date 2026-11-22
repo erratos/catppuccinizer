@@ -295,6 +295,7 @@ dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 .links { display: grid; gap: 8px; }
 .locs button.busy { opacity: .6; cursor: progress; }
 .pager { justify-content: center; margin-top: 10px; gap: 12px; }
+.othtabs { margin-bottom: 12px; }
 .links a { display: block; border: 1px solid var(--surface0); background: var(--base); border-radius: 8px; padding: 10px 12px; color: var(--text); text-decoration: none; }
 .links a:hover { border-color: var(--accent); }
 .links .host { margin-left: 8px; color: var(--accent); font-size: 12px; }
@@ -1376,9 +1377,11 @@ $("loccancel").onclick = () => $("locations").close();
 
 // ------------------------------------------------------------ other sources
 // online sources (Target.online): searched and shown here, through the server (its
-// API, its thumbnails); a click downloads into the cache and fills the field. Then
-// web pages (Target.links): opened in a new tab, what is downloaded there is chosen
-// with the file browser (Downloads is one of its places)
+// API, its thumbnails), one at a time (tabs: a source is asked only once shown); a
+// click downloads into the cache and fills the field (an item with several files, an
+// archive with several themes: one is chosen first). Then web pages (Target.links):
+// opened in a new tab, what is downloaded there is chosen with the file browser
+// (Downloads is one of its places)
 const hostOf = (url) => { try { return new URL(url).host; } catch { return ""; } };
 function onlineBlock(t, src, o, add) {
   const grid = h("div", { class: "locs" }), pager = h("div", { class: "row pager" });
@@ -1386,23 +1389,41 @@ function onlineBlock(t, src, o, add) {
   const q = h("input", { type: "search", class: "grow", placeholder: "Search (empty: the most popular)",
     onkeydown: (e) => { if (e.key === "Enter") load(1); } });
   const otherUrl = (path, params) => `${path}?${new URLSearchParams({ target: t.name, source: src.name, ...params, t: TOKEN })}`;
+  const clickHint = () => o.multiple ? "Click to download and add one or more." : "Click one to download and use it.";
+  const use = (paths, b) => {
+    add(paths);
+    if (!o.multiple) { $("others").close(); return; }
+    b.classList.add("on"); toast(`Added: ${paths.map(tidy).join(", ")}`);
+  };
+  // the grid's results put aside while a list of files or themes is shown
+  function choose(title, entries) {
+    const kept = [[...grid.children], [...pager.children], status.textContent];
+    const back = () => { grid.replaceChildren(...kept[0]); pager.replaceChildren(...kept[1]); status.textContent = kept[2]; };
+    status.textContent = title;
+    grid.replaceChildren(...entries.map((e) => h("button", { title: e.note, onclick: (ev) => e.run(ev.currentTarget) },
+      e.label, h("span", { class: "note" }, e.note))));
+    pager.replaceChildren(h("button", { class: "btn small", onclick: back }, "← Back to the results"));
+  }
+  async function get(b, id) {
+    if (b.classList.contains("busy")) return;
+    b.classList.add("busy"); const note = b.querySelector(".note"), was = note.textContent;
+    note.textContent = "Downloading…";
+    let r;
+    try { r = await api("/api/online/fetch", { target: t.name, source: src.name, id }); }
+    catch (err) { r = { error: String(err.message || err) }; }
+    b.classList.remove("busy"); note.textContent = was;
+    if (r.error) return toast(r.error);
+    if (r.paths.length === 1) return use(r.paths, b);
+    choose(`This archive holds ${r.paths.length} themes: choose ${o.multiple ? "one or more" : "one"}.`,
+      r.paths.map((p) => ({ label: p.split("/").pop(), note: tidy(p), run: (b2) => use([p], b2) })));
+  }
   const tile = (it) => {
     const img = it.thumb ? h("img", { src: otherUrl("/api/online/thumb", { url: it.thumb, s: 240 }), loading: "lazy", alt: "" }) : null;
     if (img) img.onerror = () => img.remove();
-    return h("button", { title: [it.label, it.note, it.url].filter(Boolean).join("\n"), onclick: async (e) => {
-      const b = e.currentTarget;
-      if (b.classList.contains("busy")) return;
-      b.classList.add("busy"); const note = b.querySelector(".note"), was = note.textContent;
-      note.textContent = "Downloading…";
-      let r;
-      try { r = await api("/api/online/fetch", { target: t.name, source: src.name, id: it.id }); }
-      catch (err) { r = { error: String(err.message || err) }; }
-      b.classList.remove("busy"); note.textContent = was;
-      if (r.error) return toast(r.error);
-      add([r.path]);
-      if (!o.multiple) { $("others").close(); return; }
-      b.classList.add("on"); toast(`Added: ${tidy(r.path)}`);
-    } }, img, it.label, h("span", { class: "note" }, it.note));
+    return h("button", { title: [it.label, it.note, it.url].filter(Boolean).join("\n"), onclick: (e) => it.choices
+      ? choose(`${it.label}: ${it.choices.length} files, choose one.`,
+          it.choices.map((c) => ({ label: c.label, note: c.note, run: (b) => get(b, c.id) })))
+      : get(e.currentTarget, it.id) }, img, it.label, h("span", { class: "note" }, it.note));
   };
   async function load(page) {
     status.textContent = "Loading…"; pager.replaceChildren();
@@ -1410,7 +1431,7 @@ function onlineBlock(t, src, o, add) {
     try { r = await api(otherUrl("/api/online", { q: q.value.trim(), page })); }
     catch (err) { r = { error: String(err.message || err) }; }
     if (r.error) { status.textContent = r.error; grid.replaceChildren(); return; }
-    status.textContent = r.items.length ? (o.multiple ? "Click to download and add one or more." : "Click one to download and use it.") : "Nothing found.";
+    status.textContent = r.items.length ? clickHint() : "Nothing found.";
     grid.replaceChildren(...r.items.map(tile));
     if (r.pages > 1) pager.replaceChildren(
       h("button", { class: "btn small", disabled: r.page <= 1, onclick: () => load(r.page - 1) }, "← Previous"),
@@ -1432,7 +1453,17 @@ function openOthers(o, add) {
       h("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" },
         h("b", {}, l.name), h("span", { class: "host" }, hostOf(l.url), " ↗"),
         l.note ? h("span", { class: "note" }, l.note) : null)))) : null;
-  $("othlist").replaceChildren(...t.online.map((src) => onlineBlock(t, src, o, add)), ...(links ? [links] : []));
+  // one online source shown at a time: built (and asked) when its tab is first chosen
+  const blocks = new Map(), slot = h("div", {});
+  const show = (src) => {
+    if (!blocks.has(src.name)) blocks.set(src.name, onlineBlock(t, src, o, add));
+    slot.replaceChildren(blocks.get(src.name));
+    tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.name === src.name));
+  };
+  const tabs = h("div", { class: "seg othtabs" }, t.online.length > 1 ? t.online.map((src) =>
+    h("button", { type: "button", "data-name": src.name, onclick: () => show(src) }, src.title)) : []);
+  $("othlist").replaceChildren(...(t.online.length > 1 ? [tabs] : []), slot, ...(links ? [links] : []));
+  if (t.online.length) show(t.online[0]);
   $("othhint").textContent = t.links.length ? `Web pages: download there (extract an archive first), then choose it with “${browseAccept(o, "dir") === "dir" ? "Browse folders…" : "Browse files…"}”: your Downloads folder is in its places.` + (takesImages(o) ? " Or drag it onto “Drop images here”." : "") : "";
   $("others").showModal();
 }

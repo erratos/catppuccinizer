@@ -84,8 +84,11 @@ class Gui(unittest.TestCase):
         self.assertNotIn("preview_animation", kinds)            # a picture does not move
         lut = next(t for t in s["targets"] if t["name"] == "lut")
         self.assertEqual((lut["has_locations"], lut["links"], lut["online"]), (False, [], []))
-        self.assertEqual([o["name"] for o in image["online"]], ["wallhaven"])     # browsed in the page
-        self.assertEqual(image["online"][0]["accept"], "image")
+        self.assertEqual([o["name"] for o in image["online"]], ["wallhaven", "kde-store-299"])  # in the page
+        self.assertEqual({o["accept"] for o in image["online"]}, {"image"})
+        grub = next(t for t in s["targets"] if t["name"] == "grub")           # [[source.online]]
+        self.assertEqual([(o["name"], o["accept"]) for o in grub["online"]], [("gnome-look-109", "dir")])
+        self.assertNotIn("gnome-look.org", json.dumps(grub["links"]))         # no longer a mere link
         self.assertFalse(lut["has_colours"])
         self.assertEqual({o["dest"]: o for o in lut["options"]}["method"]["choices"], ["lut", "lutgen"])
         self.assertNotIn("boot_delay", [o["dest"] for o in plymouth["options"]])

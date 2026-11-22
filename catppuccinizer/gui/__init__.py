@@ -724,7 +724,7 @@ def make_handler(app):
                 if src is None:
                     return self.send(404, {"error": "unknown online source"})
                 try:
-                    return self.send(200, {"path": str(src.fetch(str(data.get("id", ""))))})
+                    return self.send(200, {"paths": [str(p) for p in src.fetch(str(data.get("id", "")))]})
                 except (NetworkError, ArchiveError) as e:
                     return self.send(200, {"error": str(e)})
             if u.path == "/api/run":

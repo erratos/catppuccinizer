@@ -101,11 +101,9 @@ def wallpaper_dirs():
             ("Your wallpapers", user_home() / ".local/share/wallpapers")]
 
 
-WALLPAPER_LINKS = [                 # Wallhaven: an online source (core.online)
+WALLPAPER_LINKS = [         # Wallhaven, the KDE Store: online sources (core.online)
     link("Unsplash", "https://unsplash.com/wallpapers",
          "photos free to use (Unsplash licence)"),
-    link("KDE Store: wallpapers", "https://store.kde.org/browse?cat=299",
-         "wallpapers shared by the KDE community, each with its own licence"),
 ]
 
 

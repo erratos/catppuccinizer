@@ -112,6 +112,26 @@ class Schema(Home):
         self.assertIn("'url' is missing", self.load_error(USER_TOML.replace(
             '[source]\nmarker = "theme.txt"\n', '[source]\nmarker = "theme.txt"\n\n[[source.links]]\nname = "x"\n')))
 
+    def test_online(self):
+        """[[source.online]]: an OCS category browsed in the GUI, its themes found with
+        the target's marker."""
+        online = ('[source]\nmarker = "theme.txt"\n\n[[source.online]]\nstore = "{}"\n'
+                  'category = {}\ntitle = "Store: themes"\n')
+        make = lambda store, cat: USER_TOML.replace('[source]\nmarker = "theme.txt"\n',   # noqa: E731
+                                                    online.format(store, cat))
+        t = declarative.load(self.write(make("gnome-look", 109)))
+        (src,) = t.online
+        self.assertEqual((src.name, src.title, src.accept, src.marker), ("gnome-look-109", "Store: themes",
+                                                                         "dir", "theme.txt"))
+        self.assertEqual(t.other_sources[0]["url"], "https://www.gnome-look.org/browse?cat=109")
+        self.assertIn("--list", [f for o in t.all_options() for f in o.flags])
+        self.assertIn("unknown store", self.load_error(make("evil.org", 109)))
+        self.assertIn("'category' must be a number", self.load_error(make("gnome-look", '"109"')))
+        self.assertIn("positive number", self.load_error(make("gnome-look", -1)))
+        self.assertIn("already given", self.load_error(make("gnome-look", 109).replace(
+            'title = "Store: themes"\n', 'title = "Store: themes"\n\n[[source.online]]\n'
+            'store = "gnome-look"\ncategory = 109\n')))
+
     def test_commands(self):
         text = USER_TOML + 'run = [["rm", "-rf", "{installed}"]]\n'
         self.assertIn("rm is not a command apply may run", self.load_error(text))

@@ -16,6 +16,7 @@ from pathlib import Path
 from . import folder, naming, recolor
 from .formats import SYNTAXES
 from .mapping import note_accent_ignored
+from .online import Ocs
 from .options import PREVIEW_ANIMATION, Option, previewing, step
 from .palette import FLAVOR_TITLES
 from .parts import check_parts, note_unused, single
@@ -31,16 +32,19 @@ COMMANDS = ("grub-mkconfig", "grub2-mkconfig", "update-grub", "fc-cache",
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 FIELDS = ("name", "installed")               # what {…} may name in apply's values and commands
 
-STR, BOOL, STRS, TABLE, TABLES, COMMAND_LIST = "a string", "true or false", "a list of strings", \
-    "a table", "a list of tables", "a list of commands (lists of strings)"
+STR, BOOL, INT, STRS, TABLE, TABLES, COMMAND_LIST = "a string", "true or false", "a number", \
+    "a list of strings", "a table", "a list of tables", "a list of commands (lists of strings)"
 SCHEMA = {                 # key: (type, required)
     "": {"name": (STR, True), "help": (STR, True), "description": (STR, False),
          "default_out": (STR, False), "ignore": (STRS, False), "source": (TABLE, True),
          "parts": (TABLES, True), "install": (TABLE, False), "apply": (TABLE, False),
          "restore": (TABLE, False)},
     "source": {"marker": (STR, True), "search": (STRS, False), "default": (STR, False),
-               "label": (STR, False), "help": (STR, False), "links": (TABLES, False)},
+               "label": (STR, False), "help": (STR, False), "links": (TABLES, False),
+               "online": (TABLES, False)},
     "links": {"name": (STR, True), "url": (STR, True), "note": (STR, False)},
+    "online": {"store": (STR, True), "category": (INT, True), "title": (STR, False),
+               "note": (STR, False)},
     "parts": {"name": (STR, True), "kind": (STR, True), "files": (STRS, False),
               "syntax": (STR, False), "label": (STR, False)},
     "install": {"to": (STR, True), "sudo": (BOOL, False), "help": (STR, False)},
@@ -56,6 +60,8 @@ def _is(value, kind):
         return isinstance(value, str)
     if kind == BOOL:
         return isinstance(value, bool)
+    if kind == INT:
+        return isinstance(value, int) and not isinstance(value, bool)
     if kind == STRS:
         return isinstance(value, list) and all(isinstance(v, str) for v in value)
     if kind == TABLE:
@@ -158,6 +164,18 @@ class TomlTarget(Target):
                 self.links.append(link(ln["name"], ln["url"], ln.get("note", "")))
             except ValueError as e:
                 raise SystemExit(f"{w}: {e}") from None
+        self.online = []
+        for k, on in enumerate(src.get("online", [])):
+            w = f"{where} [[source.online]] #{k + 1}"
+            check_table(on, "online", w)
+            try:
+                o = Ocs(on["store"], on["category"], on.get("title"), on.get("note", ""),
+                        marker=self.marker)
+            except ValueError as e:
+                raise SystemExit(f"{w}: {e}") from None
+            if o.name in (x.name for x in self.online):
+                raise SystemExit(f"{w}: {on['store']} category {on['category']} is already given")
+            self.online.append(o)
 
         self.parts = []
         for k, p in enumerate(spec["parts"]):

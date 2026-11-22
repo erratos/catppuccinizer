@@ -28,31 +28,34 @@ ten minutes after the page is closed. `--port N` picks the port,
      Downloads folders are in its places); images can also be dropped on the
      page;
    - *Other sources…*: more on the web. Some sources are browsed right in the
-     panel (*online sources*: Wallhaven for images and Limine): search, pages
-     of thumbnails, and a click downloads the file into
-     `~/.cache/catppuccinizer/downloads/` and fills the field (one or more for
-     a source that takes several). The others are web pages, opened in your
-     browser: download there, extract an archive, then choose what you
-     downloaded with *Browse…*.
+     panel (*online sources*: Wallhaven, Gnome-look, the KDE Store), one tab
+     each: search, pages of thumbnails, and a click downloads the file into
+     `~/.cache/catppuccinizer/downloads/`, unpacks an archive and fills the
+     field (one or more for a source that takes several). An item with several
+     files (variants) first lists them; an archive holding several themes
+     lists them too. The others are web pages, opened in your browser:
+     download there, extract an archive, then choose what you downloaded with
+     *Browse…*.
 
    What each target offers:
    - images: the wallpapers installed in `/usr/share/wallpapers`,
      `/usr/share/backgrounds` and `~/.local/share/wallpapers` (a KDE wallpaper
      package: its largest image); other sources: Wallhaven (in the panel,
-     safe for work images only), Unsplash, the KDE Store wallpapers;
+     safe for work images only), the KDE Store wallpapers (in the panel, its
+     images: wallpaper packages are left out), Unsplash;
    - Plymouth: left empty, the theme in use is recoloured. The installed themes;
-     other sources: [adi1090x/plymouth-themes](plymouth.md#getting-themes) (80
-     animations) and the Gnome-look Plymouth themes;
+     other sources: the Gnome-look Plymouth themes (in the panel) and
+     [adi1090x/plymouth-themes](plymouth.md#getting-themes) (80 animations);
    - KDE splash: the splash screens installed for you and for the system;
-     other sources: the KDE Store splash screens;
+     other sources: the KDE Store splash screens (in the panel);
    - Limine: the wallpaper is optional: left empty, only the menu colours
      change and the current wallpaper is kept (the card says so). The
      wallpaper set in `limine.conf` (*in use*: choose it to recolour it) and the
      installed wallpapers; when only root can read the ESP, *Current Limine
      wallpaper* (`--wallpaper current`) is read when the command runs, with
      sudo. Other sources: as for images;
-   - GRUB: the installed themes; other sources: the Gnome-look GRUB themes and
-     Gorgeous GRUB.
+   - GRUB: the installed themes; other sources: the Gnome-look GRUB themes (in
+     the panel) and Gorgeous GRUB.
 3. **Colours**: click a flavour (Ctrl/Shift+click for several, one result
    each) and an accent. The page itself takes the colours you choose. Both are
    kept when you switch targets. When the chosen method cannot use the accent
@@ -196,11 +199,11 @@ server, only when the panel asks:
 
 | Online sources | Rule |
 |---|---|
-| hosts | `https://` only, to the hosts the source declares (Wallhaven: `wallhaven.cc`, `w.wallhaven.cc`, `th.wallhaven.cc`), redirects included; 20 s per request |
+| hosts | `https://` only, to the hosts the source declares (Wallhaven: `wallhaven.cc`, `w.wallhaven.cc`, `th.wallhaven.cc`; Gnome-look and the KDE Store: their API host, `*.pling.com` and the storage host their downloads are sent to), redirects included; 20 s per request |
 | search | the source's API, its answer read as data (4 MB at most) |
 | thumbnails | fetched by the server (4 MB at most), decoded and written again as JPEG: the page still loads images from the server only |
-| downloads | an item the source lists, by its id (checked), up to 200 MB, written in full then renamed, only for you (`700` / `600`); a file already there is used again; a download that is not an image is removed |
-| archives | (for the sources that give them) unpacked in a new folder: no absolute name or `..`, no link or device, 5000 files and 500 MB at most |
+| downloads | an item the source lists, by its id (checked), up to 200 MB, written in full then renamed, only for you (`700` / `600`); checked against the store's MD5 when it gives one; a file already there is used again; a download that is not an image is removed |
+| archives | (Gnome-look, the KDE Store) `.zip` and `.tar.*` only, unpacked in a new folder: no absolute name or `..`, no link or device, 5000 files and 500 MB at most; the archive is then removed, and so is what holds no theme folder |
 
 ## For target authors
 

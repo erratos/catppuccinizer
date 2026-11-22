@@ -26,7 +26,7 @@ from ..core.formats import read_text, recolour_text, write_text
 from ..core.mapping import (colour_report, note_accent_ignored, print_colours, text_colours,
                             text_lookup, uses_accent)
 from ..core.naming import output_name, planned, slug
-from ..core.online import WALLHAVEN
+from ..core.online import KDE_WALLPAPERS, WALLHAVEN
 from ..core.options import Option
 from ..core.parts import accent_sets, check_parts
 from ..core.palette import FLAVOR_TITLES
@@ -53,7 +53,7 @@ class ImageTarget(Target):
     name = "image"
     help = "recolour wallpapers and other images"
     links = WALLPAPER_LINKS
-    online = [WALLHAVEN]
+    online = [WALLHAVEN, KDE_WALLPAPERS]
     default_out = "images"
 
     def options(self):

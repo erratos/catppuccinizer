@@ -11,6 +11,7 @@ catppuccinize grub ~/Downloads/some-theme -f macchiato -a teal
 sudo catppuccinize grub ~/Downloads/some-theme -a teal --apply --dry-run
 sudo catppuccinize grub --restore                   # your previous theme
 sudo catppuccinize grub --list                      # installed themes, sites to get more
+catppuccinize gui                                   # Other sources…: browse Gnome-look, click to use
 ```
 
 This target is written in TOML, not in Python

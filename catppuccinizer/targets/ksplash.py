@@ -29,7 +29,8 @@ from ..core.options import PREVIEW_ANIMATION, Option, previewing, step
 from ..core.parts import check_parts, note_unused, single
 from ..core.paths import state_file
 from ..core.naming import check_name
-from ..core.sources import item, link, section, theme_folders, tidy
+from ..core.online import Ocs
+from ..core.sources import item, section, theme_folders, tidy
 from ..core.system import copy_folder, source_file, which
 from ..core.target import Target
 
@@ -48,9 +49,9 @@ PARTS = tuple(p.name for p in FILES)
 class KSplashTarget(Target):
     name = "ksplash"
     help = "recolour a KDE Plasma splash screen"
-    links = [link("KDE Store: splash screens", "https://store.kde.org/browse?cat=488",
-                  "Plasma splash screens with previews; also in System Settings, "
-                  "Splash Screen, Get New…, which installs them for you")]
+    online = [Ocs("kde-store", 488, "KDE Store: splash screens", marker=MARKER,
+                  note="Plasma splash screens with previews, each with its own licence (the "
+                       "ones of System Settings, Splash Screen, Get New…)")]
     accent_also = "the QML / SVG colours mapped to accent"
 
     def options(self):

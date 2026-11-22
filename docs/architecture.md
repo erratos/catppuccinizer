@@ -29,7 +29,7 @@ catppuccinizer/
     target.py         Target base class + discovery (Python, TOML, entry points, the user's TOML)
     declarative.py    targets described in TOML (a theme folder, install, KEY="value" settings)
     sources.py        where sources come from: system locations (sections, items), links
-    online.py         online sources the GUI browses (Wallhaven), https requests, downloads
+    online.py         online sources the GUI browses (Wallhaven, OCS stores), https requests, downloads
     archives.py       archives unpacked safely (no '..', no links, limits)
   targets/
     plymouth/         Plymouth themes (+ preview script)
@@ -47,7 +47,7 @@ tests/
   test_tuning.py      --chroma, --dark-fade, --auto-fit: effect, defaults = the former constants
   test_security.py    names, links, atomic writes, backups, commands, GUI requests
   test_sources.py     system locations, installed themes and wallpapers, links, --list
-  test_online.py      online sources, request rules, Wallhaven, safe archives (no network)
+  test_online.py      online sources, request rules, Wallhaven, OCS, safe archives (no network)
   test_outputs.py     --names of every target against what the build writes
   test_previews.py    --preview / --preview-animation: first flavour and accent, no build
   test_folder.py      core.folder (parts of a theme folder) and the "hex" colour syntax
@@ -179,11 +179,12 @@ def installed():
 `section(title, make)` calls `make()` and turns a failure (`SystemExit`, no
 rights) into the section's `error`, so one section that cannot be read does not
 hide the others. `link(name, url, note)` takes `https://` addresses only.
-Plymouth: the installed themes, and adi1090x and Gnome-look as links; image:
-the wallpapers, and wallpaper sites (`WALLPAPER_LINKS`); Limine: the wallpaper
-of `limine.conf` + the wallpapers, the same sites; KDE splash: the user's and
-the system's splash screens, the KDE Store; GRUB (TOML): its `search` folders,
-Gnome-look and Gorgeous GRUB. The GUI
+Plymouth: the installed themes, Gnome-look (online) and adi1090x (a link);
+image: the wallpapers, Wallhaven and the KDE Store wallpapers (online),
+Unsplash (`WALLPAPER_LINKS`); Limine: the wallpaper of `limine.conf` + the
+wallpapers, the same sites; KDE splash: the user's and the system's splash
+screens, the KDE Store (online); GRUB (TOML): its `search` folders, Gnome-look
+(online) and Gorgeous GRUB (a link). The GUI
 needs nothing else:
 its forms come from `options()`
 (see [Graphical interface](gui.md#for-target-authors)).
@@ -194,19 +195,36 @@ shows their thumbnails; a click downloads the item into the cache and puts its
 path in the source argument, as a file chosen with the browser would be.
 
 ```python
-from ..core.online import WALLHAVEN
+from ..core.online import KDE_WALLPAPERS, WALLHAVEN, Ocs
 
-online = [WALLHAVEN]          # image, limine
+online = [WALLHAVEN, KDE_WALLPAPERS]                       # image, limine
+online = [Ocs("gnome-look", 108, "Gnome-look: Plymouth themes", marker="*.plymouth")]
 ```
 
+`Ocs(store, category, title, note, accept="dir", marker=…)` is a category of a
+store of the pling network through its OCS API (the one of KDE's *Get New…*):
+`store` is `"gnome-look"` or `"kde-store"` (`core.online.STORES`), `category`
+the number of its `browse?cat=` page (Gnome-look: GRUB 109, Plymouth 108; KDE
+Store: splash screens 488, wallpapers 299). It lists the files of each item
+that the target takes (archives for a folder, `.rar` and the like left out;
+images for an image), asks for the file's link again when it is chosen (a
+token that expires), checks it against the MD5 the store gives, and unpacks an
+archive; the theme folders are those holding `marker`, as for `--list`. A TOML
+target declares one with [`[[source.online]]`](#format).
+
 An `OnlineSource` declares its `name`, `title`, `home`, `note`, the `hosts` it
-reaches (and `thumb_hosts`), what it gives (`accept`: `"image"` or `"dir"`), and
-implements `search(query, page)` (items from `core.online.item()`) and
-`fetch(id)` (the local path, downloaded once). Its requests go through
-`core.online.get()` / `download()`: `https://` to its hosts only, redirects
-included, a time and a size limit, written in full then renamed. What comes as
-an archive is unpacked by `core.archives.extract()` (no absolute name or `..`,
-links and devices left out, files and size limited). `--list` prints an online
+reaches (and `thumb_hosts`; `"*.example.org"` for the site's own subdomains),
+what it gives (`accept`: `"image"`, or `"dir"` with its `marker`), and
+implements `search(query, page)` (items from `core.online.item()`, with
+`choices` for an item of several files) and `fetch(id)` (the local paths,
+downloaded once: an image, or every theme folder of an archive, which the GUI
+then asks to choose from). Its requests go through `core.online.get()` /
+`download()`: `https://` to its hosts only, redirects included, a time and a
+size limit, written in full then renamed. What comes as an archive goes
+through `OnlineSource.unpacked(url, hosts, dest, filename, md5)`: downloaded,
+checked, unpacked by `core.archives.extract()` (no absolute name or `..`, links
+and devices left out, files and size limited), the theme folders found
+(`core.online.theme_dirs()`), the archive removed. `--list` prints an online
 source's page with the links.
 
 Optionally too, `def colours(self, a)` does only the analysis and returns the
@@ -342,7 +360,8 @@ A TOML target can say:
 - **where its sources are**: a file every theme folder has (`marker`), the
   folders where themes are looked up by name (`search`, also the system
   locations of `--list` and the GUI), web pages to download themes from
-  (`[[source.links]]`, the other sources), a default;
+  (`[[source.links]]`, the other sources), a store category the GUI browses
+  itself (`[[source.online]]`), a default;
 - **what is recoloured**: its parts, each a `core.folder.Part` (name, kind
   `text` / `image` / `animation`, globs, colour syntax of the text files);
   everything else in the folder is copied as it is, except the `ignore` globs;
@@ -410,10 +429,16 @@ default = "…"                         # when no source is given (optional)
 label = "Theme"                       # the GUI's label (optional)
 help = "installed theme name or theme folder"              # (optional)
 
+[[source.online]]                     # browsed in the GUI, any number (optional)
+store = "gnome-look"                  # gnome-look | kde-store (core.online.STORES)
+category = 109                        # the number of its browse?cat= page
+title = "Gnome-look: GRUB themes"     # (optional)
+note = "hundreds of themes"           # (optional)
+
 [[source.links]]                      # other sources, any number (optional)
-name = "Gnome-look: GRUB themes"
-url = "https://www.gnome-look.org/browse?cat=109"          # https:// only
-note = "download, then extract the archive"                # (optional)
+name = "Gorgeous GRUB"
+url = "https://github.com/Jacksaur/Gorgeous-GRUB"          # https:// only
+note = "a list of themes, each linking to its page"        # (optional)
 
 [[parts]]                             # in order: a file goes to the first that takes it
 name = "text"                         # -a text=ACCENT, -m text.NAME
@@ -436,6 +461,10 @@ run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
 [restore]                             # optional: its help; restore exists with [install]
 help = "…"
 ```
+
+A `[[source.online]]` store is reached as described in
+[Writing a target](#writing-a-target): the GUI downloads what is chosen into
+the cache and unpacks it safely; its theme folders are those holding `marker`.
 
 `{installed}` is `<to>/<output name>`, `{name}` the output name; paths are
 absolute, `~/` being the user's home (the invoking user's under sudo), and

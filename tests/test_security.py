@@ -387,7 +387,7 @@ class GuiRequests(unittest.TestCase):
             for url in ("https://evil.org/x.jpg", "http://th.wallhaven.cc/x.jpg", "file:///etc/passwd"):
                 self.assertEqual(self.request("/api/online/thumb?target=image&source=wallhaven&url=" + q(url))[0], 404)
             status, r = self.request("/api/online/fetch", {"target": "limine", "source": "wallhaven", "id": "abc123"})
-            self.assertEqual(r["path"], str(self.tmp / "cache/downloads/wallhaven/wallhaven-abc123.jpg"))
+            self.assertEqual(r["paths"], [str(self.tmp / "cache/downloads/wallhaven/wallhaven-abc123.jpg")])
             self.assertIn("not a Wallhaven id",
                           self.request("/api/online/fetch", {"target": "image", "source": "wallhaven", "id": "../x"})[1]["error"])
         for path in ("/api/online?target=grub&source=wallhaven", "/api/online?target=image&source=nope",

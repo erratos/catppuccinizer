@@ -33,6 +33,12 @@ def is_archive(name):
     return str(name).lower().endswith(KINDS)
 
 
+def suffix(name):
+    """The archive extension of name ('.tar.gz', '.zip'…, as in KINDS), or ''."""
+    name = str(name).lower()
+    return max((k for k in KINDS if name.endswith(k)), key=len, default="")
+
+
 def safe_name(name):
     """The relative path of a member, or ArchiveError when it is absolute or goes
     up. Backslashes count as separators (archives made on Windows)."""
