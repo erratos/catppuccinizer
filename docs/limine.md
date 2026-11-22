@@ -7,7 +7,8 @@ boot menu, optionally with a recoloured wallpaper.
 
 ```bash
 catppuccinize limine -f mocha -a mauve                        # menu colours only
-catppuccinize limine -a mauve --wallpaper wall.jpg --preview  # + recoloured wallpaper
+catppuccinize limine -a mauve --preview                       # the menu as it will boot
+catppuccinize limine -a mauve --wallpaper wall.jpg            # + recoloured wallpaper
 sudo catppuccinize limine -a mauve --apply --dry-run          # what --apply would change
 sudo catppuccinize limine -a mauve --apply                    # menu only: wallpaper kept
 sudo catppuccinize limine -a mauve --wallpaper current --apply  # recolours your wallpaper
@@ -38,8 +39,30 @@ ESP is only readable by root: it reads `limine.conf`, it changes nothing).
 
 ## Preview
 
-`--preview` also renders before/after images of the wallpaper in
-`<out>/previews/`.
+`--preview` draws the boot menu as Limine will show it, into
+`<out>/previews/catppuccin-<flavor>-limine-<accent>.png` (the first flavour
+and accent, [previews](colours.md#previews)); nothing else is written. It
+follows Limine's own layout (its `menu.c` and terminal):
+
+- the screen at the resolution of your monitor (1920×1080 when it cannot be
+  read), the text in the VGA console font (`default8x16` of `kbd`), twice as
+  big from 2560×1440 as Limine does, or `term_font_scale`;
+- the title (`interface_branding`, by default `Limine <version> (x86-64,
+  UEFI)`) on row 1 in the accent; the key help (`ARROWS Select    ENTER Boot
+  E Edit`, the keys in `interface_help_colour`) on row 3, and `S Firmware Setup
+  B Blank Entry` on row 5;
+- the entries of your `limine.conf` as a tree (`[-]` / `[+]` directories,
+  `├──►` entries), centred, the default entry (`default_entry`, else the
+  first) in reverse video; its `comment` and `Booting automatically in N...`
+  at the bottom;
+- with a wallpaper, a 64-pixel margin showing it, a 4-pixel fade, and the
+  text area in `base` slightly see-through over it (`term_background`).
+
+With `--wallpaper`, the original wallpaper is on the left (and, with `keys`,
+[what the detection sees](colours.md#separating-colours) on the right).
+Without it, the menu is drawn over the wallpaper `limine.conf` sets, as it is.
+`limine.conf` is on the ESP, which often only root can read: without sudo, the
+preview says so and shows sample entries (and no wallpaper).
 
 ## Build (default): a snippet
 
@@ -115,7 +138,7 @@ is refused, to be fixed by hand.
 | `-f, --flavor`, `-a, --accent` | flavour and accent; `-a menu=ACCENT` / `wallpaper=ACCENT` for one part (see [Colours and mapping](colours.md#parts-an-accent-each)) |
 | `--wallpaper IMAGE` | image to recolour and use as the Limine wallpaper |
 | `--style` | `stretched`, `centered` or `tiled` (with `--wallpaper`) |
-| `--preview` | also render before/after images of the wallpaper in `<out>/previews/` (needs `--wallpaper`) |
+| `--preview` | only draw the boot menu as it will look (first flavour and accent) in `<out>/previews/`: [Preview](#preview) |
 | `--list` | list the wallpaper set in `limine.conf` (needs to read the ESP) and the installed wallpapers |
 | `--names` | only list the folders and files the build would write (existing ones marked); `--json` for JSON |
 | `--colours` | only list the wallpaper colours `-m` can remap (the menu has none); `--json` for JSON |

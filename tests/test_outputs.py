@@ -83,16 +83,20 @@ class Names(unittest.TestCase):
                            "-a", "mauve", "teal", contents=False)
         self.assertTrue(any(it["path"].endswith("-status") for it in names))
         self.check("plymouth", FIXTURES / "glow_mini", "-a", "mauve", "--preview")
+        self.check("plymouth", FIXTURES / "glow_mini", "-a", "mauve", "red", "--preview-animation")
 
     def test_limine(self):
         self.check("limine", "-a", "mauve", "peach", "--wallpaper", self.tmp / "img/photo.jpg",
                    "--esp", self.tmp)
         self.check("limine", "-a", "mauve", "--wallpaper", self.tmp / "img/flat.png", "--preview",
                    "--esp", self.tmp)
+        self.check("limine", "-a", "mauve", "peach", "--preview", "--esp", self.tmp)   # menu only
 
     def test_ksplash(self):
         names = self.check("ksplash", self.tmp / "splash", "-f", "latte", "mocha", contents=False)
         self.assertTrue(all(it["folder"] for it in names))
+        self.check("ksplash", self.tmp / "splash", "-f", "latte", "mocha", "--preview")
+        self.check("ksplash", self.tmp / "splash", "--preview-animation")
 
     def test_lut(self):
         self.check("lut", "-f", "mocha", "--format", "hald", "cube", "--hald-level", "4",

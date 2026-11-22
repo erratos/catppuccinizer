@@ -24,7 +24,7 @@ step runs.
 
 | Option | What it renders | Targets |
 |---|---|---|
-| `--preview` | one image per source: the original on the left, the result on the right (and, with `keys`, [what the detection sees](#separating-colours)) | image, Plymouth (each group of images), Limine, ksplash |
+| `--preview` | one image per source: the original on the left, the result on the right (and, with `keys`, [what the detection sees](#separating-colours)) | image, Plymouth (each group of images), Limine (the [boot menu as it will look](limine.md#preview)), ksplash |
 | `--preview-animation` | the main animation, before \| after, as an animated WebP that a browser plays | Plymouth (the longest numbered sequence, at its boot speed), ksplash (the longest animated GIF or WebP) |
 
 The GUI shows them as the **Preview image** and **Preview animation** buttons.

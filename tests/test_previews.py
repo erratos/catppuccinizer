@@ -17,6 +17,9 @@ sys.path.insert(0, str(HERE))
 sys.dont_write_bytecode = True
 
 from catppuccinizer.cli import main, parse  # noqa: E402
+from catppuccinizer.core import textscreen  # noqa: E402
+from catppuccinizer.core.palette import PALETTES, hex2rgb  # noqa: E402
+from catppuccinizer.targets import limine  # noqa: E402
 from test_regression import FIXTURES, make_splash  # noqa: E402
 
 
@@ -77,6 +80,39 @@ class Previews(unittest.TestCase):
         (self.tmp / "still/contents/splash/Splash.qml").write_text("Rectangle {}\n")
         self.assertIn("no animated GIF or WebP", cli("ksplash", self.tmp / "still", "--preview-animation"))
         self.assertIn("no image to show", cli("ksplash", self.tmp / "still", "--preview"))
+
+
+class LimineMenu(unittest.TestCase):
+    """--preview draws the Limine menu as menu.c lays it out."""
+    CONF = "timeout: 3\n/+Arch\n//linux\n    comment: the usual one\n//+older\n///linux-6.1\n//lts\n/Other\n//hidden\n"
+
+    def test_tree(self):
+        got = [(e["name"], pre) for e, pre in limine.tree_lines(limine.menu_entries(self.CONF))]
+        self.assertEqual(got, [("Arch", "[-]"), ("linux", " ├──►"), ("older", " ├[-]"),
+                               ("linux-6.1", " │ └──►"), ("lts", " └──►"), ("Other", "[+]")])
+
+    def test_screen(self):
+        p = PALETTES["mocha"]
+        theme = limine.theme_lines("mocha", "peach")
+        im = limine.menu_screen(theme, "default_entry: 2\n" + self.CONF, size=(800, 600))
+        self.assertEqual(im.size, (800, 600))
+        colours = {c for _, c in im.getcolors(1 << 16)}
+        for name in ("base", "text", "peach", "subtext0", "teal"):     # comment: palette 6
+            self.assertIn(tuple(int(v) for v in hex2rgb(p[name])), colours, name)
+        # the grid: (800 / 9) columns, centred; the selected entry in reverse video
+        scr = textscreen.TextScreen((800, 600), (0, 0, 0, 0), (255, 255, 255))
+        self.assertEqual((scr.cols, scr.rows, scr.origin), (88, 37, (4, 4)))
+        over = limine.menu_screen(theme, self.CONF, Image.new("RGB", (64, 36), (255, 0, 0)),
+                                  size=(800, 600))
+        self.assertEqual(over.getpixel((10, 300)), (255, 0, 0))       # margin: the wallpaper
+        self.assertNotEqual(over.getpixel((200, 300)), (255, 0, 0))   # text area: base over it
+
+    def test_font(self):
+        font = textscreen.console_font()
+        if font is None:
+            self.skipTest("no console font (kbd) on this system")
+        for ch in "A│├└─►":
+            self.assertEqual(font[ch].shape, (16, 8))
 
 
 if __name__ == "__main__":

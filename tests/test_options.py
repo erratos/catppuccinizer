@@ -131,9 +131,7 @@ class Declarations(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             parse(["limine", "--style", "tiled"])
         self.assertIn("note: --style has no effect without --wallpaper", out.getvalue())
-        with self.assertRaises(SystemExit) as e:
-            parse(["limine", "--preview"])
-        self.assertIn("--preview shows the wallpaper", str(e.exception))
+        self.assertTrue(parse(["limine", "--preview"]).preview)  # the menu, even without a wallpaper
         schema = [o.schema() for o in TARGETS["limine"].all_options()]
         by = {o["dest"]: o for o in schema}
         self.assertFalse(options.active(by["style"], {"style": "tiled"}, schema))
