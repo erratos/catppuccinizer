@@ -115,8 +115,14 @@ slightly see-through over it) unless `--wallpaper IMAGE` replaces it or
 `--wallpaper current` recolours it (its `wallpaper_style` is kept).
 
 Running it again replaces the block. Menu entries are not touched, so tools
-that regenerate them (e.g. CachyOS's `limine-entry-tool`) keep the theme. If
-config enrollment is enabled, run `sudo limine-enroll-config` afterwards.
+that regenerate them (e.g. CachyOS's `limine-entry-tool`) keep the theme.
+
+**Config enrollment** (`ENABLE_ENROLL_LIMINE_CONFIG=yes` in `/etc/default/limine`
+or `/etc/limine-entry-tool.conf`): the checksum of `limine.conf` is written into
+Limine's EFI binary, which refuses to boot a `limine.conf` that no longer matches
+it. Every write of `limine.conf` (`--apply`, `--restore`, `--configure`) is then
+followed by `limine-enroll-config`. When that tool is missing, nothing is
+written; when it fails, the command stops with the backup to put back.
 
 ## Restore
 
@@ -162,8 +168,8 @@ sudo catppuccinize limine --wallpaper current --preview        # see them in the
 | `--editor` | `editor_enabled` | `yes` / `no`: editing an entry with E | yes |
 
 The [preview](#preview) reads `limine.conf`, so it shows the settings once
-written. With config enrollment, run `sudo limine-enroll-config` afterwards
-(`--configure` reminds you).
+written. With [config enrollment](#apply-edits-limineconf-for-you), `limine-enroll-config` runs after the
+change.
 
 ## Options
 

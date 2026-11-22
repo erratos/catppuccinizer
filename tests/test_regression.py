@@ -25,6 +25,13 @@ GOLDEN = HERE / "golden.json"
 sys.path.insert(0, str(ROOT))
 sys.dont_write_bytecode = True
 
+from catppuccinizer.targets import limine  # noqa: E402
+
+# the tests write limine.conf files of their own: never enroll this machine's Limine
+# (limine-enroll-config when /etc/default/limine turns config enrollment on); every
+# test module that runs Limine's steps imports this one
+limine.ENROLL_CONFS = ()
+
 
 # ------------------------------------------------------------ synthetic inputs
 def make_images(d):

@@ -289,6 +289,43 @@ class Limine(Tmp):
         self.restore(esp)
         self.assertEqual(len(list(esp.glob("*.bak"))), n)
 
+    def test_enrollment(self):
+        """Config enrollment on: limine-enroll-config runs after each write (Limine
+        refuses a limine.conf that does not match its checksum); missing, nothing is
+        written; failing, the command says so with the backup."""
+        from unittest import mock
+        default = self.tmp / "default-limine"
+        default.write_text('ESP_PATH="/boot"\nENABLE_ENROLL_LIMINE_CONFIG="yes"\n')
+        ran = self.tmp / "enrolled"
+        tool = self.tmp / "limine-enroll-config"
+        conf = mock.patch.object(limine, "ENROLL_CONFS", (self.tmp / "missing.conf", default))
+
+        def fake(code):
+            tool.write_text(f"#!/bin/sh\necho run >> {ran}\nexit {code}\n")
+            tool.chmod(0o755)
+            return mock.patch.object(limine, "which", return_value=str(tool))
+
+        with conf, fake(0):
+            esp = self.apply(LIMINE_CONF.encode())
+            self.assertEqual(ran.read_text(), "run\n")                  # after apply
+            quiet(main, ["limine", "--configure", "--esp", str(esp), "--timeout", "1"])
+            self.restore(esp)
+            self.assertEqual(ran.read_text(), "run\n" * 3)              # configure, restore
+        with conf, mock.patch.object(limine, "which", return_value=None), \
+                self.assertRaises(SystemExit) as e:
+            self.apply(LIMINE_CONF.encode())
+        self.assertIn("limine-enroll-config is not found: nothing was written", str(e.exception))
+        self.assertEqual((esp / "limine.conf").read_text(), LIMINE_CONF)
+        with conf, fake(1), self.assertRaises(SystemExit) as e:
+            self.apply(LIMINE_CONF.encode())
+        self.assertIn("limine-enroll-config failed", str(e.exception))
+        self.assertIn(".bak", str(e.exception))                          # the backup to put back
+        default.write_text("#ENABLE_ENROLL_LIMINE_CONFIG=yes\n")          # off: not run
+        ran.unlink()
+        with conf, fake(0):
+            self.apply(LIMINE_CONF.encode())
+        self.assertFalse(ran.exists())
+
     def test_broken_block_is_refused(self):
         broken = LIMINE_CONF.replace("timeout: 3\n", f"{limine.BEGIN}: x\nbackdrop: 000000\n")
         with self.assertRaises(SystemExit) as e:

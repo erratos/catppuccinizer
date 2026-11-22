@@ -581,7 +581,7 @@ output folder goes through `core.system` (the `System` object of the steps).
 | `/var/lib/catppuccinizer/<target>.json` | what `restore` needs (system-wide steps) | install, apply | root, 644 |
 | `~/.local/state/catppuccinizer/<target>.json` | the same, for the user's steps | install, apply | the user |
 | `<ESP>/catppuccin/` | Limine wallpapers | install | root (FAT: no Unix rights) |
-| `<ESP>/…/limine.conf` + dated backups | the theme block | apply, restore | root, rights of the existing file |
+| `<ESP>/…/limine.conf` + dated backups | the theme block, then `limine-enroll-config` with config enrollment | apply, restore | root, rights of the existing file |
 | `~/.local/share/plasma/look-and-feel/<id>/` | KDE splash packages | install | the user, 644 / 755 |
 | `ksplashrc`, Plymouth default theme | through `kwriteconfig6`, `plymouth-set-default-theme -R` | apply, restore | the user / root |
 | `/boot/grub/themes/<name>/` | GRUB themes | install | root, 644 / 755 |
@@ -620,7 +620,9 @@ How:
   nothing is written. `restore` removes exactly that, so an untouched file
   comes back as the backup of the first `apply`, and later changes (new kernel
   entries) are kept. A wallpaper path of `limine.conf` that leaves the ESP
-  (`boot():/../…`) is refused.
+  (`boot():/../…`) is refused. With config enrollment on (its checksum in
+  Limine's EFI binary), each write is followed by `limine-enroll-config`, and
+  nothing is written when that tool is missing: Limine would refuse to boot.
 - **System settings** are checked when the command line is parsed (numbers in
   a range, patterns, choices, one line of text), go through the same file
   rules as the steps (backup, atomic write, byte for byte, Limine's block read

@@ -40,7 +40,7 @@ from ..core.parts import accent_sets, check_parts, note_unused, single
 from ..core.settings import DEFAULT, given, integer, pattern, plain_text, setting
 from ..core.palette import FLAVOR_TITLES, PALETTES, hex2rgb
 from ..core.sources import WALLPAPER_LINKS, item, section, wallpaper_sections
-from ..core.system import place, read_text, which
+from ..core.system import config_text, get_variable, place, read_text, unquote, which
 from ..core.target import Target
 from ..core.textscreen import TextScreen
 
@@ -71,8 +71,8 @@ class LimineTarget(Target):
         "(1920x1080), which also makes the menu faster to draw.",
         "Booting straight into the default entry: --timeout 0 (hold a key at boot to see the "
         "menu again, depending on the firmware); --timeout no waits for a choice.",
-        "With config enrollment (Secure Boot, limine-entry-tool), run "
-        "'sudo limine-enroll-config' after each change: --configure reminds you.",
+        "With config enrollment (Secure Boot, limine-entry-tool), each change runs "
+        "limine-enroll-config: Limine refuses a limine.conf that does not match its checksum.",
     ]
 
     def options(self):
@@ -92,9 +92,7 @@ class LimineTarget(Target):
 
     def apply(self, a, built, system):
         conf = built["conf"]
-        system.write_text(conf, insert_theme(read(conf), built["lines"],
-                                             bool(built["wallpapers"])), backup=True)
-        enrollment_note()
+        write_conf(system, conf, insert_theme(read(conf), built["lines"], bool(built["wallpapers"])))
 
     def restore(self, a, system):
         esp = a.esp or default_esp()
@@ -104,14 +102,13 @@ class LimineTarget(Target):
         if stripped == text:
             print(f"  {conf}: no catppuccinizer theme in it, left as it is")
         else:
-            system.write_text(conf, stripped, backup=True)
+            write_conf(system, conf, stripped)
         walls = esp / WALL_DIR
         ours = sorted(walls.glob("catppuccin-*-wallpaper*"))
         for f in ours:
             system.remove(f)
         if walls.is_dir() and not set(walls.iterdir()) - set(ours):     # nothing else in it
             system.remove(walls)
-        enrollment_note()
 
     def colours(self, a):
         return colours(a)
@@ -211,8 +208,7 @@ def configure(a, system):
     if new == text:
         print(f"  {conf}: nothing to change")
         return
-    system.write_text(conf, new, backup=True)
-    enrollment_note()
+    write_conf(system, conf, new)
 
 
 def check_args(a):
@@ -619,10 +615,38 @@ def read(conf):
         raise SystemExit(f"Cannot read {conf}: run with sudo (--dry-run too: it changes nothing, but it reads limine.conf)")
 
 
-def enrollment_note():
-    tool = Path("/etc/limine-entry-tool.conf")
-    if tool.exists() and re.search(r"^ENABLE_ENROLL_LIMINE_CONFIG=yes", tool.read_text(), re.M):
-        print("  config enrollment is on: run 'sudo limine-enroll-config' now")
+# config enrollment (limine-entry-tool): the checksum of limine.conf is written into
+# Limine's EFI binary, which then refuses to boot a limine.conf that does not match
+# it. Newer versions read the switch from /etc/default/limine only, older ones from
+# limine-entry-tool.conf: either counts (running the tool when it is off is harmless).
+ENROLL_CONFS = (Path("/etc/limine-entry-tool.conf"), Path("/etc/default/limine"))
+ENROLL = "limine-enroll-config"
+
+
+def enroll_tool():
+    """The path of limine-enroll-config when config enrollment is on, else None;
+    SystemExit when it is on but the tool is missing (checked before anything is
+    written: Limine would refuse to boot)."""
+    on = any(unquote(get_variable(config_text(f), "ENABLE_ENROLL_LIMINE_CONFIG") or "") == "yes"
+             for f in ENROLL_CONFS)
+    if not on:
+        return None
+    exe = which(ENROLL)
+    if exe is None:
+        raise SystemExit(f"config enrollment is on but {ENROLL} is not found: nothing was written "
+                         "(Limine refuses to boot a limine.conf that does not match its checksum)")
+    return exe
+
+
+def write_conf(system, conf, text):
+    """limine.conf written (a backup first), then enrolled again when config enrollment
+    is on (enroll_tool)."""
+    exe = enroll_tool()
+    bak = system.write_text(conf, text, backup=True)
+    if exe and system.run([exe]):
+        raise SystemExit(f"{ENROLL} failed: Limine will refuse to boot with the new {conf.name} "
+                         f"until it is enrolled; run 'sudo {ENROLL}' again"
+                         + (f", or put back {bak}" if bak else ""))
 
 
 def wallpapers(a, esp, read_conf):
