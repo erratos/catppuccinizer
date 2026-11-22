@@ -401,7 +401,7 @@ class GuiRequests(unittest.TestCase):
         self.assertEqual(self.request("/api/ping")[0], 200)
         self.assertEqual(self.request("/api/ping", token=False)[0], 403)
         self.assertEqual(self.request("/api/ping", token=False,
-                                      headers={"X-Token": self.app.token[:-1] + "x"})[0], 403)
+                                      headers={"X-Token": self.app.token[:-1] + ("y" if self.app.token.endswith("x") else "x")})[0], 403)
         self.assertEqual(self.request(f"/api/ping?t={self.app.token}", token=False)[0], 200)
         own = f"http://127.0.0.1:{self.app.port}"
         for headers in ({"Host": f"evil.example:{self.app.port}"},          # DNS rebinding
