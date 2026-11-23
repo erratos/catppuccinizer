@@ -18,7 +18,7 @@ ten minutes after the page is closed. `--port N` picks the port,
 
 ## Using it
 
-1. **Target**: the tabs at the top (`plymouth`, `image`, `limine`, `ksplash`,
+1. **Target**: the tabs at the top (`image`, `plymouth`, `limine`, `ksplash`,
    `lut`, `grub`, and your [TOML targets](architecture.md#declarative-targets-toml)).
 2. **Source**, from three places, a button each (or type a path):
    - *System locations…*: what this computer has, in sections, with what the

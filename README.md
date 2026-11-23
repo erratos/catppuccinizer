@@ -11,12 +11,18 @@ transparency are preserved, and any colour can be remapped by hand.
 
 | Command | What | Guide |
 |---|---|---|
-| `catppuccinize plymouth` | boot splash themes: yours, or downloaded ones such as the 80 of [adi1090x](https://github.com/adi1090x/plymouth-themes) | [Plymouth](docs/plymouth.md) |
 | `catppuccinize image` | images: wallpapers, photos, flat art, SVG logos | [Images](docs/images.md) |
+| `catppuccinize plymouth` | boot splash themes: yours, or downloaded ones such as the 80 of [adi1090x](https://github.com/adi1090x/plymouth-themes) | [Plymouth](docs/plymouth.md) |
 | `catppuccinize limine` | the Limine boot menu, with its wallpaper | [Limine](docs/limine.md) |
 | `catppuccinize ksplash` | the KDE Plasma splash screen shown after login | [KDE splash](docs/ksplash.md) |
-| `catppuccinize grub` | GRUB themes (`theme.txt`, images, icons) | [GRUB](docs/grub.md) |
+| `catppuccinize grub` | GRUB themes (`theme.txt`, images, icons), **untested** | [GRUB](docs/grub.md) |
 | `catppuccinize lut` | a colour table (`.cube`, Hald CLUT) for ffmpeg, GIMP, OBS… | [LUT export](docs/lut.md) |
+
+> [!WARNING]
+> The GRUB target has not been tested on a real GRUB install yet: the themes it
+> writes and its `--install` / `--apply` / `--restore` steps are untested.
+> Check with `--preview` and `--dry-run` first, and keep a way to boot without
+> GRUB's theme (a live USB) at hand.
 
 ## Quick start
 
@@ -40,15 +46,44 @@ resolution…): `sudo catppuccinize limine --configure` prints the current value
 Every command names its outputs `catppuccin-<flavor>-<source>[-<accent>][-<suffix>]`
 ([output names](docs/colours.md#output-names)).
 
-Prefer clicking? `catppuccinize gui` opens a [graphical interface](docs/gui.md)
-in your browser: choose the source (or find a wallpaper on Wallhaven, a theme
-on Gnome-look or the KDE Store without leaving the page) and the options, watch an image change as you move them (live
-preview), run.
+Prefer clicking? `catppuccinize gui` opens the [graphical interface](#graphical-interface).
 
 **New here?** Follow the [getting started guide](docs/getting-started.md).
 
 Ready-made themes built with the tool (Plymouth, KDE splash screens, Limine,
 images) are published in [catppuccinized-themes](https://github.com/erratos/catppuccinized-themes).
+
+## Graphical interface
+
+```bash
+catppuccinize gui
+```
+
+opens a page in your browser with everything the command line does, one tab
+per target. It is served by catppuccinizer itself on `127.0.0.1`: nothing
+leaves your computer, nothing more to install.
+
+- **Source**: the wallpapers and themes installed on your system (the one in
+  use marked), any file or folder (or drop images on the page), or the web:
+  Wallhaven, Gnome-look, the KDE Store and adi1090x's themes are searched and
+  downloaded right in the page.
+- **Colours**: click a flavour and an accent, and the page itself takes them.
+  The colours found in the source are listed before any run: click one to send
+  it elsewhere (`-m`), or pick one in a preview.
+- **Options**: every option of the target, each with a **?** that explains it
+  and, for the colour options, a picture comparing their values. Those without
+  effect with the current choices are greyed, with the reason.
+- **Live preview**: an image is shown recoloured as you move the options; drag
+  across it to compare with the original.
+- **Run**: *Preview image*, *Preview animation* (a boot splash, played in the
+  page), *Build*, then *Install*, *Apply*, *Test*, *Restore* for the targets
+  that change the system, with a *Dry run* switch; the password for `sudo` is
+  asked by a graphical prompt. A *System settings* card shows and changes how
+  the theme is displayed (timeout, resolution, delay…).
+- **Command**: the exact `catppuccinize …` line the page runs, and the files
+  *Build* would write, are shown as you go: copy it to script the same thing.
+
+More in the [GUI guide](docs/gui.md).
 
 ## Documentation
 

@@ -2,6 +2,12 @@
 
 [← Back to the README](../README.md) · [Getting started](getting-started.md)
 
+> [!WARNING]
+> This target has not been tested on a real GRUB install yet: the themes it
+> writes and its `--install` / `--apply` / `--restore` steps are untested.
+> Check with `--preview` and `--dry-run` first, and keep a way to boot without
+> GRUB's theme (a live USB) at hand.
+
 A GRUB theme is a folder with `theme.txt`, images (background, menu boxes,
 icons) and fonts. Any of them can be recoloured:
 

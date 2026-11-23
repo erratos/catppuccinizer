@@ -20,7 +20,7 @@ from pathlib import Path
 from . import options as opts
 from .paths import config_dir
 
-BUILTIN = ["plymouth", "image", "limine", "ksplash", "lut"]
+BUILTIN = ["image", "plymouth", "limine", "ksplash", "lut"]
 BUILTIN_DIR = Path(__file__).resolve().parent.parent / "targets"     # + its *.toml files
 
 

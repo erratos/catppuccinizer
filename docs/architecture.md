@@ -33,8 +33,8 @@ catppuccinizer/
     archives.py       archives unpacked safely (no '..', no links, limits)
     settings.py       system settings (--configure): declared, checked, values replaced kept
   targets/
-    plymouth/         Plymouth themes (+ preview script)
     image.py          images (wallpapers, logos…)
+    plymouth/         Plymouth themes (+ preview script)
     limine.py         Limine boot menu
     ksplash.py        KDE Plasma splash screen
     lut.py            LUT export (Hald CLUT, .cube)

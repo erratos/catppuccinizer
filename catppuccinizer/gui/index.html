@@ -1581,7 +1581,7 @@ setInterval(() => api("/api/ping").catch(() => setStatus("fail", "The catppuccin
   S.parts = store.get("parts", {}) || {};
   S.stepArgs = store.get("stepArgs", {}) || {};
   const names = S.schema.targets.map((t) => t.name);
-  S.target = names.includes(store.get("target")) ? store.get("target") : (names.includes("image") ? "image" : names[0]);
+  S.target = names.includes(store.get("target")) ? store.get("target") : names[0];
   for (const t of names) if (typeof S.values[t] !== "object" || Array.isArray(S.values[t])) S.values[t] = {};
   renderTabs(); applyTheme(); render(); updateCommand(); scheduleColours();
 })();
