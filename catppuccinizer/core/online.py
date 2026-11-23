@@ -40,7 +40,7 @@ from PIL import Image
 from .. import __version__
 from .archives import extract, is_archive, suffix
 from .naming import slug
-from .paths import cache_dir
+from .paths import cache_dir, prune
 from .sources import link, tidy
 
 TIMEOUT = 20                 # seconds, per request
@@ -57,8 +57,22 @@ class NetworkError(Exception):
     """A request that failed or was refused: its message is shown to the user."""
 
 
+DOWNLOADS_KEPT = 30 * 86400   # seconds a download unused is kept (prune_downloads)
+
+
 def downloads():
     return cache_dir() / "downloads"
+
+
+def prune_downloads(age=DOWNLOADS_KEPT, now=None):
+    """Remove the downloads not used for age seconds (OnlineSource.used): they are
+    downloaded again when chosen again."""
+    try:
+        sources = [d for d in downloads().iterdir() if d.is_dir() and not d.is_symlink()]
+    except OSError:
+        return
+    for d in sources:
+        prune(d, age, now)
 
 
 def item(id, label, note="", thumb=None, url=None, choices=None):
@@ -272,6 +286,14 @@ class OnlineSource:
     def folder(self):
         return downloads() / self.name
 
+    def used(self, path):
+        """path, a download of this source, its entry in folder() marked as used now:
+        prune_downloads() keeps it. Returns path."""
+        top = self.folder() / Path(path).relative_to(self.folder()).parts[0]
+        with contextlib.suppress(OSError):
+            os.utime(top, follow_symlinks=False)
+        return path
+
     def json(self, url):
         try:
             return json.loads(get(url, self.hosts, MAX_JSON))
@@ -303,6 +325,7 @@ class OnlineSource:
         if not found:
             shutil.rmtree(root, ignore_errors=True)
             raise NetworkError(f"{filename}: no {self.marker} in it, not a theme for this")
+        self.used(root)
         return found
 
 
@@ -361,7 +384,7 @@ class Wallhaven(OnlineSource):
             raise NetworkError(f"not a Wallhaven id: {item_id}")
         for kept in sorted(self.folder().glob(f"wallhaven-{item_id}.*")):
             if kept.suffix.lower() in self.EXTS and kept.is_file() and not kept.is_symlink():
-                return [kept]
+                return [self.used(kept)]
         w = _dict(_dict(self.json(f"{self.API}/w/{item_id}")).get("data"))
         if w.get("purity") != "sfw":
             raise NetworkError(f"{item_id}: not a safe for work image")
@@ -487,7 +510,7 @@ class Ocs(OnlineSource):
             return self.unpacked(url, self.hosts, dest, name, md5)
         kept = dest / f"{slug(Path(name).stem, 'image')}{Path(name).suffix.lower()}"
         if kept.is_file() and not kept.is_symlink():
-            return [kept]
+            return [self.used(kept)]
         return [check_image(check_digest(download(url, self.hosts, kept), md5))]
 
 

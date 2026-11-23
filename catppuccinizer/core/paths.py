@@ -1,6 +1,8 @@
 """Where things live: cache, restore state, and sudo-aware file ownership."""
 import os
+import shutil
 import stat
+import time
 from pathlib import Path
 
 
@@ -18,6 +20,26 @@ def cache_dir():
     if not base:
         base = Path(os.environ.get("XDG_CACHE_HOME", user_home() / ".cache")) / "catppuccinizer"
     return Path(base)
+
+
+def prune(folder, age, now=None):
+    """Remove what is in folder (a cache) and was not changed for age seconds: files
+    and folders, a link itself, never what it points to."""
+    now = time.time() if now is None else now
+    try:
+        entries = list(Path(folder).iterdir())
+    except OSError:
+        return
+    for e in entries:
+        try:
+            if now - e.lstat().st_mtime < age:
+                continue
+            if e.is_dir() and not e.is_symlink():
+                shutil.rmtree(e)
+            else:
+                e.unlink()
+        except OSError:
+            pass                      # in use, or not ours: left for next time
 
 
 def config_dir():

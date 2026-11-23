@@ -3,6 +3,8 @@ the live preview."""
 import base64
 import io
 import json
+import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -10,8 +12,10 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import uuid
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 from PIL import Image, ImageDraw
 
@@ -19,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.dont_write_bytecode = True
 
+from catppuccinizer import gui  # noqa: E402
 from catppuccinizer.gui import App, build_argv, make_handler  # noqa: E402
 
 
@@ -275,6 +280,60 @@ class Gui(unittest.TestCase):
             self.assertGreater(state["outputs"][0]["version"], 0)   # new file, new thumbnail URL
             self.assertTrue(names[0].startswith("catppuccin-mocha-flat"), names)
             self.assertTrue(state["outputs"][0]["preview"])
+
+
+class Runs(unittest.TestCase):
+    """One run at a time, a bounded list of runs, the caches tidied."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="catppuccinizer-test-"))
+        env = mock.patch.dict(os.environ, {"CATPPUCCINIZER_CACHE": str(self.tmp / "cache")})
+        env.start()
+        self.addCleanup(env.stop)
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.app = gui.App()
+        self.body = {"target": "lut", "values": {"out": str(self.tmp / "out")}}
+
+    def test_one_run_at_a_time(self):
+        """Two requests at once (two clicks): one run, the other refused, never two sudo."""
+        class SlowJob:                        # a run that takes a while to start
+            def __init__(self, argv, out, sudo):
+                time.sleep(0.2)
+                self.id, self.proc, self.code, self.outputs = uuid.uuid4().hex, True, None, None
+        answers = []
+        with mock.patch.object(gui, "Job", SlowJob):
+            threads = [threading.Thread(target=lambda: answers.append(self.app.run(self.body)))
+                       for _ in range(2)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        self.assertEqual(len(self.app.jobs), 1)
+        self.assertEqual(sorted(a.get("error") or "" for a in answers), ["", "a run is already in progress"])
+
+    def test_finished_runs_kept(self):
+        class Done:
+            def __init__(self, argv, out, sudo):
+                self.id, self.proc, self.code, self.outputs = uuid.uuid4().hex, True, 0, []
+        with mock.patch.object(gui, "Job", Done):
+            ids = [self.app.run(self.body)["job"] for _ in range(gui.JOBS_KEPT + 5)]
+        self.assertEqual(list(self.app.jobs), ids[-gui.JOBS_KEPT:])       # the most recent
+
+    def test_uploads_removed(self):
+        """A server's uploads go with it; those of a GUI that did not stop normally,
+        at the next start once a day old (another GUI open now has its own)."""
+        mine = self.app.upload("wall.png", b"x")
+        base = gui.uploads_dir()
+        old, recent = base / "old", base / "recent"
+        for d in (old, recent):
+            d.mkdir()
+            (d / "a.png").write_bytes(b"x")
+        os.utime(old, (time.time() - gui.UPLOADS_KEPT - 60,) * 2)
+        gui.tidy_cache()
+        self.assertEqual(sorted(p.name for p in base.iterdir()), sorted([mine.parent.name, "recent"]))
+        self.app.tidy()
+        self.assertFalse(mine.parent.exists())
+        self.assertTrue(recent.exists())
 
 
 if __name__ == "__main__":

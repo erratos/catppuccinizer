@@ -9,6 +9,7 @@ import stat
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 import urllib.error
 import zipfile
@@ -206,6 +207,30 @@ class Wallhaven(Tmp):
         self.assertEqual(len(asked), 2)
         with self.assertRaisesRegex(NetworkError, "not a Wallhaven id"):
             WALLHAVEN.fetch("../../etc")
+
+    def test_unused_downloads_removed(self):
+        """A download not used for 30 days is removed (downloaded again when chosen);
+        one used again is kept, and a link is removed, not what it points to."""
+        info = {"data": {"id": "abc123", "purity": "sfw", "path": "https://w.wallhaven.cc/full/ab/wallhaven-abc123.png"}}
+        fake, asked = answers({"https://wallhaven.cc/api/v1/w/abc123": json.dumps(info).encode(),
+                               "https://w.wallhaven.cc/full/": png_bytes()})
+        with mock.patch.object(online, "_open", fake):
+            (p,) = WALLHAVEN.fetch("abc123")
+        folder = WALLHAVEN.folder()
+        (folder / "old-theme").mkdir()
+        (folder / "old-theme/theme.txt").write_text("x")
+        outside = self.tmp / "mine.png"
+        outside.write_bytes(b"x")
+        (folder / "link.png").symlink_to(outside)
+        long_ago = (time.time() - online.DOWNLOADS_KEPT - 60,) * 2
+        for e in (p, folder / "old-theme", folder / "link.png"):
+            os.utime(e, long_ago, follow_symlinks=False)
+        with mock.patch.object(online, "_open", fake):
+            WALLHAVEN.fetch("abc123")                                    # used again: kept
+        online.prune_downloads()
+        self.assertEqual(sorted(e.name for e in folder.iterdir()), [p.name])
+        self.assertTrue(outside.exists())
+        self.assertEqual(len(asked), 2)
 
     def test_fetch_refuses(self):
         cases = {

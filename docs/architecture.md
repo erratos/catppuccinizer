@@ -583,7 +583,7 @@ output folder goes through `core.system` (the `System` object of the steps).
 | Where | What | Step | Rights |
 |---|---|---|---|
 | output folder (`-o`) | the results | build | the user; under sudo, handed back to them |
-| `~/.cache/catppuccinizer/` | GUI uploads, `downloads/<source>/` (online sources) | GUI | the user (`700`) |
+| `~/.cache/catppuccinizer/` | GUI uploads (removed when the server stops), `downloads/<source>/` (online sources; removed after 30 days unused, `core.online.prune_downloads`) | GUI | the user (`700`) |
 | `/usr/share/plymouth/themes/<name>/` | Plymouth themes | install | root, files 644, folders 755 |
 | `/var/lib/catppuccinizer/<target>.json` | what `restore` needs (system-wide steps) | install, apply | root, 644 |
 | `~/.local/state/catppuccinizer/<target>.json` | the same, for the user's steps | install, apply | the user |

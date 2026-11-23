@@ -197,7 +197,8 @@ What the page can reach:
 | files and thumbnails | images only (by extension), readable by you, not in `/proc`, `/sys`, `/dev`, `/run`, up to 200 MB; a link is judged by the file it points to |
 | open (`xdg-open`) | folders, images and plain text outputs (`.conf`, `.txt`, `.json`, `.cube`), never a script or a `.desktop` file |
 | folder listing | any folder you can read (the file browser) |
-| upload | images up to 200 MB, in `~/.cache/catppuccinizer/gui-uploads/<random>/` (only for you, `700`), the name reduced to letters, digits, `.`, `_`, `-` |
+| upload | images up to 200 MB, in `~/.cache/catppuccinizer/gui-uploads/<random>/` (only for you, `700`), the name reduced to letters, digits, `.`, `_`, `-`; removed when the server stops (those of a server that did not stop normally, at the next start once a day old) |
+| run | one at a time, even for two clicks at once (never two `sudo`); the output of the 20 most recent is kept while the server runs |
 | run, command, colours, live | a known target and its declared options only; values are text, numbers or on/off, without control characters, and never start with `-` (no value can pass for an option) |
 | live preview | one of the still images of the target's image source, under the rules of files above; rendered in the server's process, nothing written |
 
@@ -215,7 +216,7 @@ server, only when the panel asks:
 | hosts | `https://` only, to the hosts the source declares (Wallhaven: `wallhaven.cc`, `w.wallhaven.cc`, `th.wallhaven.cc`; Gnome-look and the KDE Store: their API host, `*.pling.com` and the storage host their downloads are sent to; a GitHub release: `api.github.com`, `github.com` and its release storage hosts), redirects included; 20 s per request |
 | search | the source's API, its answer read as data (4 MB at most) |
 | thumbnails | fetched by the server (4 MB at most), decoded and written again as JPEG: the page still loads images from the server only |
-| downloads | an item the source lists, by its id (checked), up to 200 MB, written in full then renamed, only for you (`700` / `600`); checked against the digest the site gives (the stores' MD5, GitHub's SHA-256 of newer assets); a file already there is used again; a download that is not an image is removed |
+| downloads | an item the source lists, by its id (checked), up to 200 MB, written in full then renamed, only for you (`700` / `600`); checked against the digest the site gives (the stores' MD5, GitHub's SHA-256 of newer assets); a file already there is used again; a download that is not an image is removed; one not used for 30 days is removed when the GUI starts (it is downloaded again when chosen) |
 | archives | (Gnome-look, the KDE Store, a GitHub release) `.zip` and `.tar.*` only, unpacked in a new folder: no absolute name or `..`, no link or device, 5000 files and 500 MB at most; the archive is then removed, and so is what holds no theme folder |
 
 ## For target authors

@@ -42,8 +42,8 @@ from PIL import Image
 from .. import __version__
 from ..core.palette import ACCENTS, FLAVOR_TITLES, FLAVORS, PALETTES, TARGETS
 from ..core.archives import ArchiveError
-from ..core.online import NetworkError, thumbnail as online_thumbnail
-from ..core.paths import cache_dir
+from ..core.online import NetworkError, prune_downloads, thumbnail as online_thumbnail
+from ..core.paths import cache_dir, prune
 from ..core.options import STEPS, active, analysis, image_file
 from ..core.recolor import NO_ACCENT_METHODS
 from ..core.target import discover
@@ -57,6 +57,8 @@ IDLE_EXIT = 600            # seconds without any request (and no job) before the
 MAX_JSON = 1 << 20         # bytes of a JSON request
 MAX_UPLOAD = 200 << 20     # bytes of a dropped image
 MAX_FILE = 200 << 20       # bytes of a file served whole (/api/file)
+UPLOADS_KEPT = 86400       # seconds: older uploads are those of a GUI that did not stop normally
+JOBS_KEPT = 20             # finished runs whose output the server keeps
 SYSTEM_FS = ("/proc", "/sys", "/dev", "/run")      # never served, even when readable
 # what /api/open hands to xdg-open: folders, images and plain text outputs, never
 # something xdg-open could run (a script, a .desktop file)
@@ -308,6 +310,9 @@ class App:
         self.images = {o.image: image_file(o.image) for t in self.targets.values()
                        for o in t.all_options() if o.image}
         self.jobs = {}
+        # one run at a time, even for two requests at once; self.jobs changes under it
+        self.lock = threading.RLock()
+        self.uploads = []                  # the folders of this server's uploads: removed at the end
         self.live_view = live.Live()
         self.last_seen = time.time()
         self.port = None
@@ -329,11 +334,32 @@ class App:
         c = self.command(body)
         if c.get("error") or "argv" not in c:
             return c
-        if any(j.code is None and j.proc for j in self.jobs.values()):
-            return {"error": "a run is already in progress"}
-        job = Job(c["argv"], c["out"], bool(body.get("sudo")))
-        self.jobs[job.id] = job
+        with self.lock:
+            if self.busy():
+                return {"error": "a run is already in progress"}
+            job = Job(c["argv"], c["out"], bool(body.get("sudo")))
+            self.jobs[job.id] = job
+            for old in [i for i, j in self.jobs.items() if j.outputs is not None][:-JOBS_KEPT]:
+                del self.jobs[old]             # the oldest finished runs (dicts keep the order)
         return {**c, "job": job.id}
+
+    def upload(self, name, data):
+        """A dropped image saved in a new folder of the cache, only for the user: its path."""
+        base = uploads_dir()
+        base.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(base, 0o700)
+        d = base / uuid.uuid4().hex[:12]
+        d.mkdir(mode=0o700)
+        self.uploads.append(d)
+        with open(d / name, "xb") as f:               # x: a new file, never through a link
+            f.write(data)
+        return d / name
+
+    def tidy(self):
+        """At the end: this server's uploads (the page that used them is gone)."""
+        for d in self.uploads:
+            shutil.rmtree(d, ignore_errors=True)
+        self.uploads.clear()
 
     def colours(self, body):
         """The colours -m can remap, before any run: `catppuccinize ... --colours --json`
@@ -420,7 +446,8 @@ class App:
         return {**r, "path": path, "images": images, "version": version(Path(path))}
 
     def busy(self):
-        return any(j.code is None and j.proc for j in self.jobs.values())
+        with self.lock:
+            return any(j.code is None and j.proc for j in self.jobs.values())
 
 
 # what the live preview leaves out of the form values: it shows the result itself
@@ -704,14 +731,7 @@ def make_handler(app):
                 if data is None:
                     return self.send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
                                      {"error": f"images up to {MAX_UPLOAD >> 20} MB"})
-                base = cache_dir() / "gui-uploads"           # only for the user
-                base.mkdir(parents=True, exist_ok=True, mode=0o700)
-                os.chmod(base, 0o700)
-                d = base / uuid.uuid4().hex[:12]
-                d.mkdir(mode=0o700)
-                with open(d / name, "xb") as f:               # x: a new file, never through a link
-                    f.write(data)
-                return self.send(200, {"path": str(d / name)})
+                return self.send(200, {"path": str(app.upload(name, data))})
             raw = self.body(MAX_JSON)
             if raw is None:
                 return self.send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request too large"})
@@ -759,6 +779,17 @@ def make_handler(app):
     return Handler
 
 
+def uploads_dir():
+    return cache_dir() / "gui-uploads"
+
+
+def tidy_cache():
+    """At start: the uploads left by a GUI that did not stop normally (a day old, as
+    another GUI open now has its own) and the downloads unused for a while."""
+    prune(uploads_dir(), UPLOADS_KEPT)
+    prune_downloads()
+
+
 def serve(port=0, browser=True):
     if os.geteuid() == 0:
         # as root it would serve root's files to the page: a step that needs root
@@ -781,6 +812,7 @@ def serve(port=0, browser=True):
                 httpd.shutdown()
                 return
     threading.Thread(target=watchdog, daemon=True).start()
+    threading.Thread(target=tidy_cache, daemon=True).start()
     if browser:
         threading.Timer(0.3, webbrowser.open, args=(url,)).start()
     try:
@@ -791,6 +823,7 @@ def serve(port=0, browser=True):
         for j in app.jobs.values():
             j.stop()
         httpd.server_close()
+        app.tidy()
 
 
 def main():
