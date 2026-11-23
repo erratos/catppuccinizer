@@ -8,9 +8,11 @@ in theme.txt ("#rrggbb" strings) go to Catppuccin roles; the images are
 recoloured like the image target (keys for flat art, LUT for photos), the
 icons apart (-a icons=ACCENT); fonts and the rest are copied as they are.
 
---install copies the result to /boot/grub/themes, --apply (which installs
-first) sets GRUB_THEME in /etc/default/grub and runs grub-mkconfig, --restore
-puts the previous GRUB_THEME back and removes the installed themes. --preview
+--install copies the result to /boot/grub/themes (/boot/grub2/themes on
+Fedora and openSUSE), --apply (which installs first) sets GRUB_THEME in
+/etc/default/grub and writes the menu again (update-grub, grub-mkconfig or
+grub2-mkconfig), --restore puts the previous GRUB_THEME back and removes the
+installed themes. --preview
 shows the largest image (the background) before and after."""
 
 [source]
@@ -47,28 +49,37 @@ name = "images"
 kind = "image"
 
 [install]
-to = "/boot/grub/themes"
+to = ["/boot/grub/themes", "/boot/grub2/themes"]      # the first whose folder exists
 sudo = true
-help = "copy the result to /boot/grub/themes"
+help = "copy the result to the themes folder of GRUB (/boot/grub/themes or /boot/grub2/themes)"
 
 [apply]
-help = "install, then set GRUB_THEME in /etc/default/grub and run grub-mkconfig"
+help = "install, then set GRUB_THEME in /etc/default/grub and write the menu again"
 explain = """Here: GRUB_THEME in /etc/default/grub points to the installed theme.txt (a \
-backup of the file is made), then grub-mkconfig -o /boot/grub/grub.cfg writes the menu \
-again; seen at the next boot."""
+backup of the file is made), then the menu is written again (update-grub on Debian and \
+Ubuntu, grub-mkconfig -o /boot/grub/grub.cfg, or grub2-mkconfig -o /boot/grub2/grub.cfg \
+on Fedora and openSUSE); seen at the next boot."""
 set = [{ file = "/etc/default/grub", key = "GRUB_THEME", value = "{installed}/theme.txt" }]
-run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
+run = [[
+    ["update-grub"],                                        # Debian, Ubuntu
+    ["grub-mkconfig", "-o", "/boot/grub/grub.cfg"],         # Arch, Gentoo…
+    ["grub2-mkconfig", "-o", "/boot/grub2/grub.cfg"],       # Fedora, openSUSE
+]]
 
 [restore]
-help = "put the previous GRUB_THEME back, run grub-mkconfig, remove the installed themes"
+help = "put the previous GRUB_THEME back, write the menu again, remove the installed themes"
 
 [configure]                           # the display settings: --configure (core.settings)
 sudo = true
-help = "write the display settings given into /etc/default/grub, then run grub-mkconfig"
+help = "write the display settings given into /etc/default/grub, then write the menu again"
 explain = """Here: each setting is a variable of /etc/default/grub (a backup is made, the \
-value replaced is remembered), then grub-mkconfig -o /boot/grub/grub.cfg writes the menu \
-again; seen at the next boot."""
-run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
+value replaced is remembered), then the menu is written again (update-grub, grub-mkconfig \
+or grub2-mkconfig, as for --apply); seen at the next boot."""
+run = [[
+    ["update-grub"],                                        # Debian, Ubuntu
+    ["grub-mkconfig", "-o", "/boot/grub/grub.cfg"],         # Arch, Gentoo…
+    ["grub2-mkconfig", "-o", "/boot/grub2/grub.cfg"],       # Fedora, openSUSE
+]]
 tips = [
     "A theme only shows with the graphical terminal: GRUB_TERMINAL_OUTPUT must not be 'console'.",
     "A menu too small on a large screen: --gfxmode 1920x1080 (or lower), as a theme is drawn at that resolution.",

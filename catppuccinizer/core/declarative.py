@@ -24,7 +24,7 @@ from .paths import state_file, user_home
 from .settings import given, integer, pattern, plain_text, remember, setting, settings_state
 from .sources import item, link, section, theme_folders, tidy
 from .system import (UNSAFE_VALUE, VARIABLE, config_text, copy_folder, get_variable, place,
-                     set_variable, unquote)
+                     set_variable, unquote, which)
 from .target import Target
 
 # the programs apply may run: bootloader and cache refreshers (adding one is a change
@@ -34,8 +34,11 @@ COMMANDS = ("grub-mkconfig", "grub2-mkconfig", "update-grub", "fc-cache",
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 FIELDS = ("name", "installed")               # what {…} may name in apply's values and commands
 
-STR, BOOL, INT, STRS, TABLE, TABLES, COMMAND_LIST = "a string", "true or false", "a number", \
-    "a list of strings", "a table", "a list of tables", "a list of commands (lists of strings)"
+STR, BOOL, INT, STRS, TABLE, TABLES = ("a string", "true or false", "a number", "a list of strings",
+                                       "a table", "a list of tables")
+PATHS = "a string or a list of strings"
+COMMAND_LIST = ("a list of commands (lists of strings), or of alternatives (lists of commands: "
+                "the first whose program is found runs)")
 SCHEMA = {                 # key: (type, required)
     "": {"name": (STR, True), "help": (STR, True), "description": (STR, False),
          "default_out": (STR, False), "ignore": (STRS, False), "source": (TABLE, True),
@@ -49,7 +52,7 @@ SCHEMA = {                 # key: (type, required)
                "note": (STR, False)},
     "parts": {"name": (STR, True), "kind": (STR, True), "files": (STRS, False),
               "syntax": (STR, False), "label": (STR, False)},
-    "install": {"to": (STR, True), "sudo": (BOOL, False), "help": (STR, False)},
+    "install": {"to": (PATHS, True), "sudo": (BOOL, False), "help": (STR, False)},
     "apply": {"help": (STR, False), "explain": (STR, False), "set": (TABLES, False),
               "run": (COMMAND_LIST, False)},
     "set": {"file": (STR, True), "key": (STR, True), "value": (STR, True)},
@@ -75,8 +78,29 @@ def _is(value, kind):
         return isinstance(value, dict)
     if kind == TABLES:
         return isinstance(value, list) and all(isinstance(v, dict) for v in value)
-    return (isinstance(value, list) and all(isinstance(c, list) and c and all(isinstance(v, str) for v in c)
-                                            for c in value))
+    if kind == PATHS:
+        return isinstance(value, str) or (_is(value, STRS) and bool(value))
+
+    def command(c):
+        return isinstance(c, list) and c and all(isinstance(v, str) for v in c)
+    return isinstance(value, list) and all(
+        command(c) or (isinstance(c, list) and c and all(command(x) for x in c)) for c in value)
+
+
+def alternatives(cmd):
+    """A command of run as its alternatives: [cmd], or the list given."""
+    return cmd if isinstance(cmd[0], list) else [cmd]
+
+
+def found(alts):
+    """The first of a command's alternatives whose program is found (as System.run
+    looks it up); none: stop before anything is changed."""
+    for cmd in alts:
+        if which(cmd[0]):
+            return cmd
+    raise SystemExit(f"{' / '.join(c[0] for c in alts)}: not found"
+                     + (" in the system folders" if os.geteuid() == 0 else "")
+                     + ": nothing was changed")
 
 
 def check_table(table, schema, where):
@@ -212,7 +236,10 @@ class TomlTarget(Target):
             if self.sudo and not builtin:
                 raise SystemExit(f"{where} [install]: sudo = true is only for the TOML targets "
                                  "of catppuccinizer (a TOML target of yours runs with your rights)")
-            self.install_to = system_path(ins["to"], builtin, f"{where} [install]")
+            # several: the first whose parent folder exists (/boot/grub or /boot/grub2)
+            tos = [system_path(t, builtin, f"{where} [install]")
+                   for t in ([ins["to"]] if isinstance(ins["to"], str) else ins["to"])]
+            self.install_to = next((t for t in tos if t.parent.is_dir()), tos[0])
             self.step_help["install"] = ins.get("help", f"copy the result to {self.install_to}")
         if "apply" in spec:
             app = spec["apply"]
@@ -224,11 +251,12 @@ class TomlTarget(Target):
                 check_table(st, "set", f"{w} set #{k + 1}")
                 self.sets.append((system_path(st["file"], builtin, f"{w} set #{k + 1}"), st["key"],
                                   fields_of(st["value"], f"{w} set #{k + 1}")))
-            for cmd in app.get("run", []):
-                if cmd[0] not in COMMANDS:
-                    raise SystemExit(f"{w}: {cmd[0]} is not a command apply may run "
-                                     f"({', '.join(COMMANDS)})")
-                self.commands.append([fields_of(c, w) for c in cmd])
+            for alts in map(alternatives, app.get("run", [])):
+                for cmd in alts:
+                    if cmd[0] not in COMMANDS:
+                        raise SystemExit(f"{w}: {cmd[0]} is not a command apply may run "
+                                         f"({', '.join(COMMANDS)})")
+                self.commands.append([[fields_of(c, w) for c in cmd] for cmd in alts])
             self.step_help["apply"] = app.get("help", "install, then select it")
             self.apply_explain = app.get("explain")
         if "restore" in spec:
@@ -254,11 +282,12 @@ class TomlTarget(Target):
         self.configure_sudo = conf.get("sudo", False)
         if self.configure_sudo and not builtin:
             raise SystemExit(f"{where}: sudo = true is only for the TOML targets of catppuccinizer")
-        for cmd in conf.get("run", []):
-            if cmd[0] not in COMMANDS or any("{" in c for c in cmd):
-                raise SystemExit(f"{where}: {cmd[0]} is not a command configure may run "
-                                 f"({', '.join(COMMANDS)}, without {{…}})")
-            self.configure_run.append(cmd)
+        for alts in map(alternatives, conf.get("run", [])):
+            for cmd in alts:
+                if cmd[0] not in COMMANDS or any("{" in c for c in cmd):
+                    raise SystemExit(f"{where}: {cmd[0]} is not a command configure may run "
+                                     f"({', '.join(COMMANDS)}, without {{…}})")
+            self.configure_run.append(alts)
         self.tips = list(conf.get("tips", []))
         for k, st in enumerate(conf["settings"]):
             w = f"{where} [[configure.settings]] #{k + 1}"
@@ -330,6 +359,7 @@ class TomlTarget(Target):
 
     def configure(self, a, system):
         values = given(a, [o for o, _, _ in self.settings])
+        commands = [found(alts) for alts in self.configure_run]     # before any change
         changed = False
         for f in dict.fromkeys(f for _, f, _ in self.settings):
             mine = [(o, key) for o, g, key in self.settings if g == f and o.dest in values]
@@ -353,7 +383,7 @@ class TomlTarget(Target):
         if not changed:
             print("  nothing to change")
             return
-        for cmd in self.configure_run:
+        for cmd in commands:
             if system.run(cmd):
                 raise SystemExit(f"{cmd[0]} failed")
 
@@ -363,6 +393,11 @@ class TomlTarget(Target):
                 len(a.flavor) > 1 or not single(a, self.part_names)):
             raise SystemExit("--install / --apply need a single flavour and a single accent "
                              "(-f FLAVOR -a ACCENT)")
+        # the commands found before anything is changed (installed, written)
+        if getattr(a, "apply", False):
+            self.to_run()
+        if getattr(a, "restore", False):
+            self.to_run(restoring=True)
 
     # ------------------------------------------------------------- sources
     def resolve(self, arg):
@@ -512,10 +547,14 @@ class TomlTarget(Target):
             if new != text:
                 system.write_text(f, new, backup=True)
 
+    def to_run(self, restoring=False):
+        """The commands of apply, each the first of its alternatives found; restoring:
+        without those about the result ({…}), which go with it."""
+        return [found(alts) for alts in self.commands
+                if not (restoring and any("{" in c for cmd in alts for c in cmd))]
+
     def run_commands(self, system, name=None, installed=None):
-        for cmd in self.commands:
-            if name is None and any("{" in c for c in cmd):
-                continue                      # restore: a command about the result goes with it
+        for cmd in self.to_run(restoring=name is None):
             if system.run([fill(c, name or "", installed or "") for c in cmd]):
                 raise SystemExit(f"{cmd[0]} failed")
 

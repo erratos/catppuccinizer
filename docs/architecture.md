@@ -443,7 +443,12 @@ Allowed, because most installs need one (`grub-mkconfig` after
 
 - **allow list**: the program must be one of `core.declarative.COMMANDS`
   (bootloader and cache refreshers); adding one is a change to catppuccinizer,
-  reviewed like code. The arguments are fixed in the file; only `{name}` and
+  reviewed like code.
+- **alternatives**: a command may be a list of commands, of which the first
+  whose program is found runs (GRUB: `update-grub`, `grub-mkconfig`,
+  `grub2-mkconfig`, by distribution). They are looked up before anything is
+  changed (when the arguments are checked, at the start of `--configure`):
+  when one has none, the command stops there, not after a file was written. The arguments are fixed in the file; only `{name}` and
   `{installed}` are replaced, with checked names. No shell, and as root the
   program is looked up in the system folders only (`System.run`).
 - **`--dry-run`**: every step goes through `System`, so `--dry-run` lists the
@@ -505,7 +510,8 @@ syntax = "hex"                        # text: qml | svg | hex (default: by exten
 label = "theme.txt"                   # text: its name in --colours (optional)
 
 [install]
-to = "/boot/grub/themes"              # results go to <to>/<output name>
+to = "/boot/grub/themes"              # results go to <to>/<output name>; a list:
+                                      # the first whose parent folder exists
 sudo = true                           # needs root (built-in files only)
 help = "…"                            # (optional)
 
@@ -513,7 +519,7 @@ help = "…"                            # (optional)
 help = "…"
 explain = "…"                         # the GUI's long text (optional)
 set = [{ file = "/etc/default/grub", key = "GRUB_THEME", value = "{installed}/theme.txt" }]
-run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]
+run = [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]]       # in order; [[…], […]]: the first found
 
 [restore]                             # optional: its help; restore exists with [install]
 help = "…"
@@ -585,12 +591,12 @@ output folder goes through `core.system` (the `System` object of the steps).
 | `<ESP>/…/limine.conf` + dated backups | the theme block, then `limine-enroll-config` with config enrollment | apply, restore | root, rights of the existing file |
 | `~/.local/share/plasma/look-and-feel/<id>/` | KDE splash packages | install | the user, 644 / 755 |
 | `ksplashrc`, Plymouth default theme | through `kwriteconfig6`, `plymouth-set-default-theme -R` | apply, restore | the user / root |
-| `/boot/grub/themes/<name>/` | GRUB themes | install | root, 644 / 755 |
-| `/etc/default/grub` + dated backups | `GRUB_THEME`, then `grub-mkconfig` | apply, restore | root, rights of the existing file |
+| `/boot/grub/themes/<name>/` (`/boot/grub2/themes/` on Fedora, openSUSE) | GRUB themes | install | root, 644 / 755 |
+| `/etc/default/grub` + dated backups | `GRUB_THEME`, then `update-grub` / `grub-mkconfig` / `grub2-mkconfig` (the first found, else nothing is changed) | apply, restore | root, rights of the existing file |
 | `<ESP>/…/limine.conf` + dated backups | the display settings block | configure | root |
 | `/etc/plymouth/plymouthd.conf` + dated backups | `ShowDelay`, `DeviceTimeout`, `DeviceScale`, then the initramfs rebuilt | configure | root, rights of the existing file |
 | `/etc/systemd/system/plymouth-quit.service.d/catppuccinizer.conf` | `--hold`: a sleep before Plymouth quits, then `systemctl daemon-reload` | configure | root, 644 |
-| `/etc/default/grub` + dated backups | `GRUB_TIMEOUT`, `GRUB_GFXMODE`…, then `grub-mkconfig` | configure | root |
+| `/etc/default/grub` + dated backups | `GRUB_TIMEOUT`, `GRUB_GFXMODE`…, then the same command | configure | root |
 | `ksplashrc` | `Engine` (splash on / off), through `kwriteconfig6` | configure | the user |
 | `…/catppuccinizer/<target>-settings.json` | the values the settings replaced (for `default`) | configure | as the step |
 | what a user's TOML target names | its install folder, its `KEY="value"` files | install, apply, restore | the user, inside their home only (refused as root) |

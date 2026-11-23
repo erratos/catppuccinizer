@@ -35,7 +35,7 @@ image; `-m` remaps any of them, `-a icons=peach` gives the icons their own
 accent ([parts](colours.md#parts-an-accent-each)).
 
 GRUB only reads themes from a filesystem it can reach at boot (usually
-`/boot`): the result is installed into `/boot/grub/themes/`.
+`/boot`): the result is installed into its themes folder ([Install](#install)).
 
 ## Steps
 
@@ -54,31 +54,39 @@ A theme folder per flavour (and accent, when something uses it):
 
 ### Install
 
-`--install` copies it to `/boot/grub/themes/`.
+`--install` copies it to `/boot/grub/themes/`, or `/boot/grub2/themes/` where
+GRUB's folder is `/boot/grub2` (Fedora, openSUSE).
 
 ### Apply
 
 `--apply` installs, then sets `GRUB_THEME` in `/etc/default/grub` to the
 installed `theme.txt` (a dated backup of the file is made next to it; the rest
-of the file is kept byte for byte) and runs
-`grub-mkconfig -o /boot/grub/grub.cfg`. The `GRUB_THEME` of before is
-remembered (in `/var/lib/catppuccinizer/grub.json`) for `--restore`.
+of the file is kept byte for byte) and writes the menu again with the first
+of these commands that is installed:
 
-On distributions where the menu is `/boot/grub2/grub.cfg` (Fedora, openSUSE),
-run `grub2-mkconfig` yourself after `--install`, or copy the TOML file with
-your paths (see below).
+| Command | Distributions |
+|---|---|
+| `update-grub` | Debian, Ubuntu and their derivatives |
+| `grub-mkconfig -o /boot/grub/grub.cfg` | Arch, Gentoo… |
+| `grub2-mkconfig -o /boot/grub2/grub.cfg` | Fedora, openSUSE |
+
+When none is found, nothing is done at all (not even the build), rather than
+`/etc/default/grub` being changed without the menu following. The `GRUB_THEME`
+of before is remembered (in `/var/lib/catppuccinizer/grub.json`) for
+`--restore`.
 
 ### Restore
 
 `--restore` puts the previous `GRUB_THEME` back (or removes the line when there
-was none), runs `grub-mkconfig` again and removes the themes catppuccinizer
+was none), writes the menu again (the same command) and removes the themes catppuccinizer
 installed. It builds nothing.
 
 ## Display settings
 
 How the menu behaves and is drawn, apart from the theme: `--configure` sets
 variables of `/etc/default/grub` (a dated backup first, the rest of the file
-kept byte for byte), then runs `grub-mkconfig -o /boot/grub/grub.cfg`. It builds
+kept byte for byte), then writes the menu again, with the command of
+[`--apply`](#apply). It builds
 nothing; `default` puts back what the variable was (or removes its line), the
 values replaced being remembered in `/var/lib/catppuccinizer/grub-settings.json`.
 

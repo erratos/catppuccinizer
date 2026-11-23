@@ -137,7 +137,22 @@ class Schema(Home):
         text = USER_TOML + 'run = [["rm", "-rf", "{installed}"]]\n'
         self.assertIn("rm is not a command apply may run", self.load_error(text))
         t = declarative.load(self.write(USER_TOML + 'run = [["fc-cache"]]\n'))
-        self.assertEqual(t.commands, [["fc-cache"]])
+        self.assertEqual(t.commands, [[["fc-cache"]]])
+        # alternatives: the first whose program is found; each one on the allow list
+        t = declarative.load(self.write(USER_TOML + 'run = [[["update-grub"], ["fc-cache", "-f"]]]\n'))
+        self.assertEqual(t.commands, [[["update-grub"], ["fc-cache", "-f"]]])
+        self.assertIn("rm is not a command apply may run", self.load_error(
+            USER_TOML + 'run = [[["fc-cache"], ["rm", "-rf", "~"]]]\n'))
+        self.assertIn("'run' must be a list of commands", self.load_error(USER_TOML + 'run = [[[]]]\n'))
+
+    def test_install_choices(self):
+        """[install] to = [...]: the first whose parent folder exists, else the first."""
+        text = USER_TOML.replace('to = "~/installed"', 'to = ["~/grub/themes", "~/grub2/themes"]')
+        self.assertEqual(declarative.load(self.write(text)).install_to, self.home / "grub/themes")
+        (self.home / "grub2").mkdir()
+        self.assertEqual(declarative.load(self.write(text)).install_to, self.home / "grub2/themes")
+        self.assertIn("is not in your home", self.load_error(
+            USER_TOML.replace('to = "~/installed"', 'to = ["~/installed", "/usr/share/themes"]')))
 
     def test_user_rights_only(self):
         self.assertIn("sudo = true is only for", self.load_error(
@@ -266,7 +281,8 @@ class Settings(Home):
         grub = discover()["grub"]
         self.assertEqual([o.dest for o in grub.all_options() if o.stage == "configure"],
                          ["timeout", "timeout_style", "gfxmode", "gfxpayload", "configure"])
-        self.assertEqual(grub.configure_run, [["grub-mkconfig", "-o", "/boot/grub/grub.cfg"]])
+        self.assertEqual(grub.configure_run, [[["update-grub"], ["grub-mkconfig", "-o", "/boot/grub/grub.cfg"],
+                                               ["grub2-mkconfig", "-o", "/boot/grub2/grub.cfg"]]])
 
 
 class UserSteps(Home):
@@ -307,18 +323,43 @@ class UserSteps(Home):
         self.assertEqual(conf.read_text(), "TIMEOUT=5\n")
 
 
+def found_only(*names):
+    """declarative.which finding these programs only (the distribution's GRUB command)."""
+    return mock.patch.object(declarative, "which", lambda n: f"/usr/bin/{n}" if n in names else None)
+
+
 class Grub(Home):
     def test_dry_run(self):
         make_grub(self.tmp / "nebula")
-        out = cli("grub", self.tmp / "nebula", "-a", "mauve", "--apply", "--dry-run", "-o", self.tmp / "out")
+        with found_only("grub-mkconfig"):
+            out = cli("grub", self.tmp / "nebula", "-a", "mauve", "--apply", "--dry-run", "-o", self.tmp / "out")
         name = "catppuccin-mocha-nebula-mauve"
         self.assertIn(f"would copy {self.tmp / 'out' / name} -> /boot/grub/themes/{name}", out)
         self.assertIn("would write /etc/default/grub", out)
         self.assertRegex(out, r"would run (/\S+/)?grub-mkconfig -o /boot/grub/grub\.cfg")
         self.assertFalse((self.tmp / "state").exists())
-        with self.assertRaises(SystemExit) as e:
+        with found_only("grub-mkconfig"), self.assertRaises(SystemExit) as e:
             cli("grub", "--restore", "--dry-run")
         self.assertIn("Nothing to restore", str(e.exception))
+
+    def test_distributions(self):
+        """The menu is written again with the command of the distribution: update-grub
+        (Debian), grub-mkconfig, grub2-mkconfig (Fedora); none: nothing is done at all."""
+        make_grub(self.tmp / "nebula")
+        apply = ("grub", self.tmp / "nebula", "-a", "mauve", "--apply", "--dry-run", "-o", self.tmp / "out")
+        for names, run in ((("update-grub", "grub-mkconfig"), r"update-grub\n"),
+                           (("grub2-mkconfig",), r"grub2-mkconfig -o /boot/grub2/grub\.cfg")):
+            with self.subTest(names=names), found_only(*names):
+                self.assertRegex(cli(*apply), r"would run (/\S+/)?" + run)
+                self.assertRegex(cli("grub", "--configure", "--timeout", "3", "--dry-run"),
+                                 r"would run (/\S+/)?" + run)
+        shutil.rmtree(self.tmp / "out")
+        for argv in (apply, ("grub", "--restore"), ("grub", "--configure", "--timeout", "3")):
+            with self.subTest(argv=argv), found_only(), self.assertRaises(SystemExit) as e:
+                cli(*argv)
+            self.assertEqual(str(e.exception), "update-grub / grub-mkconfig / grub2-mkconfig: not found: "
+                                               "nothing was changed")
+        self.assertFalse((self.tmp / "out").exists())             # not even built
 
     def test_single_result(self):
         make_grub(self.tmp / "nebula")
