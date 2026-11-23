@@ -63,6 +63,8 @@ opens a page in your browser with everything the command line does, one tab
 per target. It is served by catppuccinizer itself on `127.0.0.1`: nothing
 leaves your computer, nothing more to install.
 
+![the graphical interface](assets/gui.png)
+
 - **Source**: the wallpapers and themes installed on your system (the one in
   use marked), any file or folder (or drop images on the page), or the web:
   Wallhaven, Gnome-look, the KDE Store and adi1090x's themes are searched and
