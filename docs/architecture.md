@@ -68,7 +68,7 @@ tests/
 | `parts.accent_sets(args, using)` / `check_parts(args, known)` / `note_unused(args, using)` / `single(args, parts)` | the results to write from `-a` (`PART=ACCENT` entries: `args.part_accents`), each with its accent per part and the accent of its output name |
 | `mapping.uses_accent(colors)` / `note_accent_ignored(a, reason)` | whether a colour goes to `accent`; the note printed when `-a` was given for nothing |
 | `recolor.recolor_image(path, bg, keys, targets, base)` / `keys_plan(grp, flavor, accent)` | keys method on one image (alpha kept); the `bg, keys, targets, base` of a detected group for a flavour and an accent |
-| `recolor.run_jobs(jobs)` / `render_job(job)` | `render()` + save of many images, `(src, dst, method, grp, flavor, accent, a)` each, in worker processes when there are more than 8 |
+| `recolor.run_jobs(jobs)` / `render_job(job)` | `render()` + save of many images, `(src, dst, method, grp, flavor, accent, a)` each, in worker processes when there are more than 8 (as many as `recolor.workers()` allows: [Performances](#performances)) |
 | `recolor.plan(path, args, memo=None)` / `render(...)` / `save_image(...)` | one image, method chosen automatically (keys or LUT); `memo`: a dict the caller keeps for the file, where the analysis (per `--separation`) and the dominant hue are kept for the next call (the GUI's live preview); `render` also takes a PIL image |
 | `options.Option(...)` / `options.defaults(opts, **values)` | declare an option ([below](#options)); a namespace of defaults for scripts |
 | `recolor.method_options(methods=None, help=None, needs=None, keys_always=False)` | `--method`, `--separation`, `--auto-fit` (with `auto`), `--keep-lum`, `--smooth`, `--chroma`, `--dark-fade`, `--lutgen-*` (only the given methods; `keys_always`: `--separation` matters whatever `--method`, for a target that also recolours with keys on its own) |
@@ -663,6 +663,13 @@ other accents' outputs (Limine, KDE splash, Plymouth image groups). The LUT
 cube is cached per flavour and options (`lru_cache` on `build_lut`, 128
 cubes of 33³, and `lutgen.build`, 16: bounded, as the GUI's live preview asks
 for a new one at each step of a slider).
+
+Many images (a folder, a Plymouth theme, an animation) are rendered in worker
+processes: one per processor, but no more than 80 % of the available memory
+holds (`recolor.workers()`). A worker needs about 150 MB plus 110 bytes per
+pixel of the largest image (peak memory measured with `keys`, the largest:
+~300 MB at 1920×1080, ~1 GB at 3840×2160, ~3.6 GB at 7680×4320), so a folder
+of 4K wallpapers runs with fewer workers rather than exhausting the memory.
 
 Measured with `python3 -m cProfile -s cumtime` (one machine, 32 threads, for
 orders of magnitude):

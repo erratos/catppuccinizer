@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -128,6 +129,45 @@ class Folder(unittest.TestCase):
             folder.preview_moving(fold, "mocha", accents, self.tmp / "p.webp")
         with Image.open(self.tmp / "p.webp") as im:
             self.assertEqual(im.n_frames, 3)
+
+
+class Workers(unittest.TestCase):
+    """The worker processes fit in the memory available (a folder of large wallpapers)."""
+
+    def workers(self, memory, largest, jobs=None, cpus=32):
+        from unittest import mock
+        with mock.patch.object(recolor, "available_memory", return_value=memory), \
+                mock.patch.object(recolor.os, "sched_getaffinity", return_value=set(range(cpus))):
+            return recolor.workers(largest, jobs)
+
+    def test_memory(self):
+        gb = 1 << 30
+        self.assertEqual(self.workers(40 * gb, 1920 * 1080), 32)          # small images: every processor
+        self.assertEqual(self.workers(16 * gb, 3840 * 2160), 12)          # ~1 GB each, 80 % of 16 GB
+        self.assertEqual(self.workers(8 * gb, 7680 * 4320), 1)            # ~3.8 GB each
+        self.assertEqual(self.workers(1 * gb, 7680 * 4320), 1)            # never none
+        self.assertEqual(self.workers(None, 7680 * 4320), 32)             # unknown: the processors
+        self.assertEqual(self.workers(40 * gb, 100, jobs=3), 3)           # no more than the jobs
+
+    def test_pixels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Image.new("RGB", (30, 20)).save(Path(tmp) / "a.png")
+            (Path(tmp) / "b.svg").write_text("<svg/>")
+            self.assertEqual(recolor.pixels(Path(tmp) / "a.png"), 600)
+            self.assertEqual(recolor.pixels(Image.new("RGB", (5, 4))), 20)
+            self.assertEqual(recolor.pixels(Path(tmp) / "b.svg"), recolor.UNKNOWN_PIXELS)
+
+    def test_frames_one_worker(self):
+        """With room for one worker only, frames are recoloured here, in order."""
+        from unittest import mock
+        frames = [Image.new("RGB", (8, 8), c) for c in ("#000000", "#ff0000", "#0000ff")]
+        plan = (np.array([0, 0, 0]), np.array([[255, 0, 0], [0, 0, 255]]),
+                np.array([[243, 139, 168], [137, 180, 250]]), np.array([30, 30, 46]))
+        with mock.patch.object(recolor, "workers", return_value=1), \
+                mock.patch.object(recolor, "ProcessPoolExecutor", side_effect=AssertionError):
+            out = list(recolor.recolor_frames(iter(frames), *plan, quantize=False))
+        self.assertEqual([im.getpixel((0, 0)) for im in out], [(30, 30, 46), (243, 139, 168), (137, 180, 250)])
+        self.assertEqual(list(recolor.recolor_frames(iter([]), *plan)), [])
 
 
 if __name__ == "__main__":
